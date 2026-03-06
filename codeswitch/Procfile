@@ -1,0 +1,1 @@
+web: gunicorn codeswitch.wsgi --log-file -
