@@ -60,8 +60,15 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'codeswitch.wsgi.application'
 
-# SQLite by default; set DB_ENGINE=django.db.backends.postgresql in .env for Postgres
-if config('DB_ENGINE', default='') == 'django.db.backends.postgresql':
+# DATABASE_URL takes priority (Vercel Postgres, Neon, Supabase, etc.)
+# Otherwise fall back to individual DB_* env vars or SQLite
+_database_url = config('DATABASE_URL', default='')
+if _database_url:
+    import dj_database_url
+    DATABASES = {
+        'default': dj_database_url.parse(_database_url, conn_max_age=600)
+    }
+elif config('DB_ENGINE', default='') == 'django.db.backends.postgresql':
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
