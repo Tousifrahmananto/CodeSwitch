@@ -48,3 +48,5 @@ desktop.ini
 
 # ── Misc junk ─────────────────────────────────
 =*
+.vercel
+.env*.local
