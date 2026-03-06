@@ -1,0 +1,19 @@
+# Python virtual environment
+venv/
+env/
+.venv/
+
+# Environment files at root level
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.idea/
+.vscode/
+*.swp

@@ -1,0 +1,50 @@
+# ── Python / Django ───────────────────────────
+.env
+.env.*
+!.env.example
+
+db.sqlite3
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+*.py[cod]
+.Python
+.python-version
+
+# Django collected static & media uploads
+staticfiles/
+media/
+
+# Migrations bytecode (keep migration .py files)
+migrations/__pycache__/
+
+# Logs
+*.log
+logs/
+
+# Claude Code agent instructions
+AGENTS.md
+
+# ── Node / React ──────────────────────────────
+frontend/node_modules/
+frontend/build/
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+frontend/npm-debug.log*
+frontend/yarn-error.log
+
+# ── OS / Editor ───────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ── Misc junk ─────────────────────────────────
+=*
