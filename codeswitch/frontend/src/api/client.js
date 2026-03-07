@@ -47,6 +47,10 @@ export const getProfile = () => client.get('/profile');
 export const convertCode = (data) => client.post('/convert', data);
 export const getConversionHistory = () => client.get('/convert/history');
 
+// ── Snippets ──────────────────────────────────
+export const createSnippet = (data) => client.post('/snippets/', data);
+export const getSnippet = (slug) => client.get(`/snippets/${slug}/`);
+
 // ── Files ─────────────────────────────────────
 export const getFiles = () => client.get('/files');
 export const createFile = (data) => client.post('/files', data);
@@ -59,6 +63,11 @@ export const getModules = () => client.get('/modules');
 export const getModule = (id) => client.get(`/modules/${id}`);
 export const updateProgress = (lessonId) => client.post('/progress/update', { lesson_id: lessonId });
 export const getProgress = () => client.get('/progress');
+export const getLessonQuiz = (lessonId) => client.get(`/lessons/${lessonId}/quiz/`);
+export const submitQuiz = (quizId, answers) => client.post(`/quizzes/${quizId}/submit/`, { answers });
+
+// ── Public Profile ─────────────────────────────
+export const getPublicProfile = (username) => client.get(`/profile/${username}/`);
 
 // ── Admin ──────────────────────────────────────
 export const adminGetStats = () => client.get('/admin/stats');

@@ -5,6 +5,7 @@ const LANG_MAP = {
   c: 'c',
   java: 'java',
   javascript: 'javascript',
+  cpp: 'cpp',
   other: 'plaintext',
 };
 

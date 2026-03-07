@@ -1,10 +1,10 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import serializers
 from .services import convert_code
-from .models import ConversionHistory
+from .models import ConversionHistory, SharedSnippet
 
 
 class ConvertCodeView(APIView):
@@ -14,7 +14,7 @@ class ConvertCodeView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
-    VALID_LANGUAGES = {'python', 'c', 'java'}
+    VALID_LANGUAGES = {'python', 'c', 'java', 'javascript', 'cpp'}
 
     def post(self, request):
         source = request.data.get('source_language', '').lower()
@@ -70,3 +70,38 @@ class ConversionHistoryView(APIView):
             for h in history
         ]
         return Response(data)
+
+
+class CreateSnippetView(APIView):
+    """POST /api/snippets/ — Save a conversion as a shareable snippet."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        data = request.data
+        snippet = SharedSnippet.objects.create(
+            source_language=data.get('source_language', ''),
+            target_language=data.get('target_language', ''),
+            input_code=data.get('input_code', ''),
+            output_code=data.get('output_code', ''),
+            engine=data.get('engine', 'ai'),
+        )
+        return Response({'slug': str(snippet.slug)}, status=status.HTTP_201_CREATED)
+
+
+class GetSnippetView(APIView):
+    """GET /api/snippets/<slug>/ — Retrieve a shared snippet (no auth required)."""
+    permission_classes = [AllowAny]
+
+    def get(self, request, slug):
+        try:
+            snippet = SharedSnippet.objects.get(slug=slug)
+        except SharedSnippet.DoesNotExist:
+            return Response({'error': 'Snippet not found.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({
+            'source_language': snippet.source_language,
+            'target_language': snippet.target_language,
+            'input_code': snippet.input_code,
+            'output_code': snippet.output_code,
+            'engine': snippet.engine,
+            'created_at': snippet.created_at,
+        })

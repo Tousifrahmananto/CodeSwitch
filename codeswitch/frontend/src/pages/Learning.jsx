@@ -1,10 +1,12 @@
 // src/pages/Learning.jsx
 import { useEffect, useState } from 'react';
-import { getModules, getModule, updateProgress, getProgress, convertCode } from '../api/client';
+import { getModules, getModule, updateProgress, getProgress, convertCode, getLessonQuiz, submitQuiz } from '../api/client';
 import CodeEditor from '../components/CodeEditor';
 import LanguageSelector from '../components/LanguageSelector';
 
 const LANG_COLORS = { c: '#555555', python: '#3572A5', java: '#b07219' };
+
+const PISTON_LANG = { python: 'python', c: 'c', java: 'java', javascript: 'javascript', cpp: 'c++' };
 
 const formatCompletionDate = (iso) =>
   iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
@@ -114,11 +116,17 @@ function TryItSandbox({ exampleCode }) {
   const [sandboxLoading, setSandboxLoading] = useState(false);
   const [sandboxError, setSandboxError] = useState('');
 
+  // Run state
+  const [runOutput, setRunOutput] = useState(null);
+  const [runLoading, setRunLoading] = useState(false);
+  const [runError, setRunError] = useState('');
+
   const handleSourceChange = (lang) => {
     setSandboxSource(lang);
     setSandboxCode(exampleCode[lang] || '');
     setSandboxOutput('');
     setSandboxError('');
+    setRunOutput(null);
   };
 
   const handleConvert = async () => {
@@ -143,17 +151,51 @@ function TryItSandbox({ exampleCode }) {
     }
   };
 
+  const handleRun = async () => {
+    if (!sandboxCode.trim()) return;
+    const lang = PISTON_LANG[sandboxSource];
+    if (!lang) return;
+    setRunLoading(true);
+    setRunOutput(null);
+    setRunError('');
+    try {
+      const resp = await fetch('https://emkc.org/api/v2/piston/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ language: lang, version: '*', files: [{ content: sandboxCode }] }),
+      });
+      const result = await resp.json();
+      const run = result.run || {};
+      setRunOutput({ stdout: run.stdout || '', stderr: run.stderr || '', code: run.code });
+    } catch {
+      setRunError('Could not reach execution server.');
+    } finally {
+      setRunLoading(false);
+    }
+  };
+
   const handleReset = () => {
     setSandboxCode(exampleCode[sandboxSource] || '');
     setSandboxOutput('');
     setSandboxError('');
+    setRunOutput(null);
   };
 
   return (
     <div className="try-it-sandbox">
       <div className="sandbox-header">
         <span className="sandbox-title">Try It</span>
-        <button className="btn-reset" onClick={handleReset}>Reset</button>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button
+            className="btn-run"
+            onClick={handleRun}
+            disabled={runLoading || !sandboxCode.trim() || !PISTON_LANG[sandboxSource]}
+            title="Run code"
+          >
+            {runLoading ? '⏳' : '▶ Run'}
+          </button>
+          <button className="btn-reset" onClick={handleReset}>Reset</button>
+        </div>
       </div>
       <div className="sandbox-controls">
         <LanguageSelector
@@ -183,6 +225,23 @@ function TryItSandbox({ exampleCode }) {
         language={sandboxSource}
         height="200px"
       />
+      {/* Run output */}
+      {(runOutput !== null || runError) && (
+        <div className="run-output run-output-sm">
+          <div className="run-output-header">
+            <span>Output</span>
+            <button className="run-output-close" onClick={() => { setRunOutput(null); setRunError(''); }}>×</button>
+          </div>
+          {runError && <pre className="run-stderr">{runError}</pre>}
+          {runOutput && (
+            <>
+              {runOutput.stdout && <pre className="run-stdout">{runOutput.stdout}</pre>}
+              {runOutput.stderr && <pre className="run-stderr">{runOutput.stderr}</pre>}
+              {!runOutput.stdout && !runOutput.stderr && <pre className="run-stdout run-empty">(no output)</pre>}
+            </>
+          )}
+        </div>
+      )}
       {sandboxOutput && (
         <div className="sandbox-output-section">
           <div className="sandbox-output-label">{sandboxTarget.toUpperCase()} Output</div>
@@ -198,10 +257,132 @@ function TryItSandbox({ exampleCode }) {
   );
 }
 
+function QuizPanel({ lessonId, onPass }) {
+  const [quiz, setQuiz] = useState(null);
+  const [answers, setAnswers] = useState({});
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [noQuiz, setNoQuiz] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    setQuiz(null);
+    setAnswers({});
+    setResult(null);
+    setError('');
+    setNoQuiz(false);
+    setLoading(true);
+    getLessonQuiz(lessonId)
+      .then(r => setQuiz(r.data))
+      .catch(() => setNoQuiz(true))
+      .finally(() => setLoading(false));
+  }, [lessonId]);
+
+  const handleSubmit = async () => {
+    if (!quiz) return;
+    setSubmitting(true);
+    try {
+      const { data } = await submitQuiz(quiz.id, answers);
+      setResult(data);
+      if (data.passed && onPass) onPass();
+    } catch {
+      setError('Failed to submit quiz. Try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return <p style={{ color: 'var(--text-muted)', padding: '20px 0' }}>Loading quiz...</p>;
+  }
+
+  if (noQuiz || !quiz) {
+    return (
+      <div className="quiz-empty">
+        <span>No quiz available for this lesson.</span>
+      </div>
+    );
+  }
+
+  const allAnswered = quiz.questions.every(q => answers[q.id]);
+
+  return (
+    <div className="quiz-panel">
+      <div className="quiz-header">
+        <span className="quiz-title">Quiz: {quiz.title}</span>
+        {quiz.attempt && !result && (
+          <span className={`quiz-badge ${quiz.attempt.passed ? 'quiz-passed' : 'quiz-failed'}`}>
+            Previous: {quiz.attempt.score}% {quiz.attempt.passed ? '✓' : '✗'}
+          </span>
+        )}
+      </div>
+
+      {quiz.questions.map(q => {
+        const correctId = result?.correct_options?.[String(q.id)];
+        const userAnswer = answers[q.id];
+        return (
+          <div key={q.id} className="quiz-question">
+            <p className="quiz-q-text">{q.order}. {q.question_text}</p>
+            <div className="quiz-options">
+              {q.options.map(opt => {
+                let cls = 'quiz-option';
+                if (result) {
+                  if (opt.id === correctId) cls += ' quiz-correct';
+                  else if (opt.id === userAnswer && opt.id !== correctId) cls += ' quiz-wrong';
+                } else if (opt.id === userAnswer) {
+                  cls += ' quiz-selected';
+                }
+                return (
+                  <label key={opt.id} className={cls}>
+                    <input
+                      type="radio"
+                      name={`q-${q.id}`}
+                      value={opt.id}
+                      checked={userAnswer === opt.id}
+                      onChange={() => !result && setAnswers(prev => ({ ...prev, [q.id]: opt.id }))}
+                      disabled={!!result}
+                    />
+                    {opt.option_text}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+
+      {!result ? (
+        <button
+          className="quiz-submit"
+          onClick={handleSubmit}
+          disabled={!allAnswered || submitting}
+        >
+          {submitting ? 'Grading...' : 'Submit Quiz'}
+        </button>
+      ) : (
+        <div className="quiz-result">
+          <span className={`quiz-score ${result.passed ? 'quiz-passed' : 'quiz-failed'}`}>
+            {result.score}% — {result.passed ? 'Passed! ✓' : 'Not passed'}
+          </span>
+          {!result.passed && (
+            <button className="quiz-retry" onClick={() => { setAnswers({}); setResult(null); }}>
+              Try Again
+            </button>
+          )}
+        </div>
+      )}
+
+      {error && <p className="quiz-error">{error}</p>}
+    </div>
+  );
+}
+
 export default function Learning() {
   const [modules, setModules] = useState([]);
   const [activeModule, setActiveModule] = useState(null);
   const [activeLesson, setActiveLesson] = useState(null);
+  const [activeView, setActiveView] = useState('lesson'); // 'lesson' | 'quiz'
   // Feature 5: Map<lessonId, completionDateISO> instead of Set
   const [completedLessons, setCompletedLessons] = useState(new Map());
   // Feature 2: { [module_title]: completed_count }
@@ -226,6 +407,7 @@ export default function Learning() {
     const { data } = await getModule(id);
     setActiveModule(data);
     setActiveLesson(data.lessons[0] || null);
+    setActiveView('lesson');
   };
 
   const goToNext = () => {
@@ -233,6 +415,7 @@ export default function Learning() {
     const idx = activeModule.lessons.findIndex(l => l.id === activeLesson?.id);
     if (idx < activeModule.lessons.length - 1) {
       setActiveLesson(activeModule.lessons[idx + 1]);
+      setActiveView('lesson');
     }
   };
 
@@ -288,7 +471,7 @@ export default function Learning() {
                 <div
                   key={l.id}
                   className={`lesson-nav-item${isActive ? ' active' : ''}${isDone ? ' done' : ''}`}
-                  onClick={() => setActiveLesson(l)}
+                  onClick={() => { setActiveLesson(l); setActiveView('lesson'); }}
                 >
                   <span className="lesson-num">{isDone ? '✓' : idx + 1}</span>
                   {/* Feature 5: show completion date */}
@@ -307,30 +490,61 @@ export default function Learning() {
           <div className="lesson-content">
             {activeLesson ? (
               <>
-                <h3>{activeLesson.title}</h3>
-                <ContentRenderer text={activeLesson.content} />
-                {/* Feature 1 + 3: code tabs with copy button, then sandbox */}
-                {parsedCode && (
-                  <CodeTabs key={`tabs-${activeLesson.id}`} code={activeLesson.example_code} />
-                )}
-                {parsedCode && Object.keys(parsedCode).length >= 2 && (
-                  <TryItSandbox key={`sandbox-${activeLesson.id}`} exampleCode={parsedCode} />
-                )}
-                <div className="lesson-actions">
-                  {!isCompleted && (
-                    <button className="btn-complete" onClick={() => markComplete(activeLesson.id)}>
-                      ✓ Mark as Complete
-                    </button>
-                  )}
-                  {!isLast && isCompleted && (
-                    <button className="btn-next" onClick={goToNext}>
-                      Next Lesson →
-                    </button>
-                  )}
-                  {isCompleted && isLast && (
-                    <p className="all-done">Module complete! Head to the Converter to practice.</p>
-                  )}
+                {/* Tab bar */}
+                <div className="lesson-tab-bar">
+                  <button
+                    className={`lesson-tab${activeView === 'lesson' ? ' active' : ''}`}
+                    onClick={() => setActiveView('lesson')}
+                  >
+                    Lesson
+                  </button>
+                  <button
+                    className={`lesson-tab${activeView === 'quiz' ? ' active' : ''}`}
+                    onClick={() => setActiveView('quiz')}
+                  >
+                    📝 Quiz
+                  </button>
                 </div>
+
+                {/* Lesson view */}
+                {activeView === 'lesson' && (
+                  <>
+                    <h3>{activeLesson.title}</h3>
+                    <ContentRenderer text={activeLesson.content} />
+                    {parsedCode && (
+                      <CodeTabs key={`tabs-${activeLesson.id}`} code={activeLesson.example_code} />
+                    )}
+                    {parsedCode && Object.keys(parsedCode).length >= 2 && (
+                      <TryItSandbox key={`sandbox-${activeLesson.id}`} exampleCode={parsedCode} />
+                    )}
+                    <div className="lesson-actions">
+                      {!isCompleted && (
+                        <button className="btn-complete" onClick={() => markComplete(activeLesson.id)}>
+                          ✓ Mark as Complete
+                        </button>
+                      )}
+                      {!isLast && isCompleted && (
+                        <button className="btn-next" onClick={goToNext}>
+                          Next Lesson →
+                        </button>
+                      )}
+                      {isCompleted && isLast && (
+                        <p className="all-done">Module complete! Head to the Converter to practice.</p>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {/* Quiz view */}
+                {activeView === 'quiz' && (
+                  <div className="quiz-page-view">
+                    <QuizPanel
+                      key={`quiz-${activeLesson.id}`}
+                      lessonId={activeLesson.id}
+                      onPass={() => !completedLessons.has(activeLesson.id) && markComplete(activeLesson.id)}
+                    />
+                  </div>
+                )}
               </>
             ) : (
               <p style={{ color: 'var(--text-muted)' }}>Select a lesson from the sidebar.</p>
