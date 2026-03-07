@@ -2529,8 +2529,13 @@ button {
   user-select: none;
 }
 
-.diff-line-add .diff-sign { color: #3fb950; }
-.diff-line-remove .diff-sign { color: #f85149; }
+.diff-line-add .diff-sign {
+  color: #3fb950;
+}
+
+.diff-line-remove .diff-sign {
+  color: #f85149;
+}
 
 .diff-text {
   margin: 0;
@@ -2540,8 +2545,13 @@ button {
   color: #e6edf3;
 }
 
-.diff-line-add .diff-text { color: #a8f0b9; }
-.diff-line-remove .diff-text { color: #ffb3ae; }
+.diff-line-add .diff-text {
+  color: #a8f0b9;
+}
+
+.diff-line-remove .diff-text {
+  color: #ffb3ae;
+}
 
 /* ── Share button & toast ────────────────────────────── */
 .btn-share {
@@ -3013,4 +3023,116 @@ button {
   padding: 48px 0;
   color: var(--text-muted);
   font-size: 14px;
+}
+
+/* ── Playground page ─────────────────────────────── */
+.playground-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.playground-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  height: 58px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+  gap: 16px;
+}
+
+.playground-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.playground-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.2px;
+}
+
+.playground-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-muted, rgba(124, 106, 247, 0.13));
+  border: 1px solid var(--accent-border, rgba(124, 106, 247, 0.3));
+  border-radius: 4px;
+  padding: 2px 7px;
+  margin-left: 4px;
+  vertical-align: middle;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  font-size: 10px;
+}
+
+.playground-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.playground-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-right: 6px;
+}
+
+.playground-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 28px 28px;
+  gap: 14px;
+  max-width: 1100px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.playground-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.playground-run-btn {
+  padding: 7px 22px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.playground-editor-wrap {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+@media (max-width: 600px) {
+  .playground-header {
+    padding: 0 16px;
+    height: auto;
+    flex-wrap: wrap;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    gap: 10px;
+  }
+
+  .playground-desc {
+    display: none;
+  }
+
+  .playground-body {
+    padding: 14px 14px 20px;
+  }
 }
