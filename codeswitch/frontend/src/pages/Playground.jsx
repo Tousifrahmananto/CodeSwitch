@@ -2,12 +2,9 @@ import { useState } from 'react';
 import CodeEditor from '../components/CodeEditor';
 import LanguageSelector from '../components/LanguageSelector';
 import Logo from '../components/Logo';
+import { runCode } from '../api/executor';
 
 const LANGUAGES = ['python', 'c', 'java', 'javascript', 'cpp'];
-
-const PISTON_LANG = {
-  python: 'python', c: 'c', java: 'java', javascript: 'javascript', cpp: 'c++',
-};
 
 const STARTER_CODE = {
   python:
@@ -42,20 +39,10 @@ export default function Playground({ onBack }) {
     setRunOutput(null);
     setRunError('');
     try {
-      const resp = await fetch('https://emkc.org/api/v2/piston/execute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          language: PISTON_LANG[lang],
-          version: '*',
-          files: [{ content: code }],
-        }),
-      });
-      const result = await resp.json();
-      const run = result.run || {};
-      setRunOutput({ stdout: run.stdout || '', stderr: run.stderr || '', code: run.code });
-    } catch {
-      setRunError('Could not reach execution server. Check your connection.');
+      const result = await runCode(lang, code);
+      setRunOutput(result);
+    } catch (err) {
+      setRunError(err.message || 'Could not reach execution server. Check your connection.');
     } finally {
       setRunLoading(false);
     }

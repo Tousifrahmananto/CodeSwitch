@@ -3,10 +3,9 @@ import { useEffect, useState } from 'react';
 import { getModules, getModule, updateProgress, getProgress, convertCode, getLessonQuiz, submitQuiz } from '../api/client';
 import CodeEditor from '../components/CodeEditor';
 import LanguageSelector from '../components/LanguageSelector';
+import { runCode, canRun } from '../api/executor';
 
 const LANG_COLORS = { c: '#555555', python: '#3572A5', java: '#b07219' };
-
-const PISTON_LANG = { python: 'python', c: 'c', java: 'java', javascript: 'javascript', cpp: 'c++' };
 
 const formatCompletionDate = (iso) =>
   iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
@@ -153,22 +152,14 @@ function TryItSandbox({ exampleCode }) {
 
   const handleRun = async () => {
     if (!sandboxCode.trim()) return;
-    const lang = PISTON_LANG[sandboxSource];
-    if (!lang) return;
     setRunLoading(true);
     setRunOutput(null);
     setRunError('');
     try {
-      const resp = await fetch('https://emkc.org/api/v2/piston/execute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ language: lang, version: '*', files: [{ content: sandboxCode }] }),
-      });
-      const result = await resp.json();
-      const run = result.run || {};
-      setRunOutput({ stdout: run.stdout || '', stderr: run.stderr || '', code: run.code });
-    } catch {
-      setRunError('Could not reach execution server.');
+      const result = await runCode(sandboxSource, sandboxCode);
+      setRunOutput(result);
+    } catch (err) {
+      setRunError(err.message || 'Could not reach execution server.');
     } finally {
       setRunLoading(false);
     }
@@ -189,7 +180,7 @@ function TryItSandbox({ exampleCode }) {
           <button
             className="btn-run"
             onClick={handleRun}
-            disabled={runLoading || !sandboxCode.trim() || !PISTON_LANG[sandboxSource]}
+            disabled={runLoading || !sandboxCode.trim() || !canRun(sandboxSource)}
             title="Run code"
           >
             {runLoading ? '⏳' : '▶ Run'}

@@ -3,6 +3,7 @@ import { convertCode, createSnippet } from '../api/client';
 import CodeEditor from '../components/CodeEditor';
 import LanguageSelector from '../components/LanguageSelector';
 import DiffView from '../components/DiffView';
+import { runCode, canRun } from '../api/executor';
 
 const LANGUAGES = ['python', 'c', 'java', 'javascript', 'cpp'];
 
@@ -13,10 +14,6 @@ const THEMES = [
   { id: 'monokai', label: 'Monokai' },
   { id: 'dracula', label: 'Dracula' },
 ];
-
-const PISTON_LANG = {
-  python: 'python', c: 'c', java: 'java', javascript: 'javascript', cpp: 'c++',
-};
 
 export default function Editor() {
   const [sourceLang, setSourceLang] = useState('python');
@@ -65,22 +62,14 @@ export default function Editor() {
 
   const handleRun = async () => {
     if (!inputCode.trim()) return;
-    const lang = PISTON_LANG[sourceLang];
-    if (!lang) return;
     setRunLoading(true);
     setRunOutput(null);
     setRunError('');
     try {
-      const resp = await fetch('https://emkc.org/api/v2/piston/execute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ language: lang, version: '*', files: [{ content: inputCode }] }),
-      });
-      const result = await resp.json();
-      const run = result.run || {};
-      setRunOutput({ stdout: run.stdout || '', stderr: run.stderr || '', code: run.code });
-    } catch {
-      setRunError('Could not reach execution server. Check your connection.');
+      const result = await runCode(sourceLang, inputCode);
+      setRunOutput(result);
+    } catch (err) {
+      setRunError(err.message || 'Could not reach execution server. Check your connection.');
     } finally {
       setRunLoading(false);
     }
@@ -150,8 +139,8 @@ export default function Editor() {
             <button
               className="btn-run"
               onClick={handleRun}
-              disabled={runLoading || !inputCode.trim() || !PISTON_LANG[sourceLang]}
-              title={!PISTON_LANG[sourceLang] ? 'Execution not supported for this language' : 'Run code'}
+              disabled={runLoading || !inputCode.trim() || !canRun(sourceLang)}
+              title={!canRun(sourceLang) ? 'Execution not supported for this language' : 'Run code'}
             >
               {runLoading ? '⏳ Running...' : '▶ Run'}
             </button>
