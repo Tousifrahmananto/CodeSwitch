@@ -8,6 +8,7 @@ import Learning from './pages/Learning';
 import AdminPanel from './pages/AdminPanel';
 import ShareView from './pages/ShareView';
 import ProfilePage from './pages/ProfilePage';
+import Playground from './pages/Playground';
 import Logo from './components/Logo';
 import { logout } from './api/client';
 
@@ -15,6 +16,7 @@ export default function App() {
   const params = new URLSearchParams(window.location.search);
   const shareSlug = params.get('share');
   const profileUsername = params.get('profile');
+  const playgroundMode = params.has('playground');
 
   const [user, setUser] = useState(() => {
     const token = localStorage.getItem('access_token');
@@ -60,6 +62,11 @@ export default function App() {
   // Public profile — render without auth check
   if (profileUsername) {
     return <ProfilePage username={profileUsername} onBack={clearUrlAndReload} />;
+  }
+
+  // Public playground — render without auth check
+  if (playgroundMode) {
+    return <Playground onBack={clearUrlAndReload} />;
   }
 
   if (!user) {

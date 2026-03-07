@@ -213,6 +213,10 @@ export default function Landing({ onGetStarted }) {
   const [featuresIn, setFeaturesIn] = useState(false);
   const [modulesIn, setModulesIn] = useState(false);
 
+  const goToPlayground = () => {
+    window.location.href = window.location.pathname + '?playground';
+  };
+
   // Intersection observers for scroll-triggered animations
   useEffect(() => {
     const opts = { threshold: 0.12 };
@@ -248,6 +252,7 @@ export default function Landing({ onGetStarted }) {
           <a href="#modules" className="land-nav-link">Modules</a>
         </div>
         <div className="land-nav-actions">
+          <button className="land-btn-ghost" onClick={goToPlayground}>Try Playground</button>
           <button className="land-btn-ghost" onClick={onGetStarted}>Sign In</button>
           <button className="land-btn-primary" onClick={onGetStarted}>Get Started</button>
         </div>
@@ -280,8 +285,11 @@ export default function Landing({ onGetStarted }) {
                 <path d="M5 12h14M12 5l7 7-7 7" />
               </svg>
             </button>
-            <button className="land-btn-outline land-btn-lg" onClick={onGetStarted}>
-              Sign In
+            <button className="land-btn-outline land-btn-lg" onClick={goToPlayground}>
+              Try Playground
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 3l14 9-14 9V3z" />
+              </svg>
             </button>
           </div>
 
