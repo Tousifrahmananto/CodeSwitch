@@ -1055,16 +1055,242 @@ def java_to_c(code: str) -> str:
 
 
 # ─────────────────────────────────────────────
+#  PYTHON → JAVASCRIPT
+# ─────────────────────────────────────────────
+
+def python_to_javascript(code: str) -> str:
+    lines = code.split('\n')
+    result = []
+    block_stack = []
+
+    for raw in lines:
+        stripped = raw.strip()
+        if not stripped:
+            result.append('')
+            continue
+
+        py_level = _py_indent_level(raw)
+
+        # Close open blocks at same or lower indent
+        m_elif = re.match(r'elif (.+):$', stripped)
+        if m_elif or stripped == 'else:':
+            while block_stack and block_stack[-1] >= py_level:
+                block_stack.pop()
+                result.append(_ind(len(block_stack)) + '}')
+            ind = _ind(len(block_stack))
+            if m_elif:
+                result.append(ind + f'}} else if ({m_elif.group(1)}) {{')
+            else:
+                result.append(ind + '} else {')
+            block_stack.append(py_level)
+            continue
+
+        while block_stack and block_stack[-1] >= py_level:
+            block_stack.pop()
+            result.append(_ind(len(block_stack)) + '}')
+
+        ind = _ind(len(block_stack))
+
+        # Comment
+        if stripped.startswith('#'):
+            result.append(ind + '// ' + stripped.lstrip('#').strip())
+            continue
+
+        # print( → console.log(
+        m = re.match(r'print\(f(["\'])(.*)\1\)', stripped)
+        if m:
+            content = m.group(2)
+            js_content = re.sub(r'\{(\w+)\}', r'${\1}', content)
+            result.append(ind + f'console.log(`{js_content}`);')
+            continue
+        m = re.match(r'print\((["\'])(.*)\1\)', stripped)
+        if m:
+            result.append(ind + f'console.log("{m.group(2)}");')
+            continue
+        m = re.match(r'print\((.+)\)', stripped)
+        if m:
+            result.append(ind + f'console.log({m.group(1).strip()});')
+            continue
+
+        # def → function
+        m = re.match(r'def (\w+)\(([^)]*)\):', stripped)
+        if m:
+            result.append(ind + f'function {m.group(1)}({m.group(2)}) {{')
+            block_stack.append(py_level)
+            continue
+
+        # return
+        m = re.match(r'return\s*(.*)', stripped)
+        if m:
+            val = m.group(1).strip()
+            result.append(ind + (f'return {val};' if val else 'return;'))
+            continue
+
+        # for i in range(...)
+        m = re.match(r'for (\w+) in range\(([^)]+)\):', stripped)
+        if m:
+            init, cond, inc = _py_range_to_c_for(m.group(1), m.group(2))
+            # Convert C init to let
+            init_js = re.sub(r'^int ', 'let ', init)
+            result.append(ind + f'for ({init_js}; {cond}; {inc}) {{')
+            block_stack.append(py_level)
+            continue
+
+        # if / elif / while
+        m = re.match(r'if (.+):$', stripped)
+        if m:
+            result.append(ind + f'if ({m.group(1)}) {{')
+            block_stack.append(py_level)
+            continue
+        m = re.match(r'while (.+):$', stripped)
+        if m:
+            result.append(ind + f'while ({m.group(1)}) {{')
+            block_stack.append(py_level)
+            continue
+
+        # Variable assignments  x = val  →  let x = val;
+        m = re.match(r'([a-zA-Z_]\w*)\s*=\s*(.+)$', stripped)
+        if m and not re.match(r'.*[=><!]=$', stripped):
+            result.append(ind + f'let {m.group(1)} = {m.group(2)};')
+            continue
+
+        # Generic: add semicolon
+        result.append(ind + stripped + ('' if stripped.endswith(';') else ';'))
+
+    # Close remaining blocks
+    while block_stack:
+        block_stack.pop()
+        result.append(_ind(len(block_stack)) + '}')
+
+    return '\n'.join(result)
+
+
+# ─────────────────────────────────────────────
+#  JAVASCRIPT → PYTHON
+# ─────────────────────────────────────────────
+
+def javascript_to_python(code: str) -> str:
+    lines = code.split('\n')
+    result = []
+    depth = 0
+
+    for raw in lines:
+        stripped = raw.strip()
+        if not stripped:
+            continue
+
+        # Closing brace
+        if stripped.startswith('}'):
+            depth = max(0, depth - 1)
+            m = re.match(r'\}\s*else\s+if\s*\((.+)\)\s*\{?', stripped)
+            if m:
+                result.append(_ind(depth) + f'elif {m.group(1)}:')
+                depth += 1
+                continue
+            if re.match(r'\}\s*else\s*\{?', stripped):
+                result.append(_ind(depth) + 'else:')
+                depth += 1
+                continue
+            continue
+
+        if stripped == '{':
+            depth += 1
+            continue
+
+        ind = _ind(depth)
+
+        # Comment
+        if stripped.startswith('//'):
+            result.append(ind + '# ' + stripped[2:].strip())
+            continue
+
+        # console.log with template literal
+        m = re.match(r'console\.log\(`(.*)`\);?$', stripped)
+        if m:
+            content = m.group(1)
+            py_content = re.sub(r'\$\{(\w+)\}', r'{\1}', content)
+            result.append(ind + f'print(f"{py_content}")')
+            continue
+
+        # console.log("string")
+        m = re.match(r'console\.log\("(.*)"\);?$', stripped)
+        if m:
+            result.append(ind + f'print("{m.group(1)}")')
+            continue
+
+        # console.log(expr)
+        m = re.match(r'console\.log\((.+)\);?$', stripped)
+        if m:
+            result.append(ind + f'print({m.group(1).strip()})')
+            continue
+
+        # function declaration
+        m = re.match(r'(?:function\s+|const\s+(\w+)\s*=\s*(?:function\s*)?\()(\w+)\s*\(([^)]*)\)\s*\{?$', stripped)
+        if not m:
+            m2 = re.match(r'function\s+(\w+)\s*\(([^)]*)\)\s*\{?$', stripped)
+            if m2:
+                result.append(ind + f'def {m2.group(1)}({m2.group(2)}):')
+                if stripped.rstrip().endswith('{'):
+                    depth += 1
+                continue
+
+        # return
+        m = re.match(r'return\s*(.*?);?$', stripped)
+        if m and stripped.startswith('return'):
+            val = m.group(1).strip().rstrip(';')
+            result.append(ind + (f'return {val}' if val else 'return'))
+            continue
+
+        # for (let i = ...)
+        if stripped.startswith('for'):
+            py_for = _c_for_to_python(stripped)
+            if py_for:
+                result.append(ind + py_for)
+                if stripped.rstrip().endswith('{'):
+                    depth += 1
+                continue
+
+        # if
+        m = re.match(r'if\s*\((.+)\)\s*\{?$', stripped)
+        if m:
+            result.append(ind + f'if {m.group(1)}:')
+            if stripped.rstrip().endswith('{'):
+                depth += 1
+            continue
+
+        # while
+        m = re.match(r'while\s*\((.+)\)\s*\{?$', stripped)
+        if m:
+            result.append(ind + f'while {m.group(1)}:')
+            if stripped.rstrip().endswith('{'):
+                depth += 1
+            continue
+
+        # let/const/var declaration
+        m = re.match(r'(?:let|const|var)\s+(\w+)\s*=\s*(.+?);?$', stripped)
+        if m:
+            result.append(ind + f'{m.group(1)} = {m.group(2).rstrip(";")}')
+            continue
+
+        # Generic: strip trailing semicolons
+        result.append(ind + stripped.rstrip(';'))
+
+    return '\n'.join(result)
+
+
+# ─────────────────────────────────────────────
 #  DISPATCH TABLE & ENTRY POINT
 # ─────────────────────────────────────────────
 
 CONVERTERS = {
-    ('python', 'c'):    python_to_c,
-    ('python', 'java'): python_to_java,
-    ('c', 'python'):    c_to_python,
-    ('java', 'python'): java_to_python,
-    ('c', 'java'):      c_to_java,
-    ('java', 'c'):      java_to_c,
+    ('python', 'c'):          python_to_c,
+    ('python', 'java'):       python_to_java,
+    ('python', 'javascript'): python_to_javascript,
+    ('c', 'python'):          c_to_python,
+    ('java', 'python'):       java_to_python,
+    ('javascript', 'python'): javascript_to_python,
+    ('c', 'java'):            c_to_java,
+    ('java', 'c'):            java_to_c,
 }
 
 

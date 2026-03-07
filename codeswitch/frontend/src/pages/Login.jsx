@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { login, register } from '../api/client';
+import Logo from '../components/Logo';
 
 // Password requirement definitions
 const PWD_REQS = [
@@ -45,7 +46,7 @@ function PasswordStrength({ password }) {
   );
 }
 
-export default function Login({ onLogin }) {
+export default function Login({ onLogin, onBack }) {
   const [mode, setMode] = useState('login');
   const [form, setForm] = useState({ username: '', email: '', password: '', password2: '' });
   const [error, setError] = useState('');
@@ -98,9 +99,19 @@ export default function Login({ onLogin }) {
     <div className="auth-page">
       <div className="auth-box">
 
+        {/* Back to landing */}
+        {onBack && (
+          <button className="auth-back" onClick={onBack}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M19 12H5M12 5l-7 7 7 7" />
+            </svg>
+            Back to home
+          </button>
+        )}
+
         {/* Brand */}
         <div className="auth-brand">
-          <div className="auth-logo"><span>CS</span></div>
+          <div className="auth-logo"><Logo size={40} id="auth" /></div>
           <h1 className="auth-app-name">CodeSwitch</h1>
           <p className="auth-tagline">Translate code across languages instantly</p>
         </div>

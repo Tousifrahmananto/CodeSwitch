@@ -62,3 +62,45 @@ class ProfileView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return self.request.user
+
+
+class PublicProfileView(APIView):
+    """GET /api/profile/<username>/ — Public stats for any user (no auth required)."""
+    permission_classes = [AllowAny]
+
+    def get(self, request, username):
+        try:
+            user = User.objects.get(username=username)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        from converter.models import ConversionHistory
+        from learning.models import UserProgress, LearningModule
+
+        conversion_count = ConversionHistory.objects.filter(user=user).count()
+        completed_progress = UserProgress.objects.filter(user=user, completed=True)
+        lessons_completed = completed_progress.count()
+        languages_used = list(
+            ConversionHistory.objects.filter(user=user)
+            .values_list('source_language', flat=True)
+            .distinct()
+        )
+
+        # Count modules where all lessons are completed by this user
+        modules_completed = 0
+        for module in LearningModule.objects.all():
+            total = module.lessons.count()
+            if total == 0:
+                continue
+            done = completed_progress.filter(module=module).count()
+            if done >= total:
+                modules_completed += 1
+
+        return Response({
+            'username': user.username,
+            'date_joined': user.date_joined,
+            'conversion_count': conversion_count,
+            'lessons_completed': lessons_completed,
+            'modules_completed': modules_completed,
+            'languages_used': languages_used,
+        })

@@ -15,6 +15,10 @@ const LANG_COLORS = {
   other: '#8b8b8b',
 };
 
+const FILE_EXT = {
+  python: '.py', c: '.c', java: '.java', javascript: '.js', other: '.txt',
+};
+
 export default function FileManager() {
   const [files, setFiles] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -68,6 +72,19 @@ export default function FileManager() {
 
   const handleNew = () => { setSelected(null); setForm(EMPTY_FORM); };
 
+  const handleDownload = () => {
+    if (!form.code_content) return;
+    const ext = FILE_EXT[form.language] || '.txt';
+    const name = form.filename || `code${ext}`;
+    const blob = new Blob([form.code_content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name.includes('.') ? name : name + ext;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="file-manager">
       {error && <p className="error">{error}</p>}
@@ -101,7 +118,10 @@ export default function FileManager() {
           language={form.language}
           height="380px"
         />
-        <button className="btn-save" onClick={handleSave}>💾 Save</button>
+        <div className="file-editor-actions">
+          <button className="btn-save" onClick={handleSave}>💾 Save</button>
+          <button className="btn-download" onClick={handleDownload} disabled={!form.code_content}>⬇ Download</button>
+        </div>
       </div>
     </div>
   );

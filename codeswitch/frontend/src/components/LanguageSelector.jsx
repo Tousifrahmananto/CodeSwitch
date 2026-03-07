@@ -6,6 +6,7 @@ const LANGUAGE_LABELS = {
   c: 'C',
   java: 'Java',
   javascript: 'JavaScript',
+  cpp: 'C++',
   other: 'Other',
 };
 
