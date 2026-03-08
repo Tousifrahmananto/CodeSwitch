@@ -8,11 +8,12 @@ import client from './client';
  * Run code via the backend execution proxy.
  * @param {string} language - one of: python, c, java, javascript, cpp
  * @param {string} code     - source code to execute
+ * @param {string} stdin    - optional stdin to feed to the program
  * @returns {{ stdout: string, stderr: string, code: number }}
  */
-export async function runCode(language, code) {
+export async function runCode(language, code, stdin = '') {
   try {
-    const { data } = await client.post('/run/', { language, code });
+    const { data } = await client.post('/run/', { language, code, stdin });
     return {
       stdout: data.stdout || '',
       stderr: data.stderr || '',

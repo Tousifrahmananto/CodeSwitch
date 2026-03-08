@@ -43,7 +43,7 @@ const FEATURES = [
         <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
       </svg>
     ),
-    title: '9 Learning Modules',
+    title: '13 Learning Modules',
     desc: 'Structured curriculum from Python basics to graph algorithms. Interactive examples, live sandbox, and per-lesson progress tracking.',
     accent: '#3b82f6',
   },
@@ -63,13 +63,17 @@ const FEATURES = [
 const MODULES = [
   { n: '01', name: 'Python Basics', tag: 'Beginner' },
   { n: '02', name: 'Strings & I/O', tag: 'Beginner' },
-  { n: '03', name: 'Data Structures', tag: 'Beginner' },
+  { n: '03', name: 'Data Structures', tag: 'Intermediate' },
   { n: '04', name: 'OOP Concepts', tag: 'Intermediate' },
-  { n: '05', name: 'Error Handling', tag: 'Intermediate' },
-  { n: '06', name: 'Algorithms', tag: 'Intermediate' },
-  { n: '07', name: 'Advanced Sorting', tag: 'Advanced' },
+  { n: '05', name: 'Error Handling', tag: 'Advanced' },
+  { n: '06', name: 'Algorithms', tag: 'Advanced' },
+  { n: '07', name: 'Advanced Sorting', tag: 'Intermediate' },
   { n: '08', name: 'Dynamic Programming', tag: 'Advanced' },
   { n: '09', name: 'Graph Algorithms', tag: 'Advanced' },
+  { n: '10', name: 'Pointers & Memory', tag: 'Intermediate' },
+  { n: '11', name: 'Linked Lists', tag: 'Intermediate' },
+  { n: '12', name: 'Stacks & Queues', tag: 'Intermediate' },
+  { n: '13', name: 'Hash Tables & Dicts', tag: 'Intermediate' },
 ];
 
 const TAG_COLORS = {
@@ -274,7 +278,7 @@ export default function Landing({ onGetStarted }) {
 
           <p className="land-hero-sub">
             CodeSwitch converts Python, Java, and C with AI accuracy.
-            Learn programming with 9 structured modules, manage your
+            Learn programming with 13 structured modules, manage your
             files in the cloud, and track your progress — all in one place.
           </p>
 
@@ -308,8 +312,8 @@ export default function Landing({ onGetStarted }) {
       {/* ── Stats strip ── */}
       <div className="land-stats land-fade-up land-delay-2">
         {[
-          { value: '3', label: 'Languages Supported' },
-          { value: '9', label: 'Learning Modules' },
+          { value: '5', label: 'Languages Supported' },
+          { value: '13', label: 'Learning Modules' },
           { value: '100+', label: 'Code Patterns' },
           { value: 'AI', label: 'Powered Engine' },
         ].map(s => (
@@ -355,7 +359,7 @@ export default function Landing({ onGetStarted }) {
         ref={modulesRef}
       >
         <div className="land-section-hdr">
-          <h2 className="land-section-h2">9 modules — from basics to algorithms</h2>
+          <h2 className="land-section-h2">13 modules — from basics to algorithms</h2>
           <p className="land-section-p">Structured learning with interactive examples and progress tracking.</p>
         </div>
 

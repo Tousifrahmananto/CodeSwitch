@@ -183,3 +183,95 @@ class AdminModuleDetailView(APIView):
             return Response({'error': 'Module not found.'}, status=status.HTTP_404_NOT_FOUND)
         module.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# ── Learning Lessons ───────────────────────────────────────────────────────────
+
+class AdminModuleLessonsView(APIView):
+    """GET /api/admin/modules/:pk/lessons — list lessons. POST — create."""
+    permission_classes = [IsAuthenticated, IsStaffUser]
+
+    def _get_module(self, pk):
+        try:
+            return LearningModule.objects.get(pk=pk)
+        except LearningModule.DoesNotExist:
+            return None
+
+    def get(self, request, pk):
+        module = self._get_module(pk)
+        if not module:
+            return Response({'error': 'Module not found.'}, status=status.HTTP_404_NOT_FOUND)
+        lessons = module.lessons.order_by('order').select_related()
+        result = []
+        for lesson in lessons:
+            try:
+                has_quiz = lesson.quiz is not None
+            except Exception:
+                has_quiz = False
+            result.append({
+                'id':       lesson.id,
+                'title':    lesson.title,
+                'order':    lesson.order,
+                'has_quiz': has_quiz,
+            })
+        return Response(result)
+
+    def post(self, request, pk):
+        module = self._get_module(pk)
+        if not module:
+            return Response({'error': 'Module not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        title = request.data.get('title', '').strip()
+        if not title:
+            return Response({'error': 'Title is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        lesson = Lesson.objects.create(
+            module=module,
+            title=title,
+            content=request.data.get('content', ''),
+            example_code=request.data.get('example_code', '{}'),
+            order=request.data.get('order', module.lessons.count() + 1),
+        )
+        return Response({'id': lesson.id, 'title': lesson.title}, status=status.HTTP_201_CREATED)
+
+
+class AdminLessonDetailView(APIView):
+    """GET /api/admin/lessons/:pk — get lesson. PUT — update. DELETE — remove."""
+    permission_classes = [IsAuthenticated, IsStaffUser]
+
+    def _get_lesson(self, pk):
+        try:
+            return Lesson.objects.get(pk=pk)
+        except Lesson.DoesNotExist:
+            return None
+
+    def get(self, request, pk):
+        lesson = self._get_lesson(pk)
+        if not lesson:
+            return Response({'error': 'Lesson not found.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({
+            'id':           lesson.id,
+            'title':        lesson.title,
+            'content':      lesson.content,
+            'example_code': lesson.example_code,
+            'order':        lesson.order,
+        })
+
+    def put(self, request, pk):
+        lesson = self._get_lesson(pk)
+        if not lesson:
+            return Response({'error': 'Lesson not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        lesson.title        = request.data.get('title', lesson.title)
+        lesson.content      = request.data.get('content', lesson.content)
+        lesson.example_code = request.data.get('example_code', lesson.example_code)
+        lesson.order        = request.data.get('order', lesson.order)
+        lesson.save()
+        return Response({'id': lesson.id, 'title': lesson.title})
+
+    def delete(self, request, pk):
+        lesson = self._get_lesson(pk)
+        if not lesson:
+            return Response({'error': 'Lesson not found.'}, status=status.HTTP_404_NOT_FOUND)
+        lesson.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

@@ -6,6 +6,8 @@ import {
   adminGetStats, adminGetUsers, adminUpdateUser, adminDeleteUser,
   adminGetConversions, adminGetModules, adminCreateModule,
   adminUpdateModule, adminDeleteModule,
+  adminGetModuleLessons, adminGetLesson, adminCreateLesson,
+  adminUpdateLesson, adminDeleteLesson,
 } from '../api/client';
 
 const TABS = ['Overview', 'Users', 'Conversions', 'Modules'];
@@ -54,10 +56,10 @@ function OverviewTab({ stats }) {
     <div>
       <h2 style={styles.sectionTitle}>Platform Overview</h2>
       <div style={styles.statsGrid}>
-        <StatCard label="Total Users"       value={stats.total_users}           sub={`+${stats.new_users_this_week} this week`} />
-        <StatCard label="Total Conversions" value={stats.total_conversions}     sub={`+${stats.conversions_this_week} this week`} />
-        <StatCard label="Saved Files"       value={stats.total_files} />
-        <StatCard label="Learning Modules"  value={stats.total_modules} />
+        <StatCard label="Total Users" value={stats.total_users} sub={`+${stats.new_users_this_week} this week`} />
+        <StatCard label="Total Conversions" value={stats.total_conversions} sub={`+${stats.conversions_this_week} this week`} />
+        <StatCard label="Saved Files" value={stats.total_files} />
+        <StatCard label="Learning Modules" value={stats.total_modules} />
       </div>
     </div>
   );
@@ -144,12 +146,154 @@ function ConversionsTab({ conversions }) {
   );
 }
 
+function LessonsPanel({ moduleId, onDone }) {
+  const emptyLesson = { title: '', content: '', example_code: '{}', order: '' };
+  const [lessons, setLessons] = useState(null);
+  const [editingId, setEditingId] = useState(null); // null = new, number = existing
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState(emptyLesson);
+  const [formErr, setFormErr] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const loadLessons = useCallback(async () => {
+    try {
+      const { data } = await adminGetModuleLessons(moduleId);
+      setLessons(data);
+    } catch {
+      setLessons([]);
+    }
+  }, [moduleId]);
+
+  useEffect(() => { loadLessons(); }, [loadLessons]);
+
+  const startNew = () => {
+    setEditingId(null);
+    setForm({ ...emptyLesson, order: (lessons?.length ?? 0) + 1 });
+    setFormErr('');
+    setShowForm(true);
+  };
+
+  const startEdit = async (lessonId) => {
+    try {
+      const { data } = await adminGetLesson(lessonId);
+      setEditingId(lessonId);
+      setForm({ title: data.title, content: data.content, example_code: data.example_code, order: data.order });
+      setFormErr('');
+      setShowForm(true);
+    } catch {
+      alert('Could not load lesson.');
+    }
+  };
+
+  const cancelForm = () => { setShowForm(false); setEditingId(null); setForm(emptyLesson); setFormErr(''); };
+
+  const handleSave = async () => {
+    if (!form.title.trim()) { setFormErr('Title is required.'); return; }
+    setSaving(true); setFormErr('');
+    try {
+      if (editingId) {
+        await adminUpdateLesson(editingId, form);
+      } else {
+        await adminCreateLesson(moduleId, form);
+      }
+      cancelForm();
+      loadLessons();
+      onDone();
+    } catch (e) {
+      setFormErr(e.response?.data?.error || 'Save failed.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id, title) => {
+    if (!window.confirm(`Delete lesson "${title}"?`)) return;
+    try {
+      await adminDeleteLesson(id);
+      loadLessons();
+      onDone();
+    } catch {
+      alert('Delete failed.');
+    }
+  };
+
+  return (
+    <div style={styles.lessonsPanel}>
+      <div style={styles.lessonsPanelHeader}>
+        <span style={{ fontWeight: 600, fontSize: 13 }}>Lessons ({lessons?.length ?? '…'})</span>
+        <button style={{ ...styles.btn, ...styles.btnSmall }} onClick={startNew}>+ Add Lesson</button>
+      </div>
+
+      {/* Lesson form */}
+      {showForm && (
+        <div style={styles.lessonForm}>
+          <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 600 }}>
+            {editingId ? 'Edit Lesson' : 'New Lesson'}
+          </p>
+          {formErr && <p style={styles.errorText}>{formErr}</p>}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <input
+              style={styles.input}
+              placeholder="Title *"
+              value={form.title}
+              onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+            />
+            <input
+              style={styles.input}
+              placeholder="Order (number)"
+              type="number"
+              value={form.order}
+              onChange={e => setForm(f => ({ ...f, order: e.target.value }))}
+            />
+            <textarea
+              style={{ ...styles.input, height: 120, resize: 'vertical', lineHeight: 1.5 }}
+              placeholder="Content (lesson explanation text)"
+              value={form.content}
+              onChange={e => setForm(f => ({ ...f, content: e.target.value }))}
+            />
+            <textarea
+              style={{ ...styles.input, height: 80, resize: 'vertical', fontFamily: 'monospace', fontSize: 12 }}
+              placeholder='Example code JSON: {"c": "...", "python": "...", "java": "..."}'
+              value={form.example_code}
+              onChange={e => setForm(f => ({ ...f, example_code: e.target.value }))}
+            />
+          </div>
+          <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+            <button style={styles.btn} onClick={handleSave} disabled={saving}>
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+            <ActionBtn onClick={cancelForm}>Cancel</ActionBtn>
+          </div>
+        </div>
+      )}
+
+      {/* Lessons list */}
+      {lessons === null && <p style={styles.muted}>Loading…</p>}
+      {lessons?.length === 0 && !showForm && (
+        <p style={styles.muted}>No lessons yet. Click "+ Add Lesson" to create one.</p>
+      )}
+      {lessons?.map(l => (
+        <div key={l.id} style={styles.lessonRow}>
+          <span style={{ color: '#6b7280', fontSize: 12, minWidth: 24 }}>{l.order}.</span>
+          <span style={{ flex: 1, fontSize: 13 }}>{l.title}</span>
+          {l.has_quiz && <span style={{ ...styles.badge, background: '#065f46', fontSize: 11, marginRight: 6 }}>Quiz</span>}
+          <ActionBtn small onClick={() => startEdit(l.id)}>Edit</ActionBtn>
+          <ActionBtn small danger onClick={() => handleDelete(l.id, l.title)}>Delete</ActionBtn>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ModulesTab({ modules, onRefresh }) {
   const emptyForm = { title: '', description: '', language: 'general', difficulty: 'beginner' };
   const [form, setForm] = useState(emptyForm);
   const [editing, setEditing] = useState(null); // module id being edited
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [expandedModuleId, setExpandedModuleId] = useState(null);
+
+  const toggleLessons = (id) => setExpandedModuleId(prev => prev === id ? null : id);
 
   const startEdit = (mod) => {
     setEditing(mod.id);
@@ -238,17 +382,29 @@ function ModulesTab({ modules, onRefresh }) {
           </thead>
           <tbody>
             {modules.map(mod => (
-              <tr key={mod.id} style={styles.tr}>
-                <td style={styles.td}>{mod.id}</td>
-                <td style={styles.td}><strong>{mod.title}</strong><br /><span style={styles.muted}>{mod.description}</span></td>
-                <td style={styles.td}><Badge>{mod.language}</Badge></td>
-                <td style={styles.td}><Badge color={mod.difficulty === 'beginner' ? '#065f46' : mod.difficulty === 'intermediate' ? '#92400e' : '#7f1d1d'}>{mod.difficulty}</Badge></td>
-                <td style={styles.td}>{mod.lesson_count}</td>
-                <td style={{ ...styles.td, display: 'flex', gap: 6 }}>
-                  <ActionBtn small onClick={() => startEdit(mod)}>Edit</ActionBtn>
-                  <ActionBtn small danger onClick={() => handleDelete(mod.id, mod.title)}>Delete</ActionBtn>
-                </td>
-              </tr>
+              <>
+                <tr key={mod.id} style={styles.tr}>
+                  <td style={styles.td}>{mod.id}</td>
+                  <td style={styles.td}><strong>{mod.title}</strong><br /><span style={styles.muted}>{mod.description}</span></td>
+                  <td style={styles.td}><Badge>{mod.language}</Badge></td>
+                  <td style={styles.td}><Badge color={mod.difficulty === 'beginner' ? '#065f46' : mod.difficulty === 'intermediate' ? '#92400e' : '#7f1d1d'}>{mod.difficulty}</Badge></td>
+                  <td style={styles.td}>{mod.lesson_count}</td>
+                  <td style={{ ...styles.td, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <ActionBtn small onClick={() => toggleLessons(mod.id)}>
+                      {expandedModuleId === mod.id ? '▲ Lessons' : '▼ Lessons'}
+                    </ActionBtn>
+                    <ActionBtn small onClick={() => startEdit(mod)}>Edit</ActionBtn>
+                    <ActionBtn small danger onClick={() => handleDelete(mod.id, mod.title)}>Delete</ActionBtn>
+                  </td>
+                </tr>
+                {expandedModuleId === mod.id && (
+                  <tr key={`lessons-${mod.id}`} style={{ background: '#0d1117' }}>
+                    <td colSpan={6} style={{ padding: 0 }}>
+                      <LessonsPanel moduleId={mod.id} onDone={() => onRefresh()} />
+                    </td>
+                  </tr>
+                )}
+              </>
             ))}
           </tbody>
         </table>
@@ -297,9 +453,9 @@ export default function AdminPanel() {
   const handleTabChange = (t) => {
     setTab(t);
     const needsLoad =
-      (t === 'Users'       && !users)       ||
-      (t === 'Conversions' && !conversions)  ||
-      (t === 'Modules'     && !modules);
+      (t === 'Users' && !users) ||
+      (t === 'Conversions' && !conversions) ||
+      (t === 'Modules' && !modules);
     if (needsLoad) load(t);
   };
 
@@ -346,10 +502,10 @@ export default function AdminPanel() {
 
       {/* Tab content */}
       <div style={styles.tabContent}>
-        {tab === 'Overview'     && <OverviewTab   stats={stats} />}
-        {tab === 'Users'        && <UsersTab       users={users}       onUpdate={handleUserUpdate} onDelete={handleUserDelete} />}
-        {tab === 'Conversions'  && <ConversionsTab conversions={conversions} />}
-        {tab === 'Modules'      && <ModulesTab     modules={modules}   onRefresh={() => load('Modules')} />}
+        {tab === 'Overview' && <OverviewTab stats={stats} />}
+        {tab === 'Users' && <UsersTab users={users} onUpdate={handleUserUpdate} onDelete={handleUserDelete} />}
+        {tab === 'Conversions' && <ConversionsTab conversions={conversions} />}
+        {tab === 'Modules' && <ModulesTab modules={modules} onRefresh={() => load('Modules')} />}
       </div>
     </div>
   );
@@ -358,40 +514,45 @@ export default function AdminPanel() {
 // ── styles ────────────────────────────────────────────────────────────────────
 
 const styles = {
-  root:         { padding: '24px', color: '#e5e7eb', maxWidth: 1100 },
-  header:       { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
-  title:        { margin: 0, fontSize: 22, fontWeight: 700 },
+  root: { padding: '24px', color: '#e5e7eb', maxWidth: 1100 },
+  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
+  title: { margin: 0, fontSize: 22, fontWeight: 700 },
   sectionTitle: { fontSize: 16, fontWeight: 600, margin: '0 0 16px' },
 
-  statsGrid:    { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 16, marginBottom: 24 },
-  card:         { background: '#1e2433', borderRadius: 10, padding: '20px 16px', textAlign: 'center' },
-  cardValue:    { fontSize: 32, fontWeight: 700, color: '#a78bfa' },
-  cardLabel:    { fontSize: 13, color: '#9ca3af', marginTop: 4 },
-  cardSub:      { fontSize: 11, color: '#6b7280', marginTop: 6 },
+  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 16, marginBottom: 24 },
+  card: { background: '#1e2433', borderRadius: 10, padding: '20px 16px', textAlign: 'center' },
+  cardValue: { fontSize: 32, fontWeight: 700, color: '#a78bfa' },
+  cardLabel: { fontSize: 13, color: '#9ca3af', marginTop: 4 },
+  cardSub: { fontSize: 11, color: '#6b7280', marginTop: 6 },
 
-  tabBar:       { display: 'flex', gap: 4, marginBottom: 24, borderBottom: '1px solid #374151', paddingBottom: 0 },
-  tabBtn:       { background: 'none', border: 'none', color: '#9ca3af', padding: '10px 18px', cursor: 'pointer', fontSize: 14, borderBottom: '2px solid transparent', borderRadius: '4px 4px 0 0' },
+  tabBar: { display: 'flex', gap: 4, marginBottom: 24, borderBottom: '1px solid #374151', paddingBottom: 0 },
+  tabBtn: { background: 'none', border: 'none', color: '#9ca3af', padding: '10px 18px', cursor: 'pointer', fontSize: 14, borderBottom: '2px solid transparent', borderRadius: '4px 4px 0 0' },
   tabBtnActive: { color: '#a78bfa', borderBottom: '2px solid #a78bfa', fontWeight: 600 },
-  tabContent:   { minHeight: 300 },
+  tabContent: { minHeight: 300 },
 
-  tableWrap:    { overflowX: 'auto' },
-  table:        { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
-  th:           { textAlign: 'left', padding: '10px 12px', background: '#1e2433', color: '#9ca3af', fontWeight: 600, whiteSpace: 'nowrap' },
-  tr:           { borderBottom: '1px solid #1f2937' },
-  td:           { padding: '10px 12px', verticalAlign: 'middle' },
+  tableWrap: { overflowX: 'auto' },
+  table: { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
+  th: { textAlign: 'left', padding: '10px 12px', background: '#1e2433', color: '#9ca3af', fontWeight: 600, whiteSpace: 'nowrap' },
+  tr: { borderBottom: '1px solid #1f2937' },
+  td: { padding: '10px 12px', verticalAlign: 'middle' },
 
-  badge:        { display: 'inline-block', padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 600, color: '#fff' },
+  badge: { display: 'inline-block', padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 600, color: '#fff' },
 
-  btn:          { background: '#7c3aed', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 500 },
+  btn: { background: '#7c3aed', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 500 },
   btnSecondary: { background: '#374151' },
-  btnDanger:    { background: '#b91c1c' },
-  btnSmall:     { padding: '4px 10px', fontSize: 12 },
+  btnDanger: { background: '#b91c1c' },
+  btnSmall: { padding: '4px 10px', fontSize: 12 },
 
-  formBox:      { background: '#1e2433', borderRadius: 10, padding: 20, marginBottom: 24 },
-  formGrid:     { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 },
-  input:        { background: '#111827', border: '1px solid #374151', color: '#e5e7eb', borderRadius: 6, padding: '8px 12px', fontSize: 13, width: '100%', boxSizing: 'border-box' },
+  formBox: { background: '#1e2433', borderRadius: 10, padding: 20, marginBottom: 24 },
+  formGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 },
+  input: { background: '#111827', border: '1px solid #374151', color: '#e5e7eb', borderRadius: 6, padding: '8px 12px', fontSize: 13, width: '100%', boxSizing: 'border-box' },
 
-  errorBanner:  { background: '#7f1d1d', color: '#fca5a5', padding: '10px 16px', borderRadius: 8, marginBottom: 16, fontSize: 13 },
-  errorText:    { color: '#fca5a5', fontSize: 13, margin: '0 0 8px' },
-  muted:        { color: '#6b7280', fontSize: 13 },
+  errorBanner: { background: '#7f1d1d', color: '#fca5a5', padding: '10px 16px', borderRadius: 8, marginBottom: 16, fontSize: 13 },
+  errorText: { color: '#fca5a5', fontSize: 13, margin: '0 0 8px' },
+  muted: { color: '#6b7280', fontSize: 13 },
+
+  lessonsPanel: { padding: '16px 20px', borderTop: '1px solid #1f2937' },
+  lessonsPanelHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  lessonForm: { background: '#161b22', border: '1px solid #374151', borderRadius: 8, padding: 16, marginBottom: 12 },
+  lessonRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderBottom: '1px solid #1f2937' },
 };

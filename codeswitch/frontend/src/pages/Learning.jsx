@@ -2,7 +2,6 @@
 import { useEffect, useState } from 'react';
 import { getModules, getModule, updateProgress, getProgress, convertCode, getLessonQuiz, submitQuiz } from '../api/client';
 import CodeEditor from '../components/CodeEditor';
-import LanguageSelector from '../components/LanguageSelector';
 import { runCode, canRun } from '../api/executor';
 
 const LANG_COLORS = { c: '#555555', python: '#3572A5', java: '#b07219' };
@@ -172,6 +171,8 @@ function TryItSandbox({ exampleCode }) {
     setRunOutput(null);
   };
 
+  const LANG_META = { c: { label: 'C', color: '#6c757d' }, python: { label: 'Python', color: '#3572A5' }, java: { label: 'Java', color: '#b07219' } };
+
   return (
     <div className="try-it-sandbox">
       <div className="sandbox-header">
@@ -188,27 +189,77 @@ function TryItSandbox({ exampleCode }) {
           <button className="btn-reset" onClick={handleReset}>Reset</button>
         </div>
       </div>
-      <div className="sandbox-controls">
-        <LanguageSelector
-          label="From:"
-          value={sandboxSource}
-          onChange={handleSourceChange}
-          languages={languages}
-        />
-        <button
-          className="btn-convert"
-          onClick={handleConvert}
-          disabled={sandboxLoading}
-        >
-          {sandboxLoading ? 'Converting...' : '⇒ Convert'}
-        </button>
-        <LanguageSelector
-          label="To:"
-          value={sandboxTarget}
-          onChange={setSandboxTarget}
-          languages={languages}
-        />
+
+      {/* ── Convert bar ── */}
+      <div className="sandbox-convert-bar">
+        {/* From group */}
+        <div className="sandbox-lang-group">
+          <span className="sandbox-lang-label">From</span>
+          <div className="sandbox-lang-pills">
+            {languages.map(lang => {
+              const meta = LANG_META[lang] || { label: lang, color: '#555' };
+              return (
+                <button
+                  key={lang}
+                  className={`sandbox-lang-pill${sandboxSource === lang ? ' active' : ''}`}
+                  style={sandboxSource === lang ? { '--pill-color': meta.color } : {}}
+                  onClick={() => handleSourceChange(lang)}
+                  title={meta.label}
+                >
+                  <span
+                    className="sandbox-lang-dot"
+                    style={{ background: meta.color }}
+                  />
+                  {meta.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Arrow + Convert button */}
+        <div className="sandbox-convert-center">
+          <div className="sandbox-convert-arrow">
+            <svg width="36" height="12" viewBox="0 0 36 12" fill="none">
+              <path d="M0 6h28M22 1l7 5-7 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+          <button
+            className="btn-convert"
+            onClick={handleConvert}
+            disabled={sandboxLoading || sandboxSource === sandboxTarget}
+            title={sandboxSource === sandboxTarget ? 'Source and target must differ' : 'Convert code'}
+          >
+            {sandboxLoading ? 'Converting…' : 'Convert'}
+          </button>
+        </div>
+
+        {/* To group */}
+        <div className="sandbox-lang-group">
+          <span className="sandbox-lang-label">To</span>
+          <div className="sandbox-lang-pills">
+            {languages.map(lang => {
+              const meta = LANG_META[lang] || { label: lang, color: '#555' };
+              return (
+                <button
+                  key={lang}
+                  className={`sandbox-lang-pill${sandboxTarget === lang ? ' active' : ''}${sandboxSource === lang ? ' disabled' : ''}`}
+                  style={sandboxTarget === lang ? { '--pill-color': meta.color } : {}}
+                  onClick={() => sandboxSource !== lang && setSandboxTarget(lang)}
+                  title={sandboxSource === lang ? `Same as source (${meta.label})` : meta.label}
+                >
+                  <span
+                    className="sandbox-lang-dot"
+                    style={{ background: meta.color }}
+                  />
+                  {meta.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
+
       {sandboxError && <p className="sandbox-error">{sandboxError}</p>}
       <CodeEditor
         value={sandboxCode}
@@ -374,6 +425,7 @@ export default function Learning() {
   const [activeModule, setActiveModule] = useState(null);
   const [activeLesson, setActiveLesson] = useState(null);
   const [activeView, setActiveView] = useState('lesson'); // 'lesson' | 'quiz'
+  const [filterDifficulty, setFilterDifficulty] = useState('all');
   // Feature 5: Map<lessonId, completionDateISO> instead of Set
   const [completedLessons, setCompletedLessons] = useState(new Map());
   // Feature 2: { [module_title]: completed_count }
@@ -550,25 +602,38 @@ export default function Learning() {
     <div className="learning-page">
       <div className="module-list">
         <h2>Learning Modules</h2>
+        <div className="learn-filter-bar">
+          {['all', 'beginner', 'intermediate', 'advanced'].map(level => (
+            <button
+              key={level}
+              className={`learn-filter-pill${filterDifficulty === level ? ' active' : ''}`}
+              onClick={() => setFilterDifficulty(level)}
+            >
+              {level.charAt(0).toUpperCase() + level.slice(1)}
+            </button>
+          ))}
+        </div>
         {modules.length === 0 && (
           <p style={{ color: 'var(--text-muted)' }}>No modules available yet.</p>
         )}
         <div className="module-grid">
-          {modules.map(m => (
-            <div key={m.id} className="module-card" onClick={() => openModule(m.id)}>
-              <h3>{m.title}</h3>
-              <p>{m.description}</p>
-              {/* Feature 2: progress pill */}
-              <div className="module-meta">
-                <span className={`badge ${m.difficulty}`}>{m.difficulty}</span>
-                <span className="lang-badge">{m.language}</span>
-                <span className="badge">{m.lesson_count} lessons</span>
-                <span className="module-progress-pill">
-                  {completedByModule[m.title] || 0}/{m.lesson_count}
-                </span>
+          {modules
+            .filter(m => filterDifficulty === 'all' || m.difficulty === filterDifficulty)
+            .map(m => (
+              <div key={m.id} className="module-card" onClick={() => openModule(m.id)}>
+                <h3>{m.title}</h3>
+                <p>{m.description}</p>
+                {/* Feature 2: progress pill */}
+                <div className="module-meta">
+                  <span className={`badge ${m.difficulty}`}>{m.difficulty}</span>
+                  <span className="lang-badge">{m.language}</span>
+                  <span className="badge">{m.lesson_count} lessons</span>
+                  <span className="module-progress-pill">
+                    {completedByModule[m.title] || 0}/{m.lesson_count}
+                  </span>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
         </div>
       </div>
     </div>

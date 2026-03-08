@@ -22,6 +22,7 @@ const STARTER_CODE = {
 export default function Playground({ onBack }) {
   const [lang, setLang] = useState('python');
   const [code, setCode] = useState(STARTER_CODE['python']);
+  const [stdin, setStdin] = useState('');
   const [runLoading, setRunLoading] = useState(false);
   const [runOutput, setRunOutput] = useState(null);
   const [runError, setRunError] = useState('');
@@ -31,6 +32,7 @@ export default function Playground({ onBack }) {
     setCode(STARTER_CODE[newLang]);
     setRunOutput(null);
     setRunError('');
+    setStdin('');
   };
 
   const handleRun = async () => {
@@ -39,7 +41,7 @@ export default function Playground({ onBack }) {
     setRunOutput(null);
     setRunError('');
     try {
-      const result = await runCode(lang, code);
+      const result = await runCode(lang, code, stdin);
       setRunOutput(result);
     } catch (err) {
       setRunError(err.message || 'Could not reach execution server. Check your connection.');
@@ -94,6 +96,19 @@ export default function Playground({ onBack }) {
           />
         </div>
 
+        {/* ── Stdin input ── */}
+        <div className="run-stdin-wrap">
+          <label className="run-stdin-label">Program Input (stdin)</label>
+          <textarea
+            className="run-stdin"
+            placeholder="Enter input for your program here (one value per line)..."
+            value={stdin}
+            onChange={e => setStdin(e.target.value)}
+            rows={3}
+            spellCheck={false}
+          />
+        </div>
+
         {/* ── Terminal output ── */}
         {(runOutput !== null || runError) && (
           <div className="run-output">
@@ -102,19 +117,25 @@ export default function Playground({ onBack }) {
               <button
                 className="run-output-close"
                 onClick={() => { setRunOutput(null); setRunError(''); }}
-              >
-                ×
-              </button>
+              >×</button>
             </div>
             {runError && <pre className="run-stderr">{runError}</pre>}
             {runOutput && (
               <>
+                {stdin.trim() && (
+                  <>
+                    <pre className="run-stdin-echo">{stdin.trim().split('\n').map(l => `> ${l}`).join('\n')}</pre>
+                    <hr className="run-divider" />
+                  </>
+                )}
                 {runOutput.stdout && <pre className="run-stdout">{runOutput.stdout}</pre>}
                 {runOutput.stderr && <pre className="run-stderr">{runOutput.stderr}</pre>}
                 {!runOutput.stdout && !runOutput.stderr && (
                   <pre className="run-stdout run-empty">(no output)</pre>
                 )}
-                <span className="run-exit-code">exit code: {runOutput.code}</span>
+                <span className={`run-exit-code${runOutput.code === 0 ? ' run-exit-ok' : ' run-exit-err'}`}>
+                  {runOutput.code === 0 ? '✓' : '✗'} exit {runOutput.code}
+                </span>
               </>
             )}
           </div>
