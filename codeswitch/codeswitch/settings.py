@@ -153,11 +153,13 @@ CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='http://localhost:
 
 # ── Cookie security ───────────────────────────────────────────────────────────
 SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SAMESITE = 'Lax'
+# Cross-origin production (Vercel → Railway): SameSite=None so cookies are sent cross-site.
+# Local development: SameSite=Lax is sufficient (both services run on localhost).
+SESSION_COOKIE_SAMESITE = 'None' if not DEBUG else 'Lax'
 # In production these are forced True by SECURE_SSL_REDIRECT
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_HTTPONLY = False   # Must be JS-readable so Axios can send X-CSRFToken header
-CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = 'None' if not DEBUG else 'Lax'
 CSRF_COOKIE_SECURE = not DEBUG
 
 # ── Security headers ──────────────────────────────────────────────────────────
