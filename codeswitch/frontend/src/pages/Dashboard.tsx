@@ -34,15 +34,23 @@ export default function Dashboard() {
   const [files, setFiles] = useState([]);
   const [modules, setModules] = useState([]);
   const [loadError, setLoadError] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getProfile()
-      .then(r => setProfile(r.data))
-      .catch(() => setLoadError('Failed to load profile.'));
-    getConversionHistory().then(r => setHistory(r.data)).catch(() => { });
-    getProgress().then(r => setProgress(r.data)).catch(() => { });
-    getFiles().then(r => setFiles(r.data)).catch(() => { });
-    getModules().then(r => setModules(r.data)).catch(() => { });
+    Promise.all([
+      getProfile(),
+      getConversionHistory(),
+      getProgress(),
+      getFiles(),
+      getModules(),
+    ]).then(([profileRes, historyRes, progressRes, filesRes, modulesRes]) => {
+      setProfile(profileRes.data);
+      setHistory(historyRes.data);
+      setProgress(progressRes.data);
+      setFiles(filesRes.data);
+      setModules(modulesRes.data);
+    }).catch(() => setLoadError('Failed to load dashboard data.'))
+      .finally(() => setLoading(false));
   }, []);
 
   const completedLessons = progress.filter(p => p.completed).length;
@@ -66,6 +74,9 @@ export default function Dashboard() {
   return (
     <div className="p-5">
 
+      {loading && <p className="text-sm text-muted mb-4">Loading dashboard...</p>}
+      {loadError && <p className="bg-danger/10 border border-danger text-danger rounded p-2.5 text-sm mb-3">{loadError}</p>}
+
       {/* ── Profile Header ── */}
       <div className="flex items-center gap-4 p-5 bg-surface border border-border rounded mb-5">
         <div className="w-[52px] h-[52px] rounded-full bg-accent text-white text-lg font-bold flex items-center justify-center flex-shrink-0 tracking-wide">{initials}</div>
@@ -75,8 +86,6 @@ export default function Dashboard() {
           {memberSince && <p className="text-xs text-muted m-0">Member since {memberSince}</p>}
         </div>
       </div>
-
-      {loadError && <p className="bg-danger/10 border border-danger text-danger rounded p-2.5 text-sm mb-3" style={{ marginBottom: 16 }}>{loadError}</p>}
 
       {/* ── Stat Cards ── */}
       <div className="grid grid-cols-4 gap-3 mb-5">

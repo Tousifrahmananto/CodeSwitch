@@ -29,8 +29,14 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
-  // Validate session via httpOnly cookie on every load
+  // Validate session via httpOnly cookie on every load.
+  // Fast path: if there is no stored user, no valid session can exist —
+  // skip the network round-trip and show login immediately.
   useEffect(() => {
+    if (!localStorage.getItem('user')) {
+      setAuthLoading(false);
+      return;
+    }
     getMe()
       .then(r => {
         setUser(r.data);
@@ -50,16 +56,13 @@ export default function App() {
     setUser(userData);
   };
 
-  const handleLogout = async () => {
-    try {
-      await logout();
-    } catch {
-      // Cookie cleanup happens server-side; proceed regardless
-    } finally {
-      localStorage.clear();
-      setUser(null);
-      setShowLanding(true);
-    }
+  const handleLogout = () => {
+    // Update UI immediately — don't wait for the server round-trip
+    localStorage.clear();
+    setUser(null);
+    setShowLanding(true);
+    // Fire-and-forget: blacklist the refresh token server-side
+    logout().catch(() => {});
   };
 
   const handleToggleTheme = () => {
