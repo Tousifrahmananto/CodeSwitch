@@ -61,11 +61,11 @@ class LoginView(APIView):
             # Email login — resolve to username first
             try:
                 user_obj = User.objects.get(email__iexact=identifier)
-                user = authenticate(username=user_obj.username, password=password)
+                user = authenticate(request, username=user_obj.username, password=password)
             except (User.DoesNotExist, User.MultipleObjectsReturned):
                 pass
         else:
-            user = authenticate(username=identifier, password=password)
+            user = authenticate(request, username=identifier, password=password)
 
         if user:
             refresh = RefreshToken.for_user(user)
