@@ -26,6 +26,9 @@ logs/
 # Claude Code agent instructions
 AGENTS.md
 
+# QA / internal reports — not for version control
+QA_REPORT.md
+
 # ── Node / React ──────────────────────────────
 frontend/node_modules/
 frontend/build/
