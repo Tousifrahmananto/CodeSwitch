@@ -279,13 +279,13 @@ export default function Landing({ onGetStarted }) {
             AI-Powered · Free to Use · Open Source
           </div>
 
-          <h1 className="text-4xl font-bold leading-tight m-0">
+          <h1 className="text-4xl font-bold leading-tight mt-0 mb-5">
             Translate Code<br />
             <span className="text-accent">Between Languages</span><br />
             Instantly
           </h1>
 
-          <p className="text-muted text-base leading-relaxed m-0">
+          <p className="text-muted text-base leading-relaxed mt-0 mb-8">
             CodeSwitch converts Python, Java, and C with AI accuracy.
             Learn programming with 13 structured modules, manage your
             files in the cloud, and track your progress — all in one place.
