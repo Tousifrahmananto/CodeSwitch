@@ -122,20 +122,20 @@ def _call_openai_compatible(api_key: str, base_url: str, model: str, user_prompt
 _ROTATE_STATUSES = {401, 403, 429}
 
 
-def ai_convert_code(source_lang: str, target_lang: str, code: str) -> dict:
+def ai_convert_code(source_lang: str, target_lang: str, code: str, user_key: str = None) -> dict:
     """
     Convert code using an AI model.
 
-    Tries each configured API key in order (AI_API_KEY, AI_API_KEY_2,
-    AI_API_KEY_3). On a rate-limit (429) or auth error (401/403) it moves
-    to the next key. On the last key it retries once after a 3-second wait
-    before giving up.
+    Tries each configured API key in order (user_key if provided, then
+    AI_API_KEY, AI_API_KEY_2, AI_API_KEY_3). On a rate-limit (429) or
+    auth error (401/403) it moves to the next key. On the last key it
+    retries once after a 3-second wait before giving up.
 
     Returns:
         {'success': True,  'output': str, 'engine': 'ai'}
         {'success': False, 'error': str}
     """
-    api_keys = _get_api_keys()
+    api_keys = ([user_key.strip()] if user_key and user_key.strip() else []) + _get_api_keys()
     if not api_keys:
         return {'success': False, 'error': 'AI_API_KEY not set in .env'}
 
@@ -192,7 +192,7 @@ _EXPLAIN_SYSTEM_PROMPT = (
 )
 
 
-def ai_explain_code(source_lang: str, target_lang: str, input_code: str, output_code: str) -> dict:
+def ai_explain_code(source_lang: str, target_lang: str, input_code: str, output_code: str, user_key: str = None) -> dict:
     """
     Explain the key differences between source code and its translation.
 
@@ -200,7 +200,7 @@ def ai_explain_code(source_lang: str, target_lang: str, input_code: str, output_
         {'success': True,  'explanation': str}
         {'success': False, 'error': str}
     """
-    api_keys = _get_api_keys()
+    api_keys = ([user_key.strip()] if user_key and user_key.strip() else []) + _get_api_keys()
     if not api_keys:
         return {'success': False, 'error': 'AI_API_KEY not set in .env'}
 

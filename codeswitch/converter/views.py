@@ -92,7 +92,8 @@ class ConvertCodeView(APIView):
         # Strip null bytes that could cause issues in downstream processing
         code = code.replace('\x00', '')
 
-        result = convert_code(source, target, code)
+        user_key = request.headers.get('X-User-Api-Key') or None
+        result = convert_code(source, target, code, user_key=user_key)
 
         if result['success']:
             # Save to history
@@ -266,7 +267,8 @@ class ExplainCodeView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        result = ai_explain_code(source, target, input_code, output_code)
+        result = ai_explain_code(source, target, input_code, output_code,
+                                  user_key=request.headers.get('X-User-Api-Key') or None)
 
         if result['success']:
             return Response({'explanation': result['explanation']}, status=status.HTTP_200_OK)

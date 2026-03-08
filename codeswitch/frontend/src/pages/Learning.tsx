@@ -459,27 +459,38 @@ export default function Learning() {
   const [completedLessons, setCompletedLessons] = useState(new Map());
   // Feature 2: { [module_title]: completed_count }
   const [completedByModule, setCompletedByModule] = useState({});
+  const [modulesLoading, setModulesLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [openingId, setOpeningId] = useState<number | null>(null);
 
   useEffect(() => {
-    getModules().then(r => setModules(r.data));
-    getProgress().then(r => {
-      const completedRecords = r.data.filter(p => p.completed);
-      // Feature 5: lesson_id → completion_date
-      setCompletedLessons(new Map(completedRecords.map(p => [p.lesson_id, p.completion_date])));
-      // Feature 2: count per module title
-      const byModule = {};
-      completedRecords.forEach(p => {
-        byModule[p.module_title] = (byModule[p.module_title] || 0) + 1;
-      });
-      setCompletedByModule(byModule);
-    });
+    Promise.all([getModules(), getProgress()])
+      .then(([modRes, progRes]) => {
+        setModules(modRes.data);
+        const completedRecords = progRes.data.filter(p => p.completed);
+        // Feature 5: lesson_id → completion_date
+        setCompletedLessons(new Map(completedRecords.map(p => [p.lesson_id, p.completion_date])));
+        // Feature 2: count per module title
+        const byModule = {};
+        completedRecords.forEach(p => {
+          byModule[p.module_title] = (byModule[p.module_title] || 0) + 1;
+        });
+        setCompletedByModule(byModule);
+      })
+      .catch(() => setLoadError('Could not load learning content. Please refresh.'))
+      .finally(() => setModulesLoading(false));
   }, []);
 
   const openModule = async (id) => {
-    const { data } = await getModule(id);
-    setActiveModule(data);
-    setActiveLesson(data.lessons[0] || null);
-    setActiveView('lesson');
+    setOpeningId(id);
+    try {
+      const { data } = await getModule(id);
+      setActiveModule(data);
+      setActiveLesson(data.lessons[0] || null);
+      setActiveView('lesson');
+    } finally {
+      setOpeningId(null);
+    }
   };
 
   const goToNext = () => {
@@ -492,7 +503,11 @@ export default function Learning() {
   };
 
   const markComplete = async (lessonId) => {
-    await updateProgress(lessonId);
+    try {
+      await updateProgress(lessonId);
+    } catch {
+      // best-effort — progress sync failure doesn't block UI update
+    }
     // Feature 5: store completion date in Map
     setCompletedLessons(prev => new Map([...prev, [lessonId, new Date().toISOString()]]));
     // Feature 2: increment module count
@@ -642,14 +657,20 @@ export default function Learning() {
             </button>
           ))}
         </div>
-        {modules.length === 0 && (
+        {modulesLoading && <p style={{ color: 'var(--text-muted)' }}>Loading modules...</p>}
+        {loadError && <p style={{ color: 'var(--danger)' }}>{loadError}</p>}
+        {!modulesLoading && !loadError && modules.length === 0 && (
           <p style={{ color: 'var(--text-muted)' }}>No modules available yet.</p>
         )}
         <div className="module-grid">
           {modules
             .filter(m => filterDifficulty === 'all' || m.difficulty === filterDifficulty)
             .map(m => (
-              <div key={m.id} className="module-card" onClick={() => openModule(m.id)}>
+              <div
+                key={m.id}
+                className="module-card"
+                style={openingId === m.id ? { opacity: 0.5, cursor: 'wait', pointerEvents: 'none' } : undefined}
+                onClick={() => openingId === null && openModule(m.id)}>
                 <h3>{m.title}</h3>
                 <p>{m.description}</p>
                 {/* Feature 2: progress pill */}
