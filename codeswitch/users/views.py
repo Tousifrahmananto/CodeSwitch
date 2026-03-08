@@ -12,14 +12,23 @@ User = get_user_model()
 
 
 def _set_auth_cookies(response, refresh):
-    """Attach access + refresh tokens as httpOnly cookies."""
+    """Attach access + refresh tokens as httpOnly cookies.
+
+    In production the frontend (Vercel) and backend (Railway) are on different
+    origins, so cookies must use SameSite=None; Secure to be sent cross-site.
+    In local development (DEBUG=True) SameSite=Lax is fine since both services
+    run on localhost.
+    """
     secure = not settings.DEBUG
+    # Cross-origin production: SameSite=None (must pair with Secure=True)
+    # Same-origin local dev:   SameSite=Lax  (works on localhost without HTTPS)
+    samesite = 'None' if not settings.DEBUG else 'Lax'
     response.set_cookie(
         'access_token',
         str(refresh.access_token),
         httponly=True,
         secure=secure,
-        samesite='Lax',
+        samesite=samesite,
         max_age=3600,          # 1 hour — matches SIMPLE_JWT ACCESS_TOKEN_LIFETIME
     )
     response.set_cookie(
@@ -27,7 +36,7 @@ def _set_auth_cookies(response, refresh):
         str(refresh),
         httponly=True,
         secure=secure,
-        samesite='Strict',
+        samesite=samesite,
         max_age=604800,        # 7 days — matches SIMPLE_JWT REFRESH_TOKEN_LIFETIME
     )
 
