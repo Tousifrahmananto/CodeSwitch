@@ -34,7 +34,7 @@ export default function Playground({ onBack }) {
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveToast, setSaveToast] = useState('');
 
-  const isLoggedIn = !!localStorage.getItem('access_token');
+  const isLoggedIn = !!localStorage.getItem('user');
 
   const handleLangChange = (newLang) => {
     setLang(newLang);

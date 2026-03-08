@@ -89,8 +89,11 @@ export default function FileManager() {
     <div className="grid gap-5 h-[calc(100vh-56px)]" style={{ gridTemplateColumns: '260px 1fr' }}>
       {error && <p className="col-span-full bg-danger/10 border border-danger text-danger rounded p-2.5 text-sm mb-3">{error}</p>}
       <div className="bg-surface border border-border rounded p-4 overflow-y-auto">
-        <h3>My Files</h3>
-        <button onClick={handleNew}>+ New File</button>
+        <h3 className="text-sm font-semibold text-primary mb-3">My Files</h3>
+        <button
+          className="w-full text-left px-2 py-1.5 mb-2 text-sm border border-border text-muted hover:text-primary hover:bg-border rounded transition-colors bg-transparent"
+          onClick={handleNew}
+        >+ New File</button>
         {files.map((f) => (
           <div
             key={f.id}
@@ -109,8 +112,9 @@ export default function FileManager() {
       </div>
 
       <div className="bg-surface border border-border rounded p-4 flex flex-col gap-2.5">
-        <h3>{selected ? 'Edit File' : 'New File'}</h3>
+        <h3 className="text-sm font-semibold text-primary">{selected ? 'Edit File' : 'New File'}</h3>
         <input
+          className="w-full bg-bg border border-border rounded px-3 py-2 text-sm text-primary focus:outline-none focus:border-accent"
           placeholder="Filename (e.g. hello.py)"
           value={form.filename}
           onChange={(e) => setForm({ ...form, filename: e.target.value })}
