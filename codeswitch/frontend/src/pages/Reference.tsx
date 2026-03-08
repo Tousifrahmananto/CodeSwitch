@@ -617,14 +617,14 @@ export default function Reference() {
     };
 
     return (
-        <div className="reference-page">
-            <div className="reference-header">
+        <div className="p-5">
+            <div className="mb-6">
                 <h2>Language Reference</h2>
-                <p className="reference-subtitle">
+                <p className="text-sm text-muted mt-2">
                     Side-by-side syntax for Python, C, Java, JavaScript, and C++ — organised by concept.
                 </p>
                 <input
-                    className="reference-search"
+                    className="w-full bg-surface border border-border rounded px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-accent mt-4"
                     type="text"
                     placeholder="Search concepts (loops, functions, classes...)"
                     value={search}
@@ -638,43 +638,43 @@ export default function Reference() {
                 </p>
             )}
 
-            <div className="reference-grid">
+            <div className="grid grid-cols-1 gap-4 mt-6">
                 {filtered.map(concept => {
                     const tab = getTab(concept.id);
                     return (
-                        <div key={concept.id} className="reference-card">
-                            <div className="reference-card-header">
+                        <div key={concept.id} className="bg-surface border border-border rounded overflow-hidden">
+                            <div className="p-4 pb-0">
                                 <div>
-                                    <h3 className="reference-card-title">{concept.title}</h3>
-                                    <p className="reference-card-desc">{concept.description}</p>
+                                    <h3 className="text-sm font-semibold mb-1">{concept.title}</h3>
+                                    <p className="text-xs text-muted">{concept.description}</p>
                                 </div>
                             </div>
 
                             {/* Language tabs */}
-                            <div className="ref-tab-bar">
+                            <div className="flex items-center border-b border-border mt-3 overflow-x-auto">
                                 {ALL_LANGS.map(lang => (
                                     <button
                                         key={lang}
-                                        className={`ref-tab-btn${tab === lang ? ' active' : ''}`}
+                                        className={`inline-flex items-center gap-1.5 text-xs px-3 py-2 cursor-pointer bg-transparent border-b-2 border-transparent transition-colors${tab === lang ? ' font-semibold text-primary' : ' text-muted hover:text-primary'}`}
                                         style={tab === lang ? { borderBottomColor: LANG_META[lang].color } : {}}
                                         onClick={() => setActiveTab(prev => ({ ...prev, [concept.id]: lang }))}
                                     >
                                         <span
-                                            className="ref-lang-dot"
+                                            className="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0"
                                             style={{ background: LANG_META[lang].color }}
                                         />
                                         {LANG_META[lang].label}
                                     </button>
                                 ))}
                                 <button
-                                    className={`code-copy-btn${copied[concept.id] ? ' copied' : ''}`}
+                                    className={`ml-auto text-xs px-3 py-1.5 border border-border rounded cursor-pointer transition-colors mr-3 my-1.5${copied[concept.id] ? ' text-success border-success bg-success/10' : ' text-muted hover:text-primary hover:border-accent bg-transparent'}`}
                                     onClick={() => handleCopy(concept.id, tab)}
                                 >
                                     {copied[concept.id] ? 'Copied!' : 'Copy'}
                                 </button>
                             </div>
 
-                            <pre className="reference-code"><code>{concept.examples[tab]}</code></pre>
+                            <pre className="m-0 p-4 text-xs font-mono overflow-x-auto bg-bg text-primary leading-relaxed whitespace-pre"><code>{concept.examples[tab]}</code></pre>
                         </div>
                     );
                 })}

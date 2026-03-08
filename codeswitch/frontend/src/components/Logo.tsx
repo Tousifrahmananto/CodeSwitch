@@ -1,4 +1,9 @@
-export default function Logo({ size = 36, id = 'logo' }) {
+interface LogoProps {
+  size?: number;
+  id?: string;
+}
+
+export default function Logo({ size = 36, id = 'logo' }: LogoProps) {
   const gradId = `logoGrad-${id}`;
   return (
     <svg

@@ -1,6 +1,15 @@
-import Editor from '@monaco-editor/react';
+import Editor, { BeforeMount } from '@monaco-editor/react';
 
-const LANG_MAP = {
+interface CodeEditorProps {
+  value: string;
+  onChange?: (value: string | undefined) => void;
+  language?: string;
+  readOnly?: boolean;
+  height?: string;
+  theme?: string;
+}
+
+const LANG_MAP: Record<string, string> = {
   python: 'python',
   c: 'c',
   java: 'java',
@@ -11,7 +20,7 @@ const LANG_MAP = {
 
 const CUSTOM_THEMES = {
   monokai: {
-    base: 'vs-dark',
+    base: 'vs-dark' as const,
     inherit: true,
     rules: [
       { token: 'comment', foreground: '75715E', fontStyle: 'italic' },
@@ -30,7 +39,7 @@ const CUSTOM_THEMES = {
     },
   },
   dracula: {
-    base: 'vs-dark',
+    base: 'vs-dark' as const,
     inherit: true,
     rules: [
       { token: 'comment', foreground: '6272A4', fontStyle: 'italic' },
@@ -50,11 +59,18 @@ const CUSTOM_THEMES = {
   },
 };
 
-function registerThemes(monaco) {
+const registerThemes: BeforeMount = (monaco) => {
   Object.entries(CUSTOM_THEMES).forEach(([id, def]) => monaco.editor.defineTheme(id, def));
-}
+};
 
-export default function CodeEditor({ value, onChange, language = 'python', readOnly = false, height = '400px', theme }) {
+export default function CodeEditor({
+  value,
+  onChange,
+  language = 'python',
+  readOnly = false,
+  height = '400px',
+  theme,
+}: CodeEditorProps) {
   const activeTheme = theme || localStorage.getItem('editor_theme') || 'vs-dark';
   return (
     <div className="monaco-wrapper" style={{ height }}>

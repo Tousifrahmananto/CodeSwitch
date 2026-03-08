@@ -3,10 +3,33 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.exceptions import TokenError
 from django.contrib.auth import get_user_model
+from django.conf import settings
 from .serializers import RegisterSerializer, UserProfileSerializer
 
 User = get_user_model()
+
+
+def _set_auth_cookies(response, refresh):
+    """Attach access + refresh tokens as httpOnly cookies."""
+    secure = not settings.DEBUG
+    response.set_cookie(
+        'access_token',
+        str(refresh.access_token),
+        httponly=True,
+        secure=secure,
+        samesite='Lax',
+        max_age=3600,          # 1 hour — matches SIMPLE_JWT ACCESS_TOKEN_LIFETIME
+    )
+    response.set_cookie(
+        'refresh_token',
+        str(refresh),
+        httponly=True,
+        secure=secure,
+        samesite='Strict',
+        max_age=604800,        # 7 days — matches SIMPLE_JWT REFRESH_TOKEN_LIFETIME
+    )
 
 
 class RegisterView(generics.CreateAPIView):
@@ -20,6 +43,7 @@ class LoginView(APIView):
 
     def post(self, request):
         from django.contrib.auth import authenticate
+
         identifier = (request.data.get('username') or '').strip()
         password = request.data.get('password')
 
@@ -36,11 +60,10 @@ class LoginView(APIView):
 
         if user:
             refresh = RefreshToken.for_user(user)
-            return Response({
-                'refresh': str(refresh),
-                'access': str(refresh.access_token),
-                'user': UserProfileSerializer(user).data,
-            })
+            response = Response({'user': UserProfileSerializer(user).data})
+            _set_auth_cookies(response, refresh)
+            return response
+
         return Response({'error': 'Invalid credentials.'}, status=status.HTTP_401_UNAUTHORIZED)
 
 
@@ -48,12 +71,55 @@ class LogoutView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
+        refresh_token = request.COOKIES.get('refresh_token')
+        if refresh_token:
+            try:
+                token = RefreshToken(refresh_token)
+                token.blacklist()
+            except Exception:
+                pass  # Already expired / blacklisted — still clear cookies
+
+        response = Response({'message': 'Logged out successfully.'})
+        response.delete_cookie('access_token')
+        response.delete_cookie('refresh_token')
+        return response
+
+
+class CookieTokenRefreshView(APIView):
+    """
+    POST /api/token/refresh/
+    Reads the refresh token from the httpOnly cookie, issues a new access token
+    (and rotated refresh token), and sets both back as cookies.
+    No request body required.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        refresh_token = request.COOKIES.get('refresh_token')
+        if not refresh_token:
+            return Response({'error': 'No refresh token.'}, status=status.HTTP_401_UNAUTHORIZED)
         try:
-            token = RefreshToken(request.data.get('refresh'))
-            token.blacklist()
-            return Response({'message': 'Logged out successfully.'}, status=status.HTTP_200_OK)
-        except Exception:
-            return Response({'error': 'Invalid or already blacklisted token.'}, status=status.HTTP_400_BAD_REQUEST)
+            refresh = RefreshToken(refresh_token)
+            response = Response({'detail': 'Token refreshed.'})
+            _set_auth_cookies(response, refresh)
+            return response
+        except TokenError:
+            response = Response({'error': 'Invalid or expired refresh token.'}, status=status.HTTP_401_UNAUTHORIZED)
+            response.delete_cookie('access_token')
+            response.delete_cookie('refresh_token')
+            return response
+
+
+class MeView(APIView):
+    """
+    GET /api/me/
+    Returns the current authenticated user's profile.
+    Used on app load to validate the session cookie.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response(UserProfileSerializer(request.user).data)
 
 
 class ProfileView(generics.RetrieveUpdateAPIView):

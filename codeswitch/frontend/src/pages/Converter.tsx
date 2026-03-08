@@ -169,10 +169,10 @@ export default function Converter() {
     runOutput.code === runOutputTarget.code;
 
   return (
-    <div className="converter-page">
+    <div className="p-5">
       <h2>Code Converter</h2>
 
-      <div className="converter-lang-bar">
+      <div className="flex items-center gap-4 mb-4 flex-wrap">
         <div className="sandbox-lang-group">
           <span className="sandbox-lang-label">From</span>
           <div className="sandbox-lang-pills">
@@ -194,7 +194,11 @@ export default function Converter() {
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="sandbox-convert-arrow">
             <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
           </svg>
-          <button className="btn-convert" onClick={handleConvert} disabled={loading}>
+          <button
+            className="bg-accent hover:bg-accent-h text-white border-none rounded px-5 py-2 text-sm font-semibold transition-colors cursor-pointer disabled:opacity-50"
+            onClick={handleConvert}
+            disabled={loading}
+          >
             {loading ? 'Converting…' : 'Convert'}
           </button>
         </div>
@@ -217,7 +221,7 @@ export default function Converter() {
           </div>
         </div>
 
-        <div className="converter-theme-selector">
+        <div className="flex items-center gap-2 ml-auto text-sm">
           <label>Theme</label>
           <select value={theme} onChange={e => handleThemeChange(e.target.value)}>
             {THEMES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
@@ -225,16 +229,19 @@ export default function Converter() {
         </div>
       </div>
 
-      {error && <p className="error">{error}</p>}
+      {error && <p className="bg-danger/10 border border-danger text-danger rounded p-2.5 text-sm mb-3">{error}</p>}
 
       {engine && (
-        <p className={`engine-badge ${engine === 'ai' ? 'badge-ai' : 'badge-rules'}`}>
+        <p className={engine === 'ai'
+          ? 'inline-block text-xs font-semibold rounded px-3 py-1 mb-3 tracking-wide bg-accent/15 border border-accent text-accent-h'
+          : 'inline-block text-xs font-semibold rounded px-3 py-1 mb-3 tracking-wide bg-warning/10 border border-warning text-warning'
+        }>
           {engine === 'ai' ? '✦ AI-powered conversion' : '⚙ Rule-based conversion (set AI_API_KEY in .env to enable AI)'}
         </p>
       )}
 
-      <div className="editor-panels">
-        <div className="panel">
+      <div className="grid grid-cols-2 gap-4 mt-4">
+        <div className="flex flex-col gap-2">
           <div className="panel-header">
             <h4>{sourceLang} (Input)</h4>
             <button
@@ -255,7 +262,7 @@ export default function Converter() {
           />
         </div>
 
-        <div className="panel">
+        <div className="flex flex-col gap-2">
           <div className="panel-header">
             <h4>{targetLang} (Output)</h4>
             <div className="panel-header-actions">
