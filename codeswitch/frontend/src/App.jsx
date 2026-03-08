@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import Converter from './pages/Converter';
 import FileManager from './pages/FileManager';
 import Learning from './pages/Learning';
+import Reference from './pages/Reference';
 import AdminPanel from './pages/AdminPanel';
 import ShareView from './pages/ShareView';
 import ProfilePage from './pages/ProfilePage';
@@ -92,6 +93,7 @@ export default function App() {
     editor: <Converter />,
     files: <FileManager />,
     learning: <Learning />,
+    reference: <Reference />,
     ...(myUsername && { profile: <ProfilePage username={myUsername} isOwner={true} onBack={() => setPage('dashboard')} /> }),
     ...(isStaff && { admin: <AdminPanel /> }),
   };
@@ -101,6 +103,7 @@ export default function App() {
     { key: 'editor', label: '💻 Converter' },
     { key: 'files', label: '📁 Files' },
     { key: 'learning', label: '📚 Learn' },
+    { key: 'reference', label: '📖 Reference' },
     ...(myUsername ? [{ key: 'profile', label: '👤 My Profile' }] : []),
     ...(isStaff ? [{ key: 'admin', label: '⚙️ Admin' }] : []),
   ];

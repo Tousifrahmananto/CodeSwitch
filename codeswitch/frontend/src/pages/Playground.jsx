@@ -3,6 +3,7 @@ import CodeEditor from '../components/CodeEditor';
 import LanguageSelector from '../components/LanguageSelector';
 import Logo from '../components/Logo';
 import { runCode } from '../api/executor';
+import { createFile } from '../api/client';
 
 const LANGUAGES = ['python', 'c', 'java', 'javascript', 'cpp'];
 
@@ -27,6 +28,14 @@ export default function Playground({ onBack }) {
   const [runOutput, setRunOutput] = useState(null);
   const [runError, setRunError] = useState('');
 
+  // Save to Files state
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [saveFilename, setSaveFilename] = useState('');
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [saveToast, setSaveToast] = useState('');
+
+  const isLoggedIn = !!localStorage.getItem('access_token');
+
   const handleLangChange = (newLang) => {
     setLang(newLang);
     setCode(STARTER_CODE[newLang]);
@@ -47,6 +56,30 @@ export default function Playground({ onBack }) {
       setRunError(err.message || 'Could not reach execution server. Check your connection.');
     } finally {
       setRunLoading(false);
+    }
+  };
+
+  const handleSaveOpen = () => {
+    setSaveFilename('');
+    setSaveToast('');
+    setShowSaveModal(true);
+  };
+
+  const handleSaveConfirm = async () => {
+    const filename = saveFilename.trim();
+    if (!filename) return;
+    setSaveLoading(true);
+    try {
+      await createFile({ filename, language: lang, code_content: code });
+      setShowSaveModal(false);
+      setSaveToast('Saved to Files!');
+      setTimeout(() => setSaveToast(''), 3000);
+    } catch {
+      setSaveToast('Save failed. Please sign in first.');
+      setTimeout(() => setSaveToast(''), 3000);
+      setShowSaveModal(false);
+    } finally {
+      setSaveLoading(false);
     }
   };
 
@@ -84,6 +117,16 @@ export default function Playground({ onBack }) {
           >
             {runLoading ? '⏳ Running...' : '▶ Run'}
           </button>
+          {code.trim() && (
+            <button
+              className="btn-save-playground"
+              onClick={handleSaveOpen}
+              title={isLoggedIn ? 'Save to your Files' : 'Sign in to save'}
+            >
+              💾 Save
+            </button>
+          )}
+          {saveToast && <span className="share-toast">{saveToast}</span>}
         </div>
 
         {/* ── Editor ── */}
@@ -142,6 +185,48 @@ export default function Playground({ onBack }) {
         )}
 
       </div>
+
+      {/* ── Save Modal ── */}
+      {showSaveModal && (
+        <div className="modal-overlay" onClick={() => setShowSaveModal(false)}>
+          <div className="modal-box" onClick={e => e.stopPropagation()}>
+            {isLoggedIn ? (
+              <>
+                <h3 className="modal-title">Save to Files</h3>
+                <p className="modal-desc">Enter a filename for this {lang} snippet.</p>
+                <input
+                  className="modal-input"
+                  type="text"
+                  placeholder={`my_snippet.${lang === 'python' ? 'py' : lang === 'javascript' ? 'js' : lang === 'java' ? 'java' : lang === 'cpp' ? 'cpp' : 'c'}`}
+                  value={saveFilename}
+                  onChange={e => setSaveFilename(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleSaveConfirm()}
+                  autoFocus
+                />
+                <div className="modal-actions">
+                  <button className="modal-btn-cancel" onClick={() => setShowSaveModal(false)}>Cancel</button>
+                  <button
+                    className="modal-btn-confirm"
+                    onClick={handleSaveConfirm}
+                    disabled={!saveFilename.trim() || saveLoading}
+                  >
+                    {saveLoading ? 'Saving…' : 'Save'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h3 className="modal-title">Sign in to save</h3>
+                <p className="modal-desc">Create a free account to save your code to your personal Files library.</p>
+                <div className="modal-actions">
+                  <button className="modal-btn-cancel" onClick={() => setShowSaveModal(false)}>Cancel</button>
+                  <button className="modal-btn-confirm" onClick={onBack}>Sign In / Register</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

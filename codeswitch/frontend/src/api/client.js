@@ -48,6 +48,7 @@ export const updateProfile = (formData) =>
 // ── Converter ─────────────────────────────────
 export const convertCode = (data) => client.post('/convert', data);
 export const getConversionHistory = () => client.get('/convert/history');
+export const explainCode = (data) => client.post('/explain/', data);
 
 // ── Snippets ──────────────────────────────────
 export const createSnippet = (data) => client.post('/snippets/', data);
