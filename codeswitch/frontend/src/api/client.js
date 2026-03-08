@@ -42,6 +42,8 @@ export const register = (data) => client.post('/register', data);
 export const login = (data) => client.post('/login', data);
 export const logout = (data) => client.post('/logout', data);
 export const getProfile = () => client.get('/profile');
+export const updateProfile = (formData) =>
+  client.patch('/profile', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
 
 // ── Converter ─────────────────────────────────
 export const convertCode = (data) => client.post('/convert', data);

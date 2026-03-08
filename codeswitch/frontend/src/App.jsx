@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Login from './pages/Login';
 import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
@@ -28,6 +28,10 @@ export default function App() {
     }
   });
   const [page, setPage] = useState('dashboard');
+  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark');
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
   // Show landing page when no session exists; set to false once user clicks Get Started
   const [showLanding, setShowLanding] = useState(() => !localStorage.getItem('access_token'));
 
@@ -47,6 +51,12 @@ export default function App() {
       setUser(null);
       setShowLanding(true);
     }
+  };
+
+  const handleToggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    localStorage.setItem('theme', next);
   };
 
   const clearUrlAndReload = () => {
@@ -82,7 +92,7 @@ export default function App() {
     editor: <Converter />,
     files: <FileManager />,
     learning: <Learning />,
-    ...(myUsername && { profile: <ProfilePage username={myUsername} onBack={() => setPage('dashboard')} /> }),
+    ...(myUsername && { profile: <ProfilePage username={myUsername} isOwner={true} onBack={() => setPage('dashboard')} /> }),
     ...(isStaff && { admin: <AdminPanel /> }),
   };
 
@@ -96,7 +106,7 @@ export default function App() {
   ];
 
   return (
-    <div className="app">
+    <div className="app" data-theme={theme}>
       <nav className="sidebar">
         <div className="sidebar-brand">
           <Logo size={26} id="sidebar" />
@@ -107,6 +117,9 @@ export default function App() {
             {label}
           </button>
         ))}
+        <button className="theme-toggle" onClick={handleToggleTheme}>
+          {theme === 'dark' ? '☀ Light Mode' : '🌙 Dark Mode'}
+        </button>
         <button className="logout" onClick={handleLogout}>🚪 Logout</button>
       </nav>
       <main className="content">{pages[page]}</main>
