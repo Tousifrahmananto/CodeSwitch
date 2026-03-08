@@ -211,6 +211,7 @@ AUTHENTICATION_BACKENDS = [
     'axes.backends.AxesStandaloneBackend',
     'django.contrib.auth.backends.ModelBackend',
 ]
+AXES_ENABLED                 = config('AXES_ENABLED', default=True, cast=bool)
 AXES_FAILURE_LIMIT           = 5       # Lock after 5 failed attempts
 AXES_COOLOFF_TIME            = 1       # Unlock after 1 hour
 AXES_LOCKOUT_PARAMETERS      = ['username', 'ip_address']
