@@ -2,7 +2,7 @@ import { useState } from 'react';
 import Login from './pages/Login';
 import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
-import Editor from './pages/Editor';
+import Converter from './pages/Converter';
 import FileManager from './pages/FileManager';
 import Learning from './pages/Learning';
 import AdminPanel from './pages/AdminPanel';
@@ -79,7 +79,7 @@ export default function App() {
 
   const pages = {
     dashboard: <Dashboard />,
-    editor: <Editor />,
+    editor: <Converter />,
     files: <FileManager />,
     learning: <Learning />,
     ...(myUsername && { profile: <ProfilePage username={myUsername} onBack={() => setPage('dashboard')} /> }),
@@ -88,7 +88,7 @@ export default function App() {
 
   const navItems = [
     { key: 'dashboard', label: '🏠 Dashboard' },
-    { key: 'editor', label: '💻 Editor' },
+    { key: 'editor', label: '💻 Converter' },
     { key: 'files', label: '📁 Files' },
     { key: 'learning', label: '📚 Learn' },
     ...(myUsername ? [{ key: 'profile', label: '👤 My Profile' }] : []),

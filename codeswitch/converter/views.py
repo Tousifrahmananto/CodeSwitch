@@ -167,6 +167,7 @@ class RunCodeView(APIView):
     def post(self, request):
         language = request.data.get('language', '').lower().strip()
         code = request.data.get('code', '')
+        stdin = request.data.get('stdin', '')
 
         if language not in self.SUPPORTED:
             return Response(
@@ -187,7 +188,7 @@ class RunCodeView(APIView):
         try:
             resp = http_requests.post(
                 'https://wandbox.org/api/compile.json',
-                json={'compiler': compiler, 'code': code, 'options': options, 'stdin': ''},
+                json={'compiler': compiler, 'code': code, 'options': options, 'stdin': stdin},
                 timeout=30,
             )
             resp.raise_for_status()

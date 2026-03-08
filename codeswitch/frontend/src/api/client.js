@@ -80,4 +80,10 @@ export const adminCreateModule = (data) => client.post('/admin/modules', data);
 export const adminUpdateModule = (id, data) => client.put(`/admin/modules/${id}`, data);
 export const adminDeleteModule = (id) => client.delete(`/admin/modules/${id}`);
 
+export const adminGetModuleLessons = (moduleId) => client.get(`/admin/modules/${moduleId}/lessons`);
+export const adminGetLesson = (id) => client.get(`/admin/lessons/${id}`);
+export const adminCreateLesson = (moduleId, data) => client.post(`/admin/modules/${moduleId}/lessons`, data);
+export const adminUpdateLesson = (id, data) => client.put(`/admin/lessons/${id}`, data);
+export const adminDeleteLesson = (id) => client.delete(`/admin/lessons/${id}`);
+
 export default client;

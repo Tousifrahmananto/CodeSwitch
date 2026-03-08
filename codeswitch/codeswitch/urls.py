@@ -4,6 +4,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from .admin_views import (
     AdminStatsView, AdminUsersView, AdminUserDetailView,
     AdminConversionsView, AdminModulesView, AdminModuleDetailView,
+    AdminModuleLessonsView, AdminLessonDetailView,
 )
 
 urlpatterns = [
@@ -15,10 +16,12 @@ urlpatterns = [
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 
     # Admin API
-    path('api/admin/stats',            AdminStatsView.as_view()),
-    path('api/admin/users',            AdminUsersView.as_view()),
-    path('api/admin/users/<int:pk>',   AdminUserDetailView.as_view()),
-    path('api/admin/conversions',      AdminConversionsView.as_view()),
-    path('api/admin/modules',          AdminModulesView.as_view()),
-    path('api/admin/modules/<int:pk>', AdminModuleDetailView.as_view()),
+    path('api/admin/stats',                             AdminStatsView.as_view()),
+    path('api/admin/users',                             AdminUsersView.as_view()),
+    path('api/admin/users/<int:pk>',                    AdminUserDetailView.as_view()),
+    path('api/admin/conversions',                       AdminConversionsView.as_view()),
+    path('api/admin/modules',                           AdminModulesView.as_view()),
+    path('api/admin/modules/<int:pk>',                  AdminModuleDetailView.as_view()),
+    path('api/admin/modules/<int:pk>/lessons',          AdminModuleLessonsView.as_view()),
+    path('api/admin/lessons/<int:pk>',                  AdminLessonDetailView.as_view()),
 ]
