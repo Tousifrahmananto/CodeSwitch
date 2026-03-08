@@ -84,26 +84,34 @@ export default function Playground({ onBack }) {
   };
 
   return (
-    <div className="playground-page">
+    <div className="flex flex-col min-h-screen bg-bg">
 
       {/* ── Header ── */}
-      <header className="playground-header">
-        <div className="playground-brand">
+      <header className="flex items-center justify-between px-5 py-3 border-b border-border bg-surface flex-shrink-0">
+        <div className="flex items-center gap-2">
           <Logo size={26} id="playground" />
-          <span className="playground-title">CodeSwitch <span className="playground-badge">Playground</span></span>
+          <span className="font-semibold text-sm text-primary">
+            CodeSwitch <span className="text-[10px] bg-accent/15 text-accent px-1.5 py-0.5 rounded font-semibold uppercase tracking-wide ml-1">Playground</span>
+          </span>
         </div>
-        <div className="playground-header-actions">
-          <span className="playground-desc">Write and run code — no sign-in required</span>
-          <button className="land-btn-ghost" onClick={onBack}>Sign In</button>
-          <button className="land-btn-primary" onClick={onBack}>Get Started</button>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-muted">Write and run code — no sign-in required</span>
+          <button
+            className="bg-transparent border border-border text-primary hover:bg-border rounded px-4 py-1.5 text-sm font-medium transition-colors"
+            onClick={onBack}
+          >Sign In</button>
+          <button
+            className="bg-accent hover:bg-accent-h text-white border-none rounded px-4 py-1.5 text-sm font-semibold transition-colors"
+            onClick={onBack}
+          >Get Started</button>
         </div>
       </header>
 
       {/* ── Main area ── */}
-      <div className="playground-body">
+      <div className="flex flex-col gap-3 p-4 flex-1">
 
         {/* ── Toolbar ── */}
-        <div className="playground-toolbar">
+        <div className="flex items-center gap-3 flex-wrap">
           <LanguageSelector
             label="Language:"
             value={lang}
@@ -111,7 +119,7 @@ export default function Playground({ onBack }) {
             languages={LANGUAGES}
           />
           <button
-            className="btn-run playground-run-btn"
+            className="bg-accent hover:bg-accent-h text-white border-none rounded px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-50"
             onClick={handleRun}
             disabled={runLoading || !code.trim()}
           >
@@ -119,18 +127,18 @@ export default function Playground({ onBack }) {
           </button>
           {code.trim() && (
             <button
-              className="btn-save-playground"
+              className="bg-transparent border border-border text-primary hover:bg-border rounded px-4 py-2 text-sm font-medium transition-colors"
               onClick={handleSaveOpen}
               title={isLoggedIn ? 'Save to your Files' : 'Sign in to save'}
             >
               💾 Save
             </button>
           )}
-          {saveToast && <span className="share-toast">{saveToast}</span>}
+          {saveToast && <span className="text-xs text-success">{saveToast}</span>}
         </div>
 
         {/* ── Editor ── */}
-        <div className="playground-editor-wrap">
+        <div>
           <CodeEditor
             value={code}
             onChange={setCode}
@@ -140,10 +148,10 @@ export default function Playground({ onBack }) {
         </div>
 
         {/* ── Stdin input ── */}
-        <div className="run-stdin-wrap">
-          <label className="run-stdin-label">Program Input (stdin)</label>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs text-muted font-medium">Program Input (stdin)</label>
           <textarea
-            className="run-stdin"
+            className="w-full bg-bg border border-border rounded px-3 py-2 text-sm font-mono text-primary resize-y focus:outline-none focus:border-accent"
             placeholder="Enter input for your program here (one value per line)..."
             value={stdin}
             onChange={e => setStdin(e.target.value)}
@@ -154,29 +162,29 @@ export default function Playground({ onBack }) {
 
         {/* ── Terminal output ── */}
         {(runOutput !== null || runError) && (
-          <div className="run-output">
-            <div className="run-output-header">
+          <div className="bg-[#0d1117] border border-border rounded overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-surface text-xs text-muted">
               <span>Terminal</span>
               <button
-                className="run-output-close"
+                className="text-muted hover:text-primary cursor-pointer text-base leading-none bg-transparent border-none p-0"
                 onClick={() => { setRunOutput(null); setRunError(''); }}
               >×</button>
             </div>
-            {runError && <pre className="run-stderr">{runError}</pre>}
+            {runError && <pre className="block p-3 text-xs font-mono text-danger whitespace-pre-wrap">{runError}</pre>}
             {runOutput && (
               <>
                 {stdin.trim() && (
                   <>
-                    <pre className="run-stdin-echo">{stdin.trim().split('\n').map(l => `> ${l}`).join('\n')}</pre>
-                    <hr className="run-divider" />
+                    <pre className="block p-3 pb-0 text-xs font-mono text-muted whitespace-pre">{stdin.trim().split('\n').map(l => `> ${l}`).join('\n')}</pre>
+                    <hr className="border-none border-t border-border my-2" />
                   </>
                 )}
-                {runOutput.stdout && <pre className="run-stdout">{runOutput.stdout}</pre>}
-                {runOutput.stderr && <pre className="run-stderr">{runOutput.stderr}</pre>}
+                {runOutput.stdout && <pre className="block p-3 text-xs font-mono text-primary whitespace-pre-wrap">{runOutput.stdout}</pre>}
+                {runOutput.stderr && <pre className="block p-3 text-xs font-mono text-danger whitespace-pre-wrap">{runOutput.stderr}</pre>}
                 {!runOutput.stdout && !runOutput.stderr && (
-                  <pre className="run-stdout run-empty">(no output)</pre>
+                  <pre className="block p-3 text-xs font-mono text-muted italic whitespace-pre-wrap">(no output)</pre>
                 )}
-                <span className={`run-exit-code${runOutput.code === 0 ? ' run-exit-ok' : ' run-exit-err'}`}>
+                <span className={`block px-3 pb-2 text-xs font-mono ${runOutput.code === 0 ? 'text-success' : 'text-danger'}`}>
                   {runOutput.code === 0 ? '✓' : '✗'} exit {runOutput.code}
                 </span>
               </>
@@ -188,14 +196,14 @@ export default function Playground({ onBack }) {
 
       {/* ── Save Modal ── */}
       {showSaveModal && (
-        <div className="modal-overlay" onClick={() => setShowSaveModal(false)}>
-          <div className="modal-box" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowSaveModal(false)}>
+          <div className="bg-surface border border-border rounded-lg p-6 w-80 flex flex-col gap-3" onClick={e => e.stopPropagation()}>
             {isLoggedIn ? (
               <>
-                <h3 className="modal-title">Save to Files</h3>
-                <p className="modal-desc">Enter a filename for this {lang} snippet.</p>
+                <h3 className="text-base font-semibold m-0">Save to Files</h3>
+                <p className="text-sm text-muted m-0">Enter a filename for this {lang} snippet.</p>
                 <input
-                  className="modal-input"
+                  className="w-full bg-bg border border-border rounded px-3 py-2 text-sm text-primary focus:outline-none focus:border-accent"
                   type="text"
                   placeholder={`my_snippet.${lang === 'python' ? 'py' : lang === 'javascript' ? 'js' : lang === 'java' ? 'java' : lang === 'cpp' ? 'cpp' : 'c'}`}
                   value={saveFilename}
@@ -203,10 +211,13 @@ export default function Playground({ onBack }) {
                   onKeyDown={e => e.key === 'Enter' && handleSaveConfirm()}
                   autoFocus
                 />
-                <div className="modal-actions">
-                  <button className="modal-btn-cancel" onClick={() => setShowSaveModal(false)}>Cancel</button>
+                <div className="flex gap-2 justify-end">
                   <button
-                    className="modal-btn-confirm"
+                    className="px-4 py-2 text-sm border border-border rounded text-muted hover:text-primary bg-transparent transition-colors"
+                    onClick={() => setShowSaveModal(false)}
+                  >Cancel</button>
+                  <button
+                    className="px-4 py-2 text-sm bg-accent hover:bg-accent-h text-white rounded border-none transition-colors disabled:opacity-50"
                     onClick={handleSaveConfirm}
                     disabled={!saveFilename.trim() || saveLoading}
                   >
@@ -216,11 +227,17 @@ export default function Playground({ onBack }) {
               </>
             ) : (
               <>
-                <h3 className="modal-title">Sign in to save</h3>
-                <p className="modal-desc">Create a free account to save your code to your personal Files library.</p>
-                <div className="modal-actions">
-                  <button className="modal-btn-cancel" onClick={() => setShowSaveModal(false)}>Cancel</button>
-                  <button className="modal-btn-confirm" onClick={onBack}>Sign In / Register</button>
+                <h3 className="text-base font-semibold m-0">Sign in to save</h3>
+                <p className="text-sm text-muted m-0">Create a free account to save your code to your personal Files library.</p>
+                <div className="flex gap-2 justify-end">
+                  <button
+                    className="px-4 py-2 text-sm border border-border rounded text-muted hover:text-primary bg-transparent transition-colors"
+                    onClick={() => setShowSaveModal(false)}
+                  >Cancel</button>
+                  <button
+                    className="px-4 py-2 text-sm bg-accent hover:bg-accent-h text-white rounded border-none transition-colors"
+                    onClick={onBack}
+                  >Sign In / Register</button>
                 </div>
               </>
             )}

@@ -8,6 +8,7 @@ from rest_framework import serializers
 from .services import convert_code
 from .ai_service import ai_explain_code
 from .models import ConversionHistory, SharedSnippet
+from .throttles import AIBurstThrottle, AISustainedThrottle, RunCodeAnonThrottle
 
 # ── Wandbox compiler list — fetched once, cached for the process lifetime ─────
 _wandbox_compilers = None
@@ -61,8 +62,10 @@ class ConvertCodeView(APIView):
     Body: { source_language, target_language, code }
     """
     permission_classes = [IsAuthenticated]
+    throttle_classes = [AIBurstThrottle, AISustainedThrottle]
 
     VALID_LANGUAGES = {'python', 'c', 'java', 'javascript', 'cpp'}
+    MAX_CODE_LENGTH = 50_000
 
     def post(self, request):
         source = request.data.get('source_language', '').lower()
@@ -80,6 +83,14 @@ class ConvertCodeView(APIView):
                 {'error': f'Languages must be one of: {", ".join(sorted(self.VALID_LANGUAGES))}.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+        if len(code) > self.MAX_CODE_LENGTH:
+            return Response(
+                {'error': f'Code must be under {self.MAX_CODE_LENGTH:,} characters.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        # Strip null bytes that could cause issues in downstream processing
+        code = code.replace('\x00', '')
 
         result = convert_code(source, target, code)
 
@@ -163,7 +174,9 @@ class RunCodeView(APIView):
     Proxies code execution to Wandbox, picking the best available compiler.
     """
     permission_classes = [AllowAny]
+    throttle_classes = [RunCodeAnonThrottle]
     SUPPORTED = {'python', 'c', 'java', 'javascript', 'cpp'}
+    MAX_CODE_LENGTH = 10_000
 
     def post(self, request):
         language = request.data.get('language', '').lower().strip()
@@ -177,6 +190,12 @@ class RunCodeView(APIView):
             )
         if not code.strip():
             return Response({'error': 'No code provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if len(code) > self.MAX_CODE_LENGTH:
+            return Response(
+                {'error': f'Code must be under {self.MAX_CODE_LENGTH:,} characters.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         compiler = _pick_compiler(language)
         if not compiler:
@@ -218,8 +237,10 @@ class ExplainCodeView(APIView):
     Returns a plain-English explanation of the conversion differences.
     """
     permission_classes = [IsAuthenticated]
+    throttle_classes = [AIBurstThrottle, AISustainedThrottle]
 
     VALID_LANGUAGES = {'python', 'c', 'java', 'javascript', 'cpp'}
+    MAX_CODE_LENGTH = 50_000
 
     def post(self, request):
         source = request.data.get('source_language', '').lower()
@@ -236,6 +257,12 @@ class ExplainCodeView(APIView):
         if source not in self.VALID_LANGUAGES or target not in self.VALID_LANGUAGES:
             return Response(
                 {'error': f'Languages must be one of: {", ".join(sorted(self.VALID_LANGUAGES))}.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if len(input_code) > self.MAX_CODE_LENGTH or len(output_code) > self.MAX_CODE_LENGTH:
+            return Response(
+                {'error': f'Code must be under {self.MAX_CODE_LENGTH:,} characters.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 

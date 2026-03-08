@@ -1,7 +1,14 @@
-// src/components/LanguageSelector.jsx
+// src/components/LanguageSelector.tsx
 // Dropdown for selecting a programming language.
 
-const LANGUAGE_LABELS = {
+interface LanguageSelectorProps {
+  value: string;
+  onChange: (lang: string) => void;
+  languages: string[];
+  label?: string;
+}
+
+const LANGUAGE_LABELS: Record<string, string> = {
   python: 'Python',
   c: 'C',
   java: 'Java',
@@ -10,7 +17,7 @@ const LANGUAGE_LABELS = {
   other: 'Other',
 };
 
-export default function LanguageSelector({ value, onChange, languages, label }) {
+export default function LanguageSelector({ value, onChange, languages, label }: LanguageSelectorProps) {
   return (
     <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)' }}>
       {label && <span>{label}</span>}

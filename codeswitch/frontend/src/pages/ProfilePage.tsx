@@ -6,7 +6,7 @@ const LANG_COLORS = {
   python: '#3572A5', javascript: '#f1e05a', java: '#b07219', c: '#555555', cpp: '#f34b7d',
 };
 
-const MEDIA_BASE = (process.env.REACT_APP_API_URL || 'http://localhost:8000/api').replace('/api', '');
+const MEDIA_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8000/api').replace('/api', '');
 
 export default function ProfilePage({ username, onBack, isOwner = false }) {
   const [profile, setProfile] = useState(null);
@@ -103,41 +103,50 @@ export default function ProfilePage({ username, onBack, isOwner = false }) {
     : '';
 
   return (
-    <div className={isOwner ? 'profile-page-inner' : 'profile-page'}>
+    <div className={isOwner ? '' : 'min-h-screen'}>
       {!isOwner && (
-        <nav className="share-nav">
-          <div className="share-nav-brand">
+        <nav className="flex items-center justify-between px-5 py-3 border-b border-border">
+          <div className="flex items-center gap-2 font-semibold">
             <Logo size={28} id="profile-nav" />
             <span>CodeSwitch</span>
           </div>
-          <button className="share-back" onClick={onBack}>← Back</button>
+          <button
+            className="text-sm text-muted hover:text-primary cursor-pointer border border-border rounded px-3 py-1.5 transition-colors bg-transparent"
+            onClick={onBack}
+          >← Back</button>
         </nav>
       )}
 
-      {error && <p className="share-error" style={{ textAlign: 'center', paddingTop: 60 }}>{error}</p>}
+      {error && <p className="bg-danger/10 border border-danger text-danger rounded p-2.5 text-sm m-5" style={{ textAlign: 'center', paddingTop: 60 }}>{error}</p>}
 
       {!profile && !error && (
-        <div className="share-loading">Loading profile...</div>
+        <div className="flex items-center justify-center p-12 text-muted text-sm">Loading profile...</div>
       )}
 
       {profile && (
-        <div className="profile-content">
-          <div className="profile-hero">
+        <div className="max-w-2xl mx-auto p-5 flex flex-col gap-5">
+          <div className="flex items-center gap-5 bg-surface border border-border rounded p-5">
             {avatarUrl
-              ? <img className="profile-avatar-img" src={avatarUrl} alt="avatar" />
-              : <div className="profile-avatar">{initials}</div>
+              ? <img className="w-[72px] h-[72px] rounded-full object-cover flex-shrink-0" src={avatarUrl} alt="avatar" />
+              : <div className="w-[72px] h-[72px] rounded-full bg-accent text-white text-xl font-bold flex items-center justify-center flex-shrink-0 tracking-wide">{initials}</div>
             }
-            <div className="profile-info">
-              {displayName && <p className="profile-display-name">{displayName}</p>}
-              <h2 className="profile-username">{profile.username}</h2>
-              {profile.bio && !editing && <p className="profile-bio">{profile.bio}</p>}
-              {joinedDate && <p className="profile-joined">Member since {joinedDate}</p>}
-              <div className="profile-hero-actions">
-                <button className="profile-share-btn" onClick={handleCopyUrl}>
+            <div className="flex flex-col gap-1">
+              {displayName && <p className="text-base font-semibold m-0">{displayName}</p>}
+              <h2 className="text-xl font-bold m-0">{profile.username}</h2>
+              {profile.bio && !editing && <p className="text-sm text-muted m-0">{profile.bio}</p>}
+              {joinedDate && <p className="text-xs text-muted m-0">Member since {joinedDate}</p>}
+              <div className="flex gap-2 mt-2">
+                <button
+                  className="text-xs border border-border rounded px-3 py-1.5 text-muted hover:text-primary cursor-pointer bg-transparent transition-colors"
+                  onClick={handleCopyUrl}
+                >
                   {copied ? 'Copied!' : '⬆ Copy profile link'}
                 </button>
                 {isOwner && !editing && (
-                  <button className="profile-edit-btn" onClick={() => setEditing(true)}>
+                  <button
+                    className="text-xs border border-accent rounded px-3 py-1.5 text-accent hover:bg-accent/10 cursor-pointer bg-transparent transition-colors"
+                    onClick={() => setEditing(true)}
+                  >
                     ✏ Edit Profile
                   </button>
                 )}
@@ -146,10 +155,10 @@ export default function ProfilePage({ username, onBack, isOwner = false }) {
           </div>
 
           {isOwner && editing && (
-            <div className="profile-edit-form">
+            <div className="bg-surface border border-border rounded p-4 flex flex-col gap-3">
               <h4>Edit Profile</h4>
-              <div className="profile-form-row">
-                <div className="profile-form-field">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1">
                   <label>First Name</label>
                   <input
                     type="text"
@@ -158,7 +167,7 @@ export default function ProfilePage({ username, onBack, isOwner = false }) {
                     placeholder="First name"
                   />
                 </div>
-                <div className="profile-form-field">
+                <div className="flex flex-col gap-1">
                   <label>Last Name</label>
                   <input
                     type="text"
@@ -168,7 +177,7 @@ export default function ProfilePage({ username, onBack, isOwner = false }) {
                   />
                 </div>
               </div>
-              <div className="profile-form-field">
+              <div className="flex flex-col gap-1">
                 <label>Bio</label>
                 <textarea
                   rows={3}
@@ -177,11 +186,11 @@ export default function ProfilePage({ username, onBack, isOwner = false }) {
                   placeholder="Tell others about yourself..."
                 />
               </div>
-              <div className="profile-form-field">
+              <div className="flex flex-col gap-1">
                 <label>Profile Photo</label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   {avatarPreview && (
-                    <img className="profile-avatar-preview" src={avatarPreview} alt="preview" />
+                    <img className="w-12 h-12 rounded-full object-cover" src={avatarPreview} alt="preview" />
                   )}
                   <input
                     ref={fileInputRef}
@@ -191,43 +200,50 @@ export default function ProfilePage({ username, onBack, isOwner = false }) {
                   />
                 </div>
               </div>
-              {saveError && <p className="profile-save-error">{saveError}</p>}
-              <div className="profile-form-actions">
-                <button className="profile-form-cancel" onClick={handleCancel}>Cancel</button>
-                <button className="profile-form-save" onClick={handleSave} disabled={saving}>
+              {saveError && <p className="text-sm text-danger m-0">{saveError}</p>}
+              <div className="flex gap-2 justify-end">
+                <button
+                  className="px-4 py-2 text-sm border border-border rounded text-muted hover:text-primary cursor-pointer bg-transparent transition-colors"
+                  onClick={handleCancel}
+                >Cancel</button>
+                <button
+                  className="px-4 py-2 text-sm bg-accent hover:bg-accent-h text-white rounded border-none cursor-pointer transition-colors disabled:opacity-50"
+                  onClick={handleSave}
+                  disabled={saving}
+                >
                   {saving ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </div>
           )}
 
-          <div className="profile-stats">
-            <div className="profile-stat-card">
-              <span className="profile-stat-value">{profile.conversion_count ?? '—'}</span>
-              <span className="profile-stat-label">Conversions</span>
+          <div className="grid grid-cols-4 gap-3">
+            <div className="bg-surface border border-border rounded p-4 flex flex-col items-center text-center">
+              <span className="text-[28px] font-bold text-accent leading-tight">{profile.conversion_count ?? '—'}</span>
+              <span className="text-[11px] text-muted mt-1 uppercase tracking-wide">Conversions</span>
             </div>
-            <div className="profile-stat-card">
-              <span className="profile-stat-value">{profile.lessons_completed ?? '—'}</span>
-              <span className="profile-stat-label">Lessons Done</span>
+            <div className="bg-surface border border-border rounded p-4 flex flex-col items-center text-center">
+              <span className="text-[28px] font-bold text-accent leading-tight">{profile.lessons_completed ?? '—'}</span>
+              <span className="text-[11px] text-muted mt-1 uppercase tracking-wide">Lessons Done</span>
             </div>
-            <div className="profile-stat-card">
-              <span className="profile-stat-value">{profile.modules_completed ?? '—'}</span>
-              <span className="profile-stat-label">Modules Complete</span>
+            <div className="bg-surface border border-border rounded p-4 flex flex-col items-center text-center">
+              <span className="text-[28px] font-bold text-accent leading-tight">{profile.modules_completed ?? '—'}</span>
+              <span className="text-[11px] text-muted mt-1 uppercase tracking-wide">Modules Complete</span>
             </div>
-            <div className="profile-stat-card">
-              <span className="profile-stat-value">{profile.languages_used?.length ?? '—'}</span>
-              <span className="profile-stat-label">Languages Used</span>
+            <div className="bg-surface border border-border rounded p-4 flex flex-col items-center text-center">
+              <span className="text-[28px] font-bold text-accent leading-tight">{profile.languages_used?.length ?? '—'}</span>
+              <span className="text-[11px] text-muted mt-1 uppercase tracking-wide">Languages Used</span>
             </div>
           </div>
 
           {profile.languages_used?.length > 0 && (
-            <div className="profile-langs">
+            <div className="bg-surface border border-border rounded p-4">
               <h4>Languages Used</h4>
-              <div className="profile-lang-chips">
+              <div className="flex flex-wrap gap-2 mt-2">
                 {profile.languages_used.map(lang => (
                   <span
                     key={lang}
-                    className="profile-lang-chip"
+                    className="text-xs px-2.5 py-1 rounded-full border font-mono font-semibold"
                     style={{ borderColor: LANG_COLORS[lang] || '#8b8b8b', color: LANG_COLORS[lang] || '#8b8b8b' }}
                   >
                     {lang}

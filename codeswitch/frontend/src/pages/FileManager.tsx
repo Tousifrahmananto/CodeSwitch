@@ -86,21 +86,29 @@ export default function FileManager() {
   };
 
   return (
-    <div className="file-manager">
-      {error && <p className="error">{error}</p>}
-      <div className="file-list">
+    <div className="grid gap-5 h-[calc(100vh-56px)]" style={{ gridTemplateColumns: '260px 1fr' }}>
+      {error && <p className="col-span-full bg-danger/10 border border-danger text-danger rounded p-2.5 text-sm mb-3">{error}</p>}
+      <div className="bg-surface border border-border rounded p-4 overflow-y-auto">
         <h3>My Files</h3>
         <button onClick={handleNew}>+ New File</button>
         {files.map((f) => (
-          <div key={f.id} className={`file-item${selected?.id === f.id ? ' active' : ''}`} onClick={() => handleSelect(f)}>
-            <span className="file-icon" style={{ color: LANG_COLORS[f.language] || '#8b8b8b' }}>◆</span>
-            <span className="file-name">{f.filename || '(unnamed)'}</span>
-            <button className="file-delete" title="Delete" onClick={(e) => { e.stopPropagation(); handleDelete(f.id); }}>×</button>
+          <div
+            key={f.id}
+            className={`flex items-center px-2 py-0.5 rounded cursor-pointer gap-1.5 transition-colors min-h-[24px] text-primary hover:bg-border${selected?.id === f.id ? ' bg-accent/15' : ''}`}
+            onClick={() => handleSelect(f)}
+          >
+            <span className="flex-shrink-0" style={{ color: LANG_COLORS[f.language] || '#8b8b8b' }}>◆</span>
+            <span className="flex-1 truncate text-sm">{f.filename || '(unnamed)'}</span>
+            <button
+              className="ml-auto text-muted hover:text-danger text-sm flex-shrink-0 cursor-pointer border-none bg-transparent p-0"
+              title="Delete"
+              onClick={(e) => { e.stopPropagation(); handleDelete(f.id); }}
+            >×</button>
           </div>
         ))}
       </div>
 
-      <div className="file-editor">
+      <div className="bg-surface border border-border rounded p-4 flex flex-col gap-2.5">
         <h3>{selected ? 'Edit File' : 'New File'}</h3>
         <input
           placeholder="Filename (e.g. hello.py)"
@@ -118,9 +126,16 @@ export default function FileManager() {
           language={form.language}
           height="380px"
         />
-        <div className="file-editor-actions">
-          <button className="btn-save" onClick={handleSave}>💾 Save</button>
-          <button className="btn-download" onClick={handleDownload} disabled={!form.code_content}>⬇ Download</button>
+        <div className="flex gap-2">
+          <button
+            className="bg-accent hover:bg-accent-h text-white border-none rounded px-5 py-2 text-sm font-semibold transition-colors self-start cursor-pointer"
+            onClick={handleSave}
+          >💾 Save</button>
+          <button
+            className="bg-transparent border border-border text-primary hover:bg-border rounded px-5 py-2 text-sm font-medium transition-colors self-start cursor-pointer disabled:opacity-40"
+            onClick={handleDownload}
+            disabled={!form.code_content}
+          >⬇ Download</button>
         </div>
       </div>
     </div>

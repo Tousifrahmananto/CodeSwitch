@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from rest_framework_simplejwt.views import TokenRefreshView
+from users.views import CookieTokenRefreshView
 from .admin_views import (
     AdminStatsView, AdminUsersView, AdminUserDetailView,
     AdminConversionsView, AdminModulesView, AdminModuleDetailView,
@@ -15,7 +15,8 @@ urlpatterns = [
     path('api/', include('converter.urls')),
     path('api/', include('files.urls')),
     path('api/', include('learning.urls')),
-    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    # Cookie-based token refresh — reads refresh_token cookie, sets new cookies
+    path('api/token/refresh/', CookieTokenRefreshView.as_view(), name='token_refresh'),
 
     # Admin API
     path('api/admin/stats',                             AdminStatsView.as_view()),

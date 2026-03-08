@@ -238,7 +238,7 @@ export default function Landing({ onGetStarted }) {
   }, []);
 
   return (
-    <div className="landing">
+    <div className="relative overflow-hidden min-h-screen">
 
       {/* ── Decorative background ── */}
       <div className="land-bg-grid" aria-hidden="true" />
@@ -246,19 +246,28 @@ export default function Landing({ onGetStarted }) {
       <div className="land-orb land-orb-2" aria-hidden="true" />
 
       {/* ── Navbar ── */}
-      <nav className="land-nav">
-        <div className="land-nav-brand">
+      <nav className="sticky top-0 z-50 flex items-center justify-between px-8 py-4 border-b border-border bg-bg/80 backdrop-blur">
+        <div className="flex items-center gap-2.5">
           <Logo size={30} id="nav" />
-          <span className="land-nav-name">CodeSwitch</span>
+          <span className="font-bold text-base text-primary">CodeSwitch</span>
         </div>
-        <div className="land-nav-links">
+        <div className="flex items-center gap-6">
           <a href="#features" className="land-nav-link">Features</a>
           <a href="#modules" className="land-nav-link">Modules</a>
         </div>
-        <div className="land-nav-actions">
-          <button className="land-btn-ghost" onClick={goToPlayground}>Try Playground</button>
-          <button className="land-btn-ghost" onClick={onGetStarted}>Sign In</button>
-          <button className="land-btn-primary" onClick={onGetStarted}>Get Started</button>
+        <div className="flex items-center gap-2">
+          <button
+            className="bg-transparent border border-border text-primary hover:bg-border rounded px-4 py-1.5 text-sm font-medium transition-colors"
+            onClick={goToPlayground}
+          >Try Playground</button>
+          <button
+            className="bg-transparent border border-border text-primary hover:bg-border rounded px-4 py-1.5 text-sm font-medium transition-colors"
+            onClick={onGetStarted}
+          >Sign In</button>
+          <button
+            className="bg-accent hover:bg-accent-h text-white border-none rounded px-4 py-1.5 text-sm font-semibold transition-colors"
+            onClick={onGetStarted}
+          >Get Started</button>
         </div>
       </nav>
 
@@ -270,26 +279,32 @@ export default function Landing({ onGetStarted }) {
             AI-Powered · Free to Use · Open Source
           </div>
 
-          <h1 className="land-hero-h1">
+          <h1 className="text-4xl font-bold leading-tight m-0">
             Translate Code<br />
-            <span className="land-h1-accent">Between Languages</span><br />
+            <span className="text-accent">Between Languages</span><br />
             Instantly
           </h1>
 
-          <p className="land-hero-sub">
+          <p className="text-muted text-base leading-relaxed m-0">
             CodeSwitch converts Python, Java, and C with AI accuracy.
             Learn programming with 13 structured modules, manage your
             files in the cloud, and track your progress — all in one place.
           </p>
 
-          <div className="land-hero-btns">
-            <button className="land-btn-primary land-btn-lg" onClick={onGetStarted}>
+          <div className="flex items-center gap-3 flex-wrap">
+            <button
+              className="bg-accent hover:bg-accent-h text-white border-none rounded px-6 py-3 text-sm font-semibold transition-colors inline-flex items-center gap-2"
+              onClick={onGetStarted}
+            >
               Start for Free
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M5 12h14M12 5l7 7-7 7" />
               </svg>
             </button>
-            <button className="land-btn-outline land-btn-lg" onClick={goToPlayground}>
+            <button
+              className="bg-transparent border border-border text-primary hover:bg-border/50 rounded px-6 py-3 text-sm font-medium transition-colors inline-flex items-center gap-2"
+              onClick={goToPlayground}
+            >
               Try Playground
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M5 3l14 9-14 9V3z" />
@@ -297,9 +312,9 @@ export default function Landing({ onGetStarted }) {
             </button>
           </div>
 
-          <div className="land-tech-stack">
+          <div className="flex items-center flex-wrap gap-2 mt-1">
             {['Django', 'React 18', 'Monaco Editor', 'JWT Auth', 'Groq / OpenAI'].map(t => (
-              <span key={t} className="land-tech-chip">{t}</span>
+              <span key={t} className="text-xs text-muted border border-border rounded px-2.5 py-1 font-mono">{t}</span>
             ))}
           </div>
         </div>
@@ -310,16 +325,16 @@ export default function Landing({ onGetStarted }) {
       </section>
 
       {/* ── Stats strip ── */}
-      <div className="land-stats land-fade-up land-delay-2">
+      <div className="flex items-center justify-center gap-12 py-6 border-y border-border bg-surface/50 land-fade-up land-delay-2">
         {[
           { value: '5', label: 'Languages Supported' },
           { value: '13', label: 'Learning Modules' },
           { value: '100+', label: 'Code Patterns' },
           { value: 'AI', label: 'Powered Engine' },
         ].map(s => (
-          <div key={s.label} className="land-stat-item">
-            <span className="land-stat-val">{s.value}</span>
-            <span className="land-stat-lbl">{s.label}</span>
+          <div key={s.label} className="flex flex-col items-center gap-1">
+            <span className="text-2xl font-bold text-accent">{s.value}</span>
+            <span className="text-xs text-muted">{s.label}</span>
           </div>
         ))}
       </div>
@@ -330,23 +345,26 @@ export default function Landing({ onGetStarted }) {
         className={`land-features-section${featuresIn ? ' animate-in' : ''}`}
         ref={featuresRef}
       >
-        <div className="land-section-hdr">
-          <h2 className="land-section-h2">Everything you need to learn and convert code</h2>
-          <p className="land-section-p">Three core tools built for CS students and developers.</p>
+        <div className="text-center mb-8">
+          <h2 className="text-2xl font-bold m-0 mb-2">Everything you need to learn and convert code</h2>
+          <p className="text-muted text-sm m-0">Three core tools built for CS students and developers.</p>
         </div>
 
-        <div className="land-features-grid">
+        <div className="grid grid-cols-3 gap-5 px-8 max-w-5xl mx-auto">
           {FEATURES.map((f, i) => (
             <div
               key={f.title}
               className="land-feat-card"
               style={{ '--accent': f.accent, animationDelay: `${i * 0.13}s` }}
             >
-              <div className="land-feat-icon" style={{ color: f.accent, background: f.accent + '18' }}>
+              <div
+                className="w-11 h-11 rounded-lg flex items-center justify-center mb-4"
+                style={{ color: f.accent, background: f.accent + '18' }}
+              >
                 {f.icon}
               </div>
-              <h3 className="land-feat-title">{f.title}</h3>
-              <p className="land-feat-desc">{f.desc}</p>
+              <h3 className="text-base font-semibold mb-2 m-0">{f.title}</h3>
+              <p className="text-sm text-muted leading-relaxed m-0">{f.desc}</p>
             </div>
           ))}
         </div>
@@ -358,12 +376,12 @@ export default function Landing({ onGetStarted }) {
         className={`land-modules-section${modulesIn ? ' animate-in' : ''}`}
         ref={modulesRef}
       >
-        <div className="land-section-hdr">
-          <h2 className="land-section-h2">13 modules — from basics to algorithms</h2>
-          <p className="land-section-p">Structured learning with interactive examples and progress tracking.</p>
+        <div className="text-center mb-8">
+          <h2 className="text-2xl font-bold m-0 mb-2">13 modules — from basics to algorithms</h2>
+          <p className="text-muted text-sm m-0">Structured learning with interactive examples and progress tracking.</p>
         </div>
 
-        <div className="land-modules-grid">
+        <div className="grid gap-2 px-8 max-w-3xl mx-auto">
           {MODULES.map((m, i) => {
             const tc = TAG_COLORS[m.tag];
             return (
@@ -372,10 +390,10 @@ export default function Landing({ onGetStarted }) {
                 className="land-module-row"
                 style={{ animationDelay: `${i * 0.055}s` }}
               >
-                <span className="land-mod-num">{m.n}</span>
-                <span className="land-mod-name">{m.name}</span>
+                <span className="text-xs font-mono text-muted w-8 flex-shrink-0">{m.n}</span>
+                <span className="text-sm font-medium flex-1">{m.name}</span>
                 <span
-                  className="land-mod-tag"
+                  className="text-[11px] font-semibold px-2.5 py-0.5 rounded border flex-shrink-0"
                   style={{ color: tc.text, background: tc.bg, borderColor: tc.border }}
                 >
                   {m.tag}
@@ -387,15 +405,18 @@ export default function Landing({ onGetStarted }) {
       </section>
 
       {/* ── CTA ── */}
-      <section className="land-cta-section">
-        <div className="land-cta-box">
+      <section className="py-20 px-8 text-center">
+        <div className="max-w-lg mx-auto flex flex-col items-center gap-4">
           <Logo size={52} id="cta" />
-          <h2 className="land-cta-h2">Ready to switch languages?</h2>
-          <p className="land-cta-p">
+          <h2 className="text-2xl font-bold m-0">Ready to switch languages?</h2>
+          <p className="text-muted text-sm m-0 leading-relaxed">
             Join students and developers already using CodeSwitch to learn,
             convert, and build.
           </p>
-          <button className="land-btn-primary land-btn-lg" onClick={onGetStarted}>
+          <button
+            className="bg-accent hover:bg-accent-h text-white border-none rounded px-6 py-3 text-sm font-semibold transition-colors inline-flex items-center gap-2"
+            onClick={onGetStarted}
+          >
             Create Free Account
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M5 12h14M12 5l7 7-7 7" />
@@ -405,15 +426,15 @@ export default function Landing({ onGetStarted }) {
       </section>
 
       {/* ── Footer ── */}
-      <footer className="land-footer">
-        <div className="land-footer-brand">
+      <footer className="py-8 px-8 border-t border-border text-center flex flex-col gap-2">
+        <div className="flex items-center justify-center gap-2 mb-1">
           <Logo size={22} id="footer" />
-          <span className="land-footer-name">CodeSwitch</span>
+          <span className="font-semibold text-sm">CodeSwitch</span>
         </div>
-        <p className="land-footer-line">
+        <p className="text-xs text-muted m-0">
           Built with Django, React 18, and Monaco Editor. A full-stack project for code learning and translation.
         </p>
-        <p className="land-footer-copy">
+        <p className="text-xs text-muted m-0">
           &copy; {new Date().getFullYear()} CodeSwitch — Made for the open-source community.
         </p>
       </footer>
