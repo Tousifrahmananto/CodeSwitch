@@ -169,7 +169,12 @@ X_FRAME_OPTIONS = 'DENY'
 SECURE_HSTS_SECONDS = 31536000 if not DEBUG else 0
 SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
 SECURE_HSTS_PRELOAD = not DEBUG
-SECURE_SSL_REDIRECT = not DEBUG
+# Railway (and most PaaS) terminates SSL at the load balancer and forwards to
+# Django over plain HTTP internally. Setting SECURE_SSL_REDIRECT=True causes an
+# infinite redirect loop. Instead, trust the X-Forwarded-Proto header so Django
+# knows the original request was HTTPS without redirecting itself.
+SECURE_SSL_REDIRECT = False
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 LOGGING = {
