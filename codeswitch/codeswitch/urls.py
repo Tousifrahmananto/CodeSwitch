@@ -1,5 +1,7 @@
 from django.contrib import admin
 from django.urls import path, include
+from django.conf import settings
+from django.conf.urls.static import static
 from rest_framework_simplejwt.views import TokenRefreshView
 from .admin_views import (
     AdminStatsView, AdminUsersView, AdminUserDetailView,
@@ -24,4 +26,4 @@ urlpatterns = [
     path('api/admin/modules/<int:pk>',                  AdminModuleDetailView.as_view()),
     path('api/admin/modules/<int:pk>/lessons',          AdminModuleLessonsView.as_view()),
     path('api/admin/lessons/<int:pk>',                  AdminLessonDetailView.as_view()),
-]
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
