@@ -1294,7 +1294,7 @@ CONVERTERS = {
 }
 
 
-def convert_code(source_lang: str, target_lang: str, code: str) -> dict:
+def convert_code(source_lang: str, target_lang: str, code: str, user_key: str = None) -> dict:
     """
     Main entry point for code conversion.
 
@@ -1313,7 +1313,7 @@ def convert_code(source_lang: str, target_lang: str, code: str) -> dict:
 
     # ── 1. Attempt AI conversion ───────────────────────────────────────────────
     from .ai_service import ai_convert_code
-    ai_result = ai_convert_code(src, tgt, code)
+    ai_result = ai_convert_code(src, tgt, code, user_key=user_key)
     if ai_result['success']:
         return ai_result
 

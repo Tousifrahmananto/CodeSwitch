@@ -39,6 +39,15 @@ client.interceptors.response.use(
   }
 );
 
+// Inject user-provided API key header if one has been saved in localStorage
+client.interceptors.request.use((config) => {
+  const userKey = localStorage.getItem('userApiKey');
+  if (userKey) {
+    config.headers['X-User-Api-Key'] = userKey;
+  }
+  return config;
+});
+
 // ── Auth ──────────────────────────────────────
 export const register = (data: Record<string, string>): Promise<AxiosResponse> =>
   client.post('/register', data);

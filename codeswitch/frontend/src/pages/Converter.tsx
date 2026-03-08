@@ -55,6 +55,14 @@ export default function Converter() {
   const [explainLoading, setExplainLoading] = useState(false);
   const [showExplanation, setShowExplanation] = useState(false);
 
+  // User API key state
+  const [quotaExhausted, setQuotaExhausted] = useState(false);
+  const [userKeyInput, setUserKeyInput] = useState('');
+  const [hasUserKey, setHasUserKey] = useState(!!localStorage.getItem('userApiKey'));
+
+  const isQuotaError = (msg: string) =>
+    msg.includes('All API keys exhausted') || msg.includes('AI_API_KEY not set');
+
   const handleConvert = async () => {
     if (!inputCode.trim()) return setError('Please enter some code.');
     if (sourceLang === targetLang) return setError('Source and target languages must differ.');
@@ -74,8 +82,10 @@ export default function Converter() {
       });
       setOutputCode(data.output);
       setEngine(data.engine || 'rules');
-    } catch (err) {
-      setError(err.response?.data?.error || 'Conversion failed.');
+    } catch (err: any) {
+      const msg: string = err.response?.data?.error || 'Conversion failed.';
+      setError(msg);
+      if (isQuotaError(msg)) setQuotaExhausted(true);
     } finally {
       setLoading(false);
     }
@@ -150,8 +160,14 @@ export default function Converter() {
         target_language: targetLang,
       });
       setExplanation(data.explanation);
-    } catch {
-      setExplanation('Could not generate explanation. Make sure your AI_API_KEY is set in .env.');
+    } catch (err: any) {
+      const msg: string = err.response?.data?.error || '';
+      if (isQuotaError(msg)) {
+        setQuotaExhausted(true);
+        setExplanation('AI capacity reached — add your own API key below to continue.');
+      } else {
+        setExplanation('Could not generate explanation. Please try again.');
+      }
     } finally {
       setExplainLoading(false);
     }
@@ -160,6 +176,22 @@ export default function Converter() {
   const handleThemeChange = (t) => {
     setTheme(t);
     localStorage.setItem('editor_theme', t);
+  };
+
+  const handleSaveUserKey = () => {
+    const key = userKeyInput.trim();
+    if (!key) return;
+    localStorage.setItem('userApiKey', key);
+    setHasUserKey(true);
+    setUserKeyInput('');
+    setQuotaExhausted(false);
+    setError('');
+    handleConvert();
+  };
+
+  const handleRemoveUserKey = () => {
+    localStorage.removeItem('userApiKey');
+    setHasUserKey(false);
   };
 
   // Compute output match badge when both sides are run
@@ -226,10 +258,54 @@ export default function Converter() {
           <select value={theme} onChange={e => handleThemeChange(e.target.value)}>
             {THEMES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
           </select>
+          {hasUserKey && (
+            <>
+              <span className="text-xs bg-success/15 text-success border border-success/30 rounded px-2 py-1 whitespace-nowrap">✓ Your API key active</span>
+              <button className="text-xs text-muted hover:text-danger bg-transparent border-none cursor-pointer p-0" onClick={handleRemoveUserKey}>Remove</button>
+            </>
+          )}
         </div>
       </div>
 
       {error && <p className="bg-danger/10 border border-danger text-danger rounded p-2.5 text-sm mb-3">{error}</p>}
+
+      {quotaExhausted && (
+        <div className="bg-surface border border-border rounded p-4 mb-4 flex flex-col gap-3">
+          <div>
+            <p className="text-sm font-semibold text-primary mb-1">AI capacity reached</p>
+            <p className="text-xs text-muted">Our AI quota is temporarily exhausted. Add your own free API key to keep using AI-powered conversions.</p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap text-xs text-muted">
+            <span>Get a free key:</span>
+            <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">Groq Console</a>
+            <span>·</span>
+            <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">Gemini Studio</a>
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="password"
+              className="flex-1 bg-bg border border-border rounded px-3 py-1.5 text-sm text-primary focus:outline-none focus:border-accent"
+              placeholder="Paste your API key here"
+              value={userKeyInput}
+              onChange={e => setUserKeyInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSaveUserKey()}
+            />
+            <button
+              className="bg-accent hover:bg-accent-h text-white border-none rounded px-4 py-1.5 text-sm font-semibold transition-colors disabled:opacity-50"
+              onClick={handleSaveUserKey}
+              disabled={!userKeyInput.trim()}
+            >
+              Save & Retry
+            </button>
+            <button
+              className="bg-transparent border border-border text-muted hover:text-primary rounded px-3 py-1.5 text-sm transition-colors"
+              onClick={() => setQuotaExhausted(false)}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       {engine && (
         <p className={engine === 'ai'

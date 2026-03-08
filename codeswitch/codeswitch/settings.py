@@ -149,6 +149,9 @@ SIMPLE_JWT = {
 CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='http://localhost:3000').split(',')
 # Credentials (cookies) must be sent cross-origin — requires explicit origin list (no wildcard)
 CORS_ALLOW_CREDENTIALS = True
+# Allow the user-provided API key header from the frontend
+from corsheaders.defaults import default_headers as _default_cors_headers
+CORS_ALLOW_HEADERS = list(_default_cors_headers) + ['X-User-Api-Key']
 CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='http://localhost:8000').split(',')
 
 # ── Cookie security ───────────────────────────────────────────────────────────
