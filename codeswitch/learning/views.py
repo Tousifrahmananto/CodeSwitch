@@ -3,6 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import serializers
+from django.db.models import Count
 from django.utils import timezone
 from .models import LearningModule, Lesson, UserProgress, Quiz, QuizAttempt
 
@@ -23,7 +24,7 @@ class ModuleSerializer(serializers.ModelSerializer):
         fields = ('id', 'title', 'description', 'difficulty', 'language', 'lesson_count')
 
     def get_lesson_count(self, obj):
-        return obj.lessons.count()
+        return obj.lesson_count
 
 
 class ModuleDetailSerializer(ModuleSerializer):
@@ -46,14 +47,14 @@ class ProgressSerializer(serializers.ModelSerializer):
 
 class ModuleListView(generics.ListAPIView):
     """GET /api/modules — List all available learning modules."""
-    queryset = LearningModule.objects.all()
+    queryset = LearningModule.objects.annotate(lesson_count=Count('lessons'))
     serializer_class = ModuleSerializer
     permission_classes = [IsAuthenticated]
 
 
 class ModuleDetailView(generics.RetrieveAPIView):
     """GET /api/modules/{id} — Get a module with its lessons."""
-    queryset = LearningModule.objects.all()
+    queryset = LearningModule.objects.prefetch_related('lessons')
     serializer_class = ModuleDetailSerializer
     permission_classes = [IsAuthenticated]
 
@@ -95,7 +96,8 @@ class GetProgressView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return UserProgress.objects.filter(user=self.request.user)
+        return UserProgress.objects.filter(user=self.request.user)\
+            .select_related('lesson', 'module')
 
 
 class GetLessonQuizView(APIView):
@@ -150,7 +152,7 @@ class SubmitQuizAttemptView(APIView):
         correct_options = {}
         correct_count = 0
         for q in questions:
-            correct_option = q.options.filter(is_correct=True).first()
+            correct_option = next((o for o in q.options.all() if o.is_correct), None)
             if correct_option:
                 correct_options[str(q.id)] = correct_option.id
                 if str(answers.get(str(q.id))) == str(correct_option.id):

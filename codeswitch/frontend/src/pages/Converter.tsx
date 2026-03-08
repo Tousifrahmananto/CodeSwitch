@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { convertCode, createSnippet, explainCode } from '../api/client';
 import CodeEditor from '../components/CodeEditor';
 import DiffView from '../components/DiffView';
@@ -58,7 +58,21 @@ export default function Converter() {
   // User API key state
   const [quotaExhausted, setQuotaExhausted] = useState(false);
   const [userKeyInput, setUserKeyInput] = useState('');
-  const [hasUserKey, setHasUserKey] = useState(!!localStorage.getItem('userApiKey'));
+  const [hasUserKey, setHasUserKey] = useState(!!sessionStorage.getItem('userApiKey'));
+
+  // Abort controllers for in-flight AI requests — cancelled on unmount or new request
+  const convertControllerRef = useRef<AbortController | null>(null);
+  const explainControllerRef = useRef<AbortController | null>(null);
+  const elapsedIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [convertElapsed, setConvertElapsed] = useState(0);
+
+  useEffect(() => {
+    return () => {
+      convertControllerRef.current?.abort();
+      explainControllerRef.current?.abort();
+      if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current);
+    };
+  }, []);
 
   const isQuotaError = (msg: string) =>
     msg.includes('All API keys exhausted') || msg.includes('AI_API_KEY not set');
@@ -66,6 +80,9 @@ export default function Converter() {
   const handleConvert = async () => {
     if (!inputCode.trim()) return setError('Please enter some code.');
     if (sourceLang === targetLang) return setError('Source and target languages must differ.');
+    convertControllerRef.current?.abort();
+    const controller = new AbortController();
+    convertControllerRef.current = controller;
     setLoading(true);
     setError('');
     setEngine('');
@@ -74,19 +91,24 @@ export default function Converter() {
     setShowDiff(false);
     setExplanation('');
     setShowExplanation(false);
+    setConvertElapsed(0);
+    elapsedIntervalRef.current = setInterval(() => setConvertElapsed(e => e + 1), 1000);
     try {
       const { data } = await convertCode({
         source_language: sourceLang,
         target_language: targetLang,
         code: inputCode,
-      });
+      }, { signal: controller.signal });
       setOutputCode(data.output);
       setEngine(data.engine || 'rules');
     } catch (err: any) {
+      if (err.name === 'CanceledError' || err.name === 'AbortError') return;
       const msg: string = err.response?.data?.error || 'Conversion failed.';
       setError(msg);
       if (isQuotaError(msg)) setQuotaExhausted(true);
     } finally {
+      if (elapsedIntervalRef.current) { clearInterval(elapsedIntervalRef.current); elapsedIntervalRef.current = null; }
+      setConvertElapsed(0);
       setLoading(false);
     }
   };
@@ -150,6 +172,9 @@ export default function Converter() {
       setShowExplanation(false);
       return;
     }
+    explainControllerRef.current?.abort();
+    const controller = new AbortController();
+    explainControllerRef.current = controller;
     setExplainLoading(true);
     setShowExplanation(true);
     try {
@@ -158,9 +183,10 @@ export default function Converter() {
         output_code: outputCode,
         source_language: sourceLang,
         target_language: targetLang,
-      });
+      }, { signal: controller.signal });
       setExplanation(data.explanation);
     } catch (err: any) {
+      if (err.name === 'CanceledError' || err.name === 'AbortError') return;
       const msg: string = err.response?.data?.error || '';
       if (isQuotaError(msg)) {
         setQuotaExhausted(true);
@@ -181,7 +207,7 @@ export default function Converter() {
   const handleSaveUserKey = () => {
     const key = userKeyInput.trim();
     if (!key) return;
-    localStorage.setItem('userApiKey', key);
+    sessionStorage.setItem('userApiKey', key);
     setHasUserKey(true);
     setUserKeyInput('');
     setQuotaExhausted(false);
@@ -190,7 +216,7 @@ export default function Converter() {
   };
 
   const handleRemoveUserKey = () => {
-    localStorage.removeItem('userApiKey');
+    sessionStorage.removeItem('userApiKey');
     setHasUserKey(false);
   };
 
@@ -231,7 +257,9 @@ export default function Converter() {
             onClick={handleConvert}
             disabled={loading}
           >
-            {loading ? 'Converting…' : 'Convert'}
+            {loading
+              ? convertElapsed > 3 ? `Converting… ${convertElapsed}s` : 'Converting…'
+              : 'Convert'}
           </button>
         </div>
 

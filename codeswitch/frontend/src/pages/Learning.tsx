@@ -1,5 +1,5 @@
 // src/pages/Learning.jsx
-import { useEffect, useState } from 'react';
+import { useEffect, useState, memo } from 'react';
 import { getModules, getModule, updateProgress, getProgress, convertCode, getLessonQuiz, submitQuiz } from '../api/client';
 import CodeEditor from '../components/CodeEditor';
 import { runCode, canRun } from '../api/executor';
@@ -9,7 +9,7 @@ const LANG_COLORS = { c: '#555555', python: '#3572A5', java: '#b07219' };
 const formatCompletionDate = (iso) =>
   iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
 
-function ContentRenderer({ text }) {
+const ContentRenderer = memo(function ContentRenderer({ text }) {
   if (!text) return null;
 
   // Parse inline formatting: **bold**, *italic*, `code`
@@ -81,7 +81,7 @@ function ContentRenderer({ text }) {
       })}
     </div>
   );
-}
+});
 
 // Feature 3: copy to clipboard
 function CodeTabs({ code }) {
@@ -488,6 +488,8 @@ export default function Learning() {
       setActiveModule(data);
       setActiveLesson(data.lessons[0] || null);
       setActiveView('lesson');
+    } catch {
+      setLoadError('Failed to load module. Please try again.');
     } finally {
       setOpeningId(null);
     }

@@ -514,45 +514,45 @@ export default function AdminPanel() {
 // ── styles ────────────────────────────────────────────────────────────────────
 
 const styles = {
-  root: { padding: '24px', color: '#e5e7eb', maxWidth: 1100 },
+  root: { padding: '24px', color: 'var(--text)', maxWidth: 1100 },
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
   title: { margin: 0, fontSize: 22, fontWeight: 700 },
   sectionTitle: { fontSize: 16, fontWeight: 600, margin: '0 0 16px' },
 
   statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 16, marginBottom: 24 },
-  card: { background: '#1e2433', borderRadius: 10, padding: '20px 16px', textAlign: 'center' },
-  cardValue: { fontSize: 32, fontWeight: 700, color: '#a78bfa' },
-  cardLabel: { fontSize: 13, color: '#9ca3af', marginTop: 4 },
-  cardSub: { fontSize: 11, color: '#6b7280', marginTop: 6 },
+  card: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '20px 16px', textAlign: 'center' },
+  cardValue: { fontSize: 32, fontWeight: 700, color: 'var(--accent)' },
+  cardLabel: { fontSize: 13, color: 'var(--text-muted)', marginTop: 4 },
+  cardSub: { fontSize: 11, color: 'var(--text-muted)', marginTop: 6 },
 
-  tabBar: { display: 'flex', gap: 4, marginBottom: 24, borderBottom: '1px solid #374151', paddingBottom: 0 },
-  tabBtn: { background: 'none', border: 'none', color: '#9ca3af', padding: '10px 18px', cursor: 'pointer', fontSize: 14, borderBottom: '2px solid transparent', borderRadius: '4px 4px 0 0' },
-  tabBtnActive: { color: '#a78bfa', borderBottom: '2px solid #a78bfa', fontWeight: 600 },
+  tabBar: { display: 'flex', gap: 4, marginBottom: 24, borderBottom: '1px solid var(--border)', paddingBottom: 0 },
+  tabBtn: { background: 'none', border: 'none', color: 'var(--text-muted)', padding: '10px 18px', cursor: 'pointer', fontSize: 14, borderBottom: '2px solid transparent', borderRadius: '4px 4px 0 0' },
+  tabBtnActive: { color: 'var(--accent)', borderBottom: '2px solid var(--accent)', fontWeight: 600 },
   tabContent: { minHeight: 300 },
 
   tableWrap: { overflowX: 'auto' },
   table: { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
-  th: { textAlign: 'left', padding: '10px 12px', background: '#1e2433', color: '#9ca3af', fontWeight: 600, whiteSpace: 'nowrap' },
-  tr: { borderBottom: '1px solid #1f2937' },
+  th: { textAlign: 'left', padding: '10px 12px', background: 'var(--surface)', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' },
+  tr: { borderBottom: '1px solid var(--border)' },
   td: { padding: '10px 12px', verticalAlign: 'middle' },
 
   badge: { display: 'inline-block', padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 600, color: '#fff' },
 
-  btn: { background: '#7c3aed', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 500 },
-  btnSecondary: { background: '#374151' },
-  btnDanger: { background: '#b91c1c' },
+  btn: { background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 500 },
+  btnSecondary: { background: 'var(--border)' },
+  btnDanger: { background: 'var(--danger)' },
   btnSmall: { padding: '4px 10px', fontSize: 12 },
 
-  formBox: { background: '#1e2433', borderRadius: 10, padding: 20, marginBottom: 24 },
+  formBox: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 20, marginBottom: 24 },
   formGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 },
-  input: { background: '#111827', border: '1px solid #374151', color: '#e5e7eb', borderRadius: 6, padding: '8px 12px', fontSize: 13, width: '100%', boxSizing: 'border-box' },
+  input: { background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: 6, padding: '8px 12px', fontSize: 13, width: '100%', boxSizing: 'border-box' },
 
-  errorBanner: { background: '#7f1d1d', color: '#fca5a5', padding: '10px 16px', borderRadius: 8, marginBottom: 16, fontSize: 13 },
-  errorText: { color: '#fca5a5', fontSize: 13, margin: '0 0 8px' },
-  muted: { color: '#6b7280', fontSize: 13 },
+  errorBanner: { background: 'rgba(243,56,56,0.12)', color: 'var(--danger)', padding: '10px 16px', borderRadius: 8, marginBottom: 16, fontSize: 13, border: '1px solid var(--danger)' },
+  errorText: { color: 'var(--danger)', fontSize: 13, margin: '0 0 8px' },
+  muted: { color: 'var(--text-muted)', fontSize: 13 },
 
-  lessonsPanel: { padding: '16px 20px', borderTop: '1px solid #1f2937' },
+  lessonsPanel: { padding: '16px 20px', borderTop: '1px solid var(--border)' },
   lessonsPanelHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  lessonForm: { background: '#161b22', border: '1px solid #374151', borderRadius: 8, padding: 16, marginBottom: 12 },
-  lessonRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderBottom: '1px solid #1f2937' },
+  lessonForm: { background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: 16, marginBottom: 12 },
+  lessonRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderBottom: '1px solid var(--border)' },
 };

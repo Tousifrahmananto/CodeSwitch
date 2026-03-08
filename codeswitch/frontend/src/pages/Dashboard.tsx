@@ -1,8 +1,21 @@
 import { useEffect, useState } from 'react';
 import { getProfile, getConversionHistory, getProgress, getFiles, getModules } from '../api/client';
 
-const LANG_COLORS = { c: '#aaaaaa', python: '#5ba8f5', java: '#e8a44a' };
-const LANG_BG = { c: 'rgba(170,170,170,0.12)', python: 'rgba(91,168,245,0.12)', java: 'rgba(232,164,74,0.12)' };
+const LANG_COLORS = {
+  c: '#aaaaaa', python: '#5ba8f5', java: '#e8a44a',
+  javascript: '#f1e05a', cpp: '#f34b7d',
+};
+const LANG_BG = {
+  c: 'rgba(170,170,170,0.12)', python: 'rgba(91,168,245,0.12)', java: 'rgba(232,164,74,0.12)',
+  javascript: 'rgba(241,224,90,0.12)', cpp: 'rgba(243,75,125,0.12)',
+};
+
+// Module-level cache — survives re-mounts/navigation within the same session
+const _dashCache: {
+  data: { profile: any; history: any[]; progress: any[]; files: any[]; modules: any[] } | null;
+  ts: number;
+} = { data: null, ts: 0 };
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 function LangChip({ lang }) {
   return (
@@ -28,15 +41,19 @@ function StatCard({ value, label, accent }) {
 }
 
 export default function Dashboard() {
-  const [profile, setProfile] = useState(null);
-  const [history, setHistory] = useState([]);
-  const [progress, setProgress] = useState([]);
-  const [files, setFiles] = useState([]);
-  const [modules, setModules] = useState([]);
+  const fresh = _dashCache.data && Date.now() - _dashCache.ts < CACHE_TTL
+    ? _dashCache.data : null;
+
+  const [profile, setProfile] = useState(fresh?.profile ?? null);
+  const [history, setHistory] = useState(fresh?.history ?? []);
+  const [progress, setProgress] = useState(fresh?.progress ?? []);
+  const [files, setFiles] = useState(fresh?.files ?? []);
+  const [modules, setModules] = useState(fresh?.modules ?? []);
   const [loadError, setLoadError] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!fresh);
 
   useEffect(() => {
+    if (fresh) return; // Serve cached data — skip the network round-trips
     Promise.all([
       getProfile(),
       getConversionHistory(),
@@ -44,11 +61,20 @@ export default function Dashboard() {
       getFiles(),
       getModules(),
     ]).then(([profileRes, historyRes, progressRes, filesRes, modulesRes]) => {
-      setProfile(profileRes.data);
-      setHistory(historyRes.data);
-      setProgress(progressRes.data);
-      setFiles(filesRes.data);
-      setModules(modulesRes.data);
+      const data = {
+        profile: profileRes.data,
+        history: historyRes.data,
+        progress: progressRes.data,
+        files: filesRes.data,
+        modules: modulesRes.data,
+      };
+      _dashCache.data = data;
+      _dashCache.ts = Date.now();
+      setProfile(data.profile);
+      setHistory(data.history);
+      setProgress(data.progress);
+      setFiles(data.files);
+      setModules(data.modules);
     }).catch(() => setLoadError('Failed to load dashboard data.'))
       .finally(() => setLoading(false));
   }, []);

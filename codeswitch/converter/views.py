@@ -117,7 +117,7 @@ class ConversionHistoryView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        history = ConversionHistory.objects.filter(user=request.user)[:50]
+        history = ConversionHistory.objects.filter(user=request.user).order_by('-timestamp')[:50]
         data = [
             {
                 'id': h.id,
