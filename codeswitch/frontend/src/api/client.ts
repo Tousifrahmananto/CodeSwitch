@@ -27,9 +27,12 @@ client.interceptors.response.use(
         // Retry the original request — the new access_token cookie will be included
         return client(original);
       } catch {
-        // Refresh failed — force re-login
+        // Refresh failed — user has no valid session. Clear stale local state
+        // and reject so the caller (App.tsx) can set user=null and show login.
+        // Do NOT reload here — that would create an infinite loop when no user
+        // is logged in (every /me/ 401 would trigger reload → /me/ → 401 ...).
         localStorage.removeItem('user');
-        window.location.reload();
+        return Promise.reject(error);
       }
     }
     return Promise.reject(error);
