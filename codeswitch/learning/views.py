@@ -122,7 +122,7 @@ class GetLessonQuizView(APIView):
                     'question_text': q.question_text,
                     'order': q.order,
                     'options': [
-                        {'id': o.id, 'option_text': o.option_text}
+                        {'id': o.id, 'option_text': o.option_text, 'explanation': o.explanation or ''}
                         for o in q.options.all()
                     ],
                 }

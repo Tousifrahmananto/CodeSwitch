@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { convertCode, createSnippet } from '../api/client';
+import { convertCode, createSnippet, explainCode } from '../api/client';
 import CodeEditor from '../components/CodeEditor';
 import DiffView from '../components/DiffView';
 import { runCode, canRun } from '../api/executor';
@@ -32,11 +32,16 @@ export default function Converter() {
   const [engine, setEngine] = useState('');
   const [theme, setTheme] = useState(() => localStorage.getItem('editor_theme') || 'vs-dark');
 
-  // Run state
+  // Run source state
   const [runLoading, setRunLoading] = useState(false);
   const [runOutput, setRunOutput] = useState(null);
   const [runError, setRunError] = useState('');
   const [runStdin, setRunStdin] = useState('');
+
+  // Run target state
+  const [runLoadingTarget, setRunLoadingTarget] = useState(false);
+  const [runOutputTarget, setRunOutputTarget] = useState(null);
+  const [runErrorTarget, setRunErrorTarget] = useState('');
 
   // Diff state
   const [showDiff, setShowDiff] = useState(false);
@@ -45,6 +50,11 @@ export default function Converter() {
   const [shareLoading, setShareLoading] = useState(false);
   const [shareToast, setShareToast] = useState('');
 
+  // Explain state
+  const [explanation, setExplanation] = useState('');
+  const [explainLoading, setExplainLoading] = useState(false);
+  const [showExplanation, setShowExplanation] = useState(false);
+
   const handleConvert = async () => {
     if (!inputCode.trim()) return setError('Please enter some code.');
     if (sourceLang === targetLang) return setError('Source and target languages must differ.');
@@ -52,7 +62,10 @@ export default function Converter() {
     setError('');
     setEngine('');
     setRunOutput(null);
+    setRunOutputTarget(null);
     setShowDiff(false);
+    setExplanation('');
+    setShowExplanation(false);
     try {
       const { data } = await convertCode({
         source_language: sourceLang,
@@ -83,6 +96,21 @@ export default function Converter() {
     }
   };
 
+  const handleRunTarget = async () => {
+    if (!outputCode.trim()) return;
+    setRunLoadingTarget(true);
+    setRunOutputTarget(null);
+    setRunErrorTarget('');
+    try {
+      const result = await runCode(targetLang, outputCode, runStdin);
+      setRunOutputTarget(result);
+    } catch (err) {
+      setRunErrorTarget(err.message || 'Could not reach execution server. Check your connection.');
+    } finally {
+      setRunLoadingTarget(false);
+    }
+  };
+
   const handleShare = async () => {
     if (!outputCode) return;
     setShareLoading(true);
@@ -106,10 +134,39 @@ export default function Converter() {
     }
   };
 
+  const handleExplain = async () => {
+    if (!outputCode) return;
+    if (showExplanation && explanation) {
+      setShowExplanation(false);
+      return;
+    }
+    setExplainLoading(true);
+    setShowExplanation(true);
+    try {
+      const { data } = await explainCode({
+        input_code: inputCode,
+        output_code: outputCode,
+        source_language: sourceLang,
+        target_language: targetLang,
+      });
+      setExplanation(data.explanation);
+    } catch {
+      setExplanation('Could not generate explanation. Make sure your AI_API_KEY is set in .env.');
+    } finally {
+      setExplainLoading(false);
+    }
+  };
+
   const handleThemeChange = (t) => {
     setTheme(t);
     localStorage.setItem('editor_theme', t);
   };
+
+  // Compute output match badge when both sides are run
+  const bothRan = runOutput !== null && runOutputTarget !== null;
+  const outputsMatch = bothRan &&
+    runOutput.stdout?.trim() === runOutputTarget.stdout?.trim() &&
+    runOutput.code === runOutputTarget.code;
 
   return (
     <div className="converter-page">
@@ -184,7 +241,7 @@ export default function Converter() {
               className="btn-run"
               onClick={handleRun}
               disabled={runLoading || !inputCode.trim() || !canRun(sourceLang)}
-              title={!canRun(sourceLang) ? 'Execution not supported for this language' : 'Run code'}
+              title={!canRun(sourceLang) ? 'Execution not supported for this language' : 'Run source code'}
             >
               {runLoading ? '⏳ Running...' : '▶ Run'}
             </button>
@@ -204,10 +261,30 @@ export default function Converter() {
             <div className="panel-header-actions">
               {outputCode && (
                 <button
+                  className="btn-run"
+                  onClick={handleRunTarget}
+                  disabled={runLoadingTarget || !canRun(targetLang)}
+                  title={!canRun(targetLang) ? 'Execution not supported for this language' : 'Run converted code'}
+                >
+                  {runLoadingTarget ? '⏳ Running...' : '▶ Run'}
+                </button>
+              )}
+              {outputCode && (
+                <button
                   className={`btn-diff${showDiff ? ' active' : ''}`}
                   onClick={() => setShowDiff(d => !d)}
                 >
                   ⊕ Diff
+                </button>
+              )}
+              {outputCode && (
+                <button
+                  className={`btn-explain${showExplanation ? ' active' : ''}`}
+                  onClick={handleExplain}
+                  disabled={explainLoading}
+                  title="Explain this conversion"
+                >
+                  {explainLoading ? '...' : '💡 Explain'}
                 </button>
               )}
               {outputCode && (
@@ -245,31 +322,85 @@ export default function Converter() {
         />
       </div>
 
-      {/* Run output terminal */}
-      {(runOutput !== null || runError) && (
-        <div className="run-output">
-          <div className="run-output-header">
-            <span>Terminal</span>
-            <button className="run-output-close" onClick={() => { setRunOutput(null); setRunError(''); }}>×</button>
-          </div>
-          {runError && <pre className="run-stderr">{runError}</pre>}
-          {runOutput && (
-            <>
-              {runStdin.trim() && (
+      {/* Output comparison panel */}
+      {(runOutput !== null || runError || runOutputTarget !== null || runErrorTarget) && (
+        <div className="run-compare-panel">
+          {bothRan && (
+            <div className={`run-compare-badge ${outputsMatch ? 'match' : 'differ'}`}>
+              {outputsMatch ? '✓ Outputs match' : '⚠ Outputs differ'}
+            </div>
+          )}
+          <div className="run-compare-columns">
+            {/* Source terminal */}
+            <div className="run-output run-output-half">
+              <div className="run-output-header">
+                <span>{LANG_META[sourceLang].label} (Input) — Terminal</span>
+                <button className="run-output-close" onClick={() => { setRunOutput(null); setRunError(''); }}>×</button>
+              </div>
+              {runError && <pre className="run-stderr">{runError}</pre>}
+              {runOutput && (
                 <>
-                  <pre className="run-stdin-echo">{runStdin.trim().split('\n').map(l => `> ${l}`).join('\n')}</pre>
-                  <hr className="run-divider" />
+                  {runStdin.trim() && (
+                    <>
+                      <pre className="run-stdin-echo">{runStdin.trim().split('\n').map(l => `> ${l}`).join('\n')}</pre>
+                      <hr className="run-divider" />
+                    </>
+                  )}
+                  {runOutput.stdout && <pre className="run-stdout">{runOutput.stdout}</pre>}
+                  {runOutput.stderr && <pre className="run-stderr">{runOutput.stderr}</pre>}
+                  {!runOutput.stdout && !runOutput.stderr && (
+                    <pre className="run-stdout run-empty">(no output)</pre>
+                  )}
+                  <span className={`run-exit-code${runOutput.code === 0 ? ' run-exit-ok' : ' run-exit-err'}`}>
+                    {runOutput.code === 0 ? '✓' : '✗'} exit {runOutput.code}
+                  </span>
                 </>
               )}
-              {runOutput.stdout && <pre className="run-stdout">{runOutput.stdout}</pre>}
-              {runOutput.stderr && <pre className="run-stderr">{runOutput.stderr}</pre>}
-              {!runOutput.stdout && !runOutput.stderr && (
-                <pre className="run-stdout run-empty">(no output)</pre>
-              )}
-              <span className={`run-exit-code${runOutput.code === 0 ? ' run-exit-ok' : ' run-exit-err'}`}>
-                {runOutput.code === 0 ? '✓' : '✗'} exit {runOutput.code}
-              </span>
-            </>
+            </div>
+
+            {/* Target terminal */}
+            {(runOutputTarget !== null || runErrorTarget) && (
+              <div className="run-output run-output-half">
+                <div className="run-output-header">
+                  <span>{LANG_META[targetLang].label} (Output) — Terminal</span>
+                  <button className="run-output-close" onClick={() => { setRunOutputTarget(null); setRunErrorTarget(''); }}>×</button>
+                </div>
+                {runErrorTarget && <pre className="run-stderr">{runErrorTarget}</pre>}
+                {runOutputTarget && (
+                  <>
+                    {runStdin.trim() && (
+                      <>
+                        <pre className="run-stdin-echo">{runStdin.trim().split('\n').map(l => `> ${l}`).join('\n')}</pre>
+                        <hr className="run-divider" />
+                      </>
+                    )}
+                    {runOutputTarget.stdout && <pre className="run-stdout">{runOutputTarget.stdout}</pre>}
+                    {runOutputTarget.stderr && <pre className="run-stderr">{runOutputTarget.stderr}</pre>}
+                    {!runOutputTarget.stdout && !runOutputTarget.stderr && (
+                      <pre className="run-stdout run-empty">(no output)</pre>
+                    )}
+                    <span className={`run-exit-code${runOutputTarget.code === 0 ? ' run-exit-ok' : ' run-exit-err'}`}>
+                      {runOutputTarget.code === 0 ? '✓' : '✗'} exit {runOutputTarget.code}
+                    </span>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Explanation section */}
+      {showExplanation && (
+        <div className="explain-section">
+          <div className="explain-header">
+            <span>💡 Conversion Explanation</span>
+            <button className="run-output-close" onClick={() => setShowExplanation(false)}>×</button>
+          </div>
+          {explainLoading ? (
+            <p className="explain-loading">Generating explanation…</p>
+          ) : (
+            <p className="explain-content">{explanation}</p>
           )}
         </div>
       )}

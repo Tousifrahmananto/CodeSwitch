@@ -11,11 +11,34 @@ const formatCompletionDate = (iso) =>
 
 function ContentRenderer({ text }) {
   if (!text) return null;
+
+  // Parse inline formatting: **bold**, *italic*, `code`
+  function renderInline(str) {
+    const parts = [];
+    const re = /(\*\*(.+?)\*\*|\*(.+?)\*|`([^`]+?)`)/g;
+    let last = 0;
+    let match;
+    while ((match = re.exec(str)) !== null) {
+      if (match.index > last) parts.push(str.slice(last, match.index));
+      if (match[2] !== undefined) parts.push(<strong key={match.index}>{match[2]}</strong>);
+      else if (match[3] !== undefined) parts.push(<em key={match.index}>{match[3]}</em>);
+      else if (match[4] !== undefined) parts.push(<code key={match.index} className="inline-code">{match[4]}</code>);
+      last = match.index + match[0].length;
+    }
+    if (last < str.length) parts.push(str.slice(last));
+    return parts.length > 0 ? parts : str;
+  }
+
   const paragraphs = text.split('\n\n');
   return (
     <div className="content-body">
       {paragraphs.map((para, i) => {
         const lines = para.split('\n');
+
+        // ## heading
+        if (lines.length === 1 && lines[0].startsWith('## ')) {
+          return <h4 key={i} className="lesson-heading">{lines[0].slice(3)}</h4>;
+        }
 
         if (lines.every(l => l.trim().startsWith('|'))) {
           const [header, ...rows] = lines;
@@ -23,13 +46,13 @@ function ContentRenderer({ text }) {
           return (
             <table key={i} className="compare-table">
               <thead>
-                <tr>{cols.map((c, j) => <th key={j}>{c}</th>)}</tr>
+                <tr>{cols.map((c, j) => <th key={j}>{renderInline(c)}</th>)}</tr>
               </thead>
               <tbody>
                 {rows.map((row, ri) => (
                   <tr key={ri}>
                     {row.split('|').filter(Boolean).map((cell, ci) => (
-                      <td key={ci}>{cell.trim()}</td>
+                      <td key={ci}>{renderInline(cell.trim())}</td>
                     ))}
                   </tr>
                 ))}
@@ -41,7 +64,7 @@ function ContentRenderer({ text }) {
         if (lines.every(l => /^\d+\./.test(l.trim()))) {
           return (
             <ol key={i} className="lesson-list">
-              {lines.map((l, li) => <li key={li}>{l.replace(/^\d+\.\s*/, '')}</li>)}
+              {lines.map((l, li) => <li key={li}>{renderInline(l.replace(/^\d+\.\s*/, ''))}</li>)}
             </ol>
           );
         }
@@ -49,12 +72,12 @@ function ContentRenderer({ text }) {
         if (lines.every(l => l.trim().startsWith('- '))) {
           return (
             <ul key={i} className="lesson-list">
-              {lines.map((l, li) => <li key={li}>{l.replace(/^-\s*/, '')}</li>)}
+              {lines.map((l, li) => <li key={li}>{renderInline(l.replace(/^-\s*/, ''))}</li>)}
             </ul>
           );
         }
 
-        return <p key={i}>{para}</p>;
+        return <p key={i}>{renderInline(para)}</p>;
       })}
     </div>
   );
@@ -375,18 +398,24 @@ function QuizPanel({ lessonId, onPass }) {
                 } else if (opt.id === userAnswer) {
                   cls += ' quiz-selected';
                 }
+                const showExplanation = result && opt.id === userAnswer && opt.id !== correctId && opt.explanation;
                 return (
-                  <label key={opt.id} className={cls}>
-                    <input
-                      type="radio"
-                      name={`q-${q.id}`}
-                      value={opt.id}
-                      checked={userAnswer === opt.id}
-                      onChange={() => !result && setAnswers(prev => ({ ...prev, [q.id]: opt.id }))}
-                      disabled={!!result}
-                    />
-                    {opt.option_text}
-                  </label>
+                  <div key={opt.id}>
+                    <label className={cls}>
+                      <input
+                        type="radio"
+                        name={`q-${q.id}`}
+                        value={opt.id}
+                        checked={userAnswer === opt.id}
+                        onChange={() => !result && setAnswers(prev => ({ ...prev, [q.id]: opt.id }))}
+                        disabled={!!result}
+                      />
+                      {opt.option_text}
+                    </label>
+                    {showExplanation && (
+                      <p className="quiz-option-explanation">{opt.explanation}</p>
+                    )}
+                  </div>
                 );
               })}
             </div>

@@ -6,6 +6,7 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import serializers
 from .services import convert_code
+from .ai_service import ai_explain_code
 from .models import ConversionHistory, SharedSnippet
 
 # ── Wandbox compiler list — fetched once, cached for the process lifetime ─────
@@ -208,3 +209,39 @@ class RunCodeView(APIView):
         stderr = '\n'.join(s for s in [compile_err, runtime_err] if s)
 
         return Response({'stdout': stdout, 'stderr': stderr, 'code': exit_code})
+
+
+class ExplainCodeView(APIView):
+    """
+    POST /api/explain/
+    Body: { input_code, output_code, source_language, target_language }
+    Returns a plain-English explanation of the conversion differences.
+    """
+    permission_classes = [IsAuthenticated]
+
+    VALID_LANGUAGES = {'python', 'c', 'java', 'javascript', 'cpp'}
+
+    def post(self, request):
+        source = request.data.get('source_language', '').lower()
+        target = request.data.get('target_language', '').lower()
+        input_code = request.data.get('input_code', '')
+        output_code = request.data.get('output_code', '')
+
+        if not source or not target or not input_code or not output_code:
+            return Response(
+                {'error': 'source_language, target_language, input_code, and output_code are required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if source not in self.VALID_LANGUAGES or target not in self.VALID_LANGUAGES:
+            return Response(
+                {'error': f'Languages must be one of: {", ".join(sorted(self.VALID_LANGUAGES))}.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        result = ai_explain_code(source, target, input_code, output_code)
+
+        if result['success']:
+            return Response({'explanation': result['explanation']}, status=status.HTTP_200_OK)
+        else:
+            return Response({'error': result['error']}, status=status.HTTP_400_BAD_REQUEST)

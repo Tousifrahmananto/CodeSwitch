@@ -181,3 +181,96 @@ def ai_convert_code(source_lang: str, target_lang: str, code: str) -> dict:
                 break  # unexpected error — try next key
 
     return {'success': False, 'error': last_error}
+
+
+_EXPLAIN_SYSTEM_PROMPT = (
+    'You are a programming tutor. Your job is to explain, in plain English, '
+    'the key differences between a piece of code in one language and its translation '
+    'to another language. Focus on concepts that are educational for a student learning '
+    'the target language: highlight important syntax differences, idioms, or constructs '
+    'that changed. Be concise (3-6 sentences). Do not repeat the code.'
+)
+
+
+def ai_explain_code(source_lang: str, target_lang: str, input_code: str, output_code: str) -> dict:
+    """
+    Explain the key differences between source code and its translation.
+
+    Returns:
+        {'success': True,  'explanation': str}
+        {'success': False, 'error': str}
+    """
+    api_keys = _get_api_keys()
+    if not api_keys:
+        return {'success': False, 'error': 'AI_API_KEY not set in .env'}
+
+    provider = _get('AI_PROVIDER', 'gemini').lower().strip()
+    model    = _get('AI_MODEL', _DEFAULT_MODELS.get(provider, 'gemini-2.0-flash-lite')).strip()
+    base_url = _get('AI_BASE_URL', _BASE_URLS.get(provider, _BASE_URLS['openai']))
+
+    user_prompt = (
+        f'Here is a {source_lang} program and its {target_lang} translation. '
+        f'Explain the key differences to a student learning {target_lang}.\n\n'
+        f'--- {source_lang} (original) ---\n{input_code}\n\n'
+        f'--- {target_lang} (translated) ---\n{output_code}'
+    )
+
+    last_error = 'All API keys exhausted.'
+
+    for key_index, api_key in enumerate(api_keys):
+        is_last_key = (key_index == len(api_keys) - 1)
+        attempts = 2 if is_last_key else 1
+
+        for attempt in range(attempts):
+            try:
+                if provider == 'gemini':
+                    url = (
+                        f'https://generativelanguage.googleapis.com/v1beta/models/'
+                        f'{model}:generateContent?key={api_key}'
+                    )
+                    payload = {
+                        'system_instruction': {'parts': [{'text': _EXPLAIN_SYSTEM_PROMPT}]},
+                        'contents': [{'parts': [{'text': user_prompt}]}],
+                        'generationConfig': {'temperature': 0.3, 'maxOutputTokens': 512},
+                    }
+                    resp = requests.post(url, json=payload, timeout=45)
+                    resp.raise_for_status()
+                    raw = resp.json()['candidates'][0]['content']['parts'][0]['text']
+                else:
+                    url = f'{base_url.rstrip("/")}/chat/completions'
+                    headers = {
+                        'Authorization': f'Bearer {api_key}',
+                        'Content-Type': 'application/json',
+                    }
+                    payload = {
+                        'model': model,
+                        'messages': [
+                            {'role': 'system', 'content': _EXPLAIN_SYSTEM_PROMPT},
+                            {'role': 'user', 'content': user_prompt},
+                        ],
+                        'temperature': 0.3,
+                        'max_tokens': 512,
+                    }
+                    resp = requests.post(url, json=payload, headers=headers, timeout=45)
+                    resp.raise_for_status()
+                    raw = resp.json()['choices'][0]['message']['content']
+
+                return {'success': True, 'explanation': raw.strip()}
+
+            except requests.HTTPError as exc:
+                status_code = exc.response.status_code if exc.response is not None else None
+                last_error = f'AI service error (key #{key_index + 1}): {exc}'
+
+                if status_code in _ROTATE_STATUSES:
+                    if is_last_key and attempt == 0:
+                        time.sleep(3)
+                        continue
+                    break
+                else:
+                    return {'success': False, 'error': last_error}
+
+            except Exception as exc:
+                last_error = f'AI service error (key #{key_index + 1}): {exc}'
+                break
+
+    return {'success': False, 'error': last_error}
