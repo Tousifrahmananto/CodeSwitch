@@ -1,4 +1,4 @@
-import axios, { AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosResponse, AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
 import type { User, ConversionRecord, CodeFile, LearningModule, Lesson, UserProgress, Quiz, SharedSnippet, PublicProfile, AdminStats, AdminUser, AdminConversion, AdminLesson } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
@@ -39,9 +39,9 @@ client.interceptors.response.use(
   }
 );
 
-// Inject user-provided API key header if one has been saved in localStorage
+// Inject user-provided API key header if one has been saved in sessionStorage
 client.interceptors.request.use((config) => {
-  const userKey = localStorage.getItem('userApiKey');
+  const userKey = sessionStorage.getItem('userApiKey');
   if (userKey) {
     config.headers['X-User-Api-Key'] = userKey;
   }
@@ -68,23 +68,20 @@ export const updateProfile = (formData: FormData): Promise<AxiosResponse<User>> 
   client.patch('/profile', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
 
 // ── Converter ─────────────────────────────────
-export const convertCode = (data: {
-  source_language: string;
-  target_language: string;
-  code: string;
-}): Promise<AxiosResponse<{ output: string; engine: string }>> =>
-  client.post('/convert', data);
+export const convertCode = (
+  data: { source_language: string; target_language: string; code: string },
+  config?: AxiosRequestConfig,
+): Promise<AxiosResponse<{ output: string; engine: string }>> =>
+  client.post('/convert', data, config);
 
 export const getConversionHistory = (): Promise<AxiosResponse<ConversionRecord[]>> =>
   client.get('/convert/history');
 
-export const explainCode = (data: {
-  input_code: string;
-  output_code: string;
-  source_language: string;
-  target_language: string;
-}): Promise<AxiosResponse<{ explanation: string }>> =>
-  client.post('/explain/', data);
+export const explainCode = (
+  data: { input_code: string; output_code: string; source_language: string; target_language: string },
+  config?: AxiosRequestConfig,
+): Promise<AxiosResponse<{ explanation: string }>> =>
+  client.post('/explain/', data, config);
 
 // ── Snippets ──────────────────────────────────
 export const createSnippet = (data: {

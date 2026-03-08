@@ -50,13 +50,14 @@ class AdminUsersView(APIView):
     permission_classes = [IsAuthenticated, IsStaffUser]
 
     def get(self, request):
+        limit = min(int(request.query_params.get('limit', 100)), 500)
         users = (
             User.objects
             .annotate(conversion_count=Count('conversions'))
             .order_by('-date_joined')
             .values('id', 'username', 'email', 'is_staff', 'is_active',
                     'date_joined', 'conversion_count')
-        )
+        )[:limit]
         return Response(list(users))
 
 
@@ -201,7 +202,7 @@ class AdminModuleLessonsView(APIView):
         module = self._get_module(pk)
         if not module:
             return Response({'error': 'Module not found.'}, status=status.HTTP_404_NOT_FOUND)
-        lessons = module.lessons.order_by('order').select_related()
+        lessons = module.lessons.order_by('order').select_related('quiz')
         result = []
         for lesson in lessons:
             try:

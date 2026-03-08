@@ -1,10 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense, Component } from 'react';
+import type { ErrorInfo, ReactNode, ReactElement } from 'react';
 import Login from './pages/Login';
 import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
-import Converter from './pages/Converter';
-import FileManager from './pages/FileManager';
-import Learning from './pages/Learning';
 import Reference from './pages/Reference';
 import AdminPanel from './pages/AdminPanel';
 import ShareView from './pages/ShareView';
@@ -14,14 +12,71 @@ import Logo from './components/Logo';
 import { logout, getMe } from './api/client';
 import type { User } from './types';
 
-export default function App() {
-  const params = new URLSearchParams(window.location.search);
-  const shareSlug = params.get('share');
-  const profileUsername = params.get('profile');
-  const playgroundMode = params.has('playground');
+// Lazy-load Monaco-heavy pages — deferred until first navigation to that page.
+// This removes ~5–7 MB from the initial bundle seen by Landing/Login/Dashboard.
+const Converter = lazy(() => import('./pages/Converter'));
+const FileManager = lazy(() => import('./pages/FileManager'));
+const Learning = lazy(() => import('./pages/Learning'));
 
-  const [user, setUser] = useState<User | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
+// ── Error Boundary ─────────────────────────────────────────────────────────────
+// Prevents a render error in one page from crashing the entire app.
+class ErrorBoundary extends Component<
+  { children: ReactNode },
+  { error: Error | null }
+> {
+  state = { error: null as Error | null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('Page error:', error, info);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full gap-4 p-8 text-center">
+          <p className="text-danger font-semibold">Something went wrong on this page.</p>
+          <p className="text-sm text-muted">{this.state.error.message}</p>
+          <button
+            className="bg-accent text-white border-none rounded px-4 py-2 text-sm cursor-pointer"
+            onClick={() => this.setState({ error: null })}
+          >
+            Try Again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+export default function App() {
+  // Parse URL params as state so navigation back can reset them without a
+  // full page reload (avoids re-downloading all assets and re-running auth).
+  const [shareSlug, setShareSlug] = useState<string | null>(() =>
+    new URLSearchParams(window.location.search).get('share')
+  );
+  const [profileUsername, setProfileUsername] = useState<string | null>(() =>
+    new URLSearchParams(window.location.search).get('profile')
+  );
+  const [playgroundMode, setPlaygroundMode] = useState(() =>
+    new URLSearchParams(window.location.search).has('playground')
+  );
+
+  // Initialise from localStorage immediately — returning users see the app
+  // shell at once instead of a blank spinner while /api/me/ resolves.
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const stored = localStorage.getItem('user');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+
   const [page, setPage] = useState('dashboard');
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark');
 
@@ -29,14 +84,10 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
-  // Validate session via httpOnly cookie on every load.
-  // Fast path: if there is no stored user, no valid session can exist —
-  // skip the network round-trip and show login immediately.
+  // Silently validate the session cookie in the background.
+  // The cached user is shown immediately; this corrects it if the session has expired.
   useEffect(() => {
-    if (!localStorage.getItem('user')) {
-      setAuthLoading(false);
-      return;
-    }
+    if (!localStorage.getItem('user')) return;
     getMe()
       .then(r => {
         setUser(r.data);
@@ -45,8 +96,7 @@ export default function App() {
       .catch(() => {
         setUser(null);
         localStorage.removeItem('user');
-      })
-      .finally(() => setAuthLoading(false));
+      });
   }, []);
 
   const [showLanding, setShowLanding] = useState(() => !localStorage.getItem('user'));
@@ -62,7 +112,7 @@ export default function App() {
     setUser(null);
     setShowLanding(true);
     // Fire-and-forget: blacklist the refresh token server-side
-    logout().catch(() => {});
+    logout().catch(() => { });
   };
 
   const handleToggleTheme = () => {
@@ -71,34 +121,22 @@ export default function App() {
     localStorage.setItem('theme', next);
   };
 
-  const clearUrlAndReload = () => {
+  // Clear URL special-mode params via React state — no full page reload needed.
+  const clearSpecialMode = () => {
     window.history.replaceState({}, '', window.location.pathname);
-    window.location.reload();
+    setShareSlug(null);
+    setProfileUsername(null);
+    setPlaygroundMode(false);
   };
 
   // Shared snippet — render without auth check
-  if (shareSlug) {
-    return <ShareView slug={shareSlug} onBack={clearUrlAndReload} />;
-  }
+  if (shareSlug) return <ShareView slug={shareSlug} onBack={clearSpecialMode} />;
 
   // Public profile — render without auth check
-  if (profileUsername) {
-    return <ProfilePage username={profileUsername} onBack={clearUrlAndReload} />;
-  }
+  if (profileUsername) return <ProfilePage username={profileUsername} onBack={clearSpecialMode} />;
 
   // Public playground — render without auth check
-  if (playgroundMode) {
-    return <Playground onBack={clearUrlAndReload} />;
-  }
-
-  // Don't flash login page while checking cookie auth
-  if (authLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-bg">
-        <span className="w-8 h-8 border-2 border-border border-t-accent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  if (playgroundMode) return <Playground onBack={clearSpecialMode} />;
 
   if (!user) {
     if (showLanding) return <Landing onGetStarted={() => setShowLanding(false)} />;
@@ -108,11 +146,23 @@ export default function App() {
   const isStaff = user?.is_staff;
   const myUsername = user?.username;
 
-  const pages: Record<string, React.ReactElement> = {
+  const pages: Record<string, ReactElement> = {
     dashboard: <Dashboard />,
-    editor: <Converter />,
-    files: <FileManager />,
-    learning: <Learning />,
+    editor: (
+      <Suspense fallback={<p className="p-8 text-muted text-sm">Loading editor...</p>}>
+        <Converter />
+      </Suspense>
+    ),
+    files: (
+      <Suspense fallback={<p className="p-8 text-muted text-sm">Loading files...</p>}>
+        <FileManager />
+      </Suspense>
+    ),
+    learning: (
+      <Suspense fallback={<p className="p-8 text-muted text-sm">Loading modules...</p>}>
+        <Learning />
+      </Suspense>
+    ),
     reference: <Reference />,
     ...(myUsername && { profile: <ProfilePage username={myUsername} isOwner={true} onBack={() => setPage('dashboard')} /> }),
     ...(isStaff && { admin: <AdminPanel /> }),
@@ -143,8 +193,8 @@ export default function App() {
           <button
             key={key}
             className={`w-full text-left px-3 py-2.5 rounded text-[13px] transition-colors bg-transparent border-none ${page === key
-                ? 'bg-accent text-white font-semibold'
-                : 'text-muted hover:bg-border hover:text-primary'
+              ? 'bg-accent text-white font-semibold'
+              : 'text-muted hover:bg-border hover:text-primary'
               }`}
             onClick={() => setPage(key)}
           >
@@ -169,9 +219,11 @@ export default function App() {
         </button>
       </nav>
 
-      {/* Main content */}
+      {/* Main content — each page is isolated in its own ErrorBoundary */}
       <main className="flex-1 overflow-y-auto p-7 px-8">
-        {pages[page]}
+        <ErrorBoundary key={page}>
+          {pages[page]}
+        </ErrorBoundary>
       </main>
     </div>
   );

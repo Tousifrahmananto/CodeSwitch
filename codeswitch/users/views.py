@@ -151,6 +151,7 @@ class PublicProfileView(APIView):
 
         from converter.models import ConversionHistory
         from learning.models import UserProgress, LearningModule
+        from django.db.models import Count, Q, F
 
         conversion_count = ConversionHistory.objects.filter(user=user).count()
         completed_progress = UserProgress.objects.filter(user=user, completed=True)
@@ -161,15 +162,22 @@ class PublicProfileView(APIView):
             .distinct()
         )
 
-        # Count modules where all lessons are completed by this user
-        modules_completed = 0
-        for module in LearningModule.objects.all():
-            total = module.lessons.count()
-            if total == 0:
-                continue
-            done = completed_progress.filter(module=module).count()
-            if done >= total:
-                modules_completed += 1
+        # Count modules where all lessons are completed by this user (single query)
+        modules_completed = (
+            LearningModule.objects
+            .annotate(
+                total_lessons=Count('lessons', distinct=True),
+                done_lessons=Count(
+                    'lessons__userprogress',
+                    filter=Q(
+                        lessons__userprogress__user=user,
+                        lessons__userprogress__completed=True
+                    )
+                )
+            )
+            .filter(total_lessons__gt=0, done_lessons__gte=F('total_lessons'))
+            .count()
+        )
 
         return Response({
             'username': user.username,

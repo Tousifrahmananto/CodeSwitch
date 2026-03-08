@@ -22,7 +22,6 @@ the service automatically retries with the next available key.
 
 import os
 import re
-import time
 
 import requests
 
@@ -91,7 +90,7 @@ def _call_gemini(api_key: str, model: str, user_prompt: str) -> str:
         'contents': [{'parts': [{'text': user_prompt}]}],
         'generationConfig': {'temperature': 0.1, 'maxOutputTokens': 4096},
     }
-    resp = requests.post(url, json=payload, timeout=45)
+    resp = requests.post(url, json=payload, timeout=25)
     resp.raise_for_status()
     data = resp.json()
     return data['candidates'][0]['content']['parts'][0]['text']
@@ -113,7 +112,7 @@ def _call_openai_compatible(api_key: str, base_url: str, model: str, user_prompt
         'temperature': 0.1,
         'max_tokens': 4096,
     }
-    resp = requests.post(url, json=payload, headers=headers, timeout=45)
+    resp = requests.post(url, json=payload, headers=headers, timeout=25)
     resp.raise_for_status()
     return resp.json()['choices'][0]['message']['content']
 
@@ -167,8 +166,7 @@ def ai_convert_code(source_lang: str, target_lang: str, code: str, user_key: str
 
                 if status in _ROTATE_STATUSES:
                     if is_last_key and attempt == 0:
-                        # Last key, first attempt — wait then retry
-                        time.sleep(3)
+                        # Last key, first attempt — retry immediately
                         continue
                     # Move on to the next key
                     break
@@ -233,7 +231,7 @@ def ai_explain_code(source_lang: str, target_lang: str, input_code: str, output_
                         'contents': [{'parts': [{'text': user_prompt}]}],
                         'generationConfig': {'temperature': 0.3, 'maxOutputTokens': 512},
                     }
-                    resp = requests.post(url, json=payload, timeout=45)
+                    resp = requests.post(url, json=payload, timeout=25)
                     resp.raise_for_status()
                     raw = resp.json()['candidates'][0]['content']['parts'][0]['text']
                 else:
@@ -251,7 +249,7 @@ def ai_explain_code(source_lang: str, target_lang: str, input_code: str, output_
                         'temperature': 0.3,
                         'max_tokens': 512,
                     }
-                    resp = requests.post(url, json=payload, headers=headers, timeout=45)
+                    resp = requests.post(url, json=payload, headers=headers, timeout=25)
                     resp.raise_for_status()
                     raw = resp.json()['choices'][0]['message']['content']
 
@@ -263,7 +261,6 @@ def ai_explain_code(source_lang: str, target_lang: str, input_code: str, output_
 
                 if status_code in _ROTATE_STATUSES:
                     if is_last_key and attempt == 0:
-                        time.sleep(3)
                         continue
                     break
                 else:

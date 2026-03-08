@@ -94,7 +94,7 @@ function CodeDemo() {
 
   // Phase state machine
   useEffect(() => {
-    let t;
+    let t: ReturnType<typeof setTimeout> | undefined;
     if (phase === 'showing-input') {
       t = setTimeout(() => setPhase('converting'), 1800);
     } else if (phase === 'converting') {

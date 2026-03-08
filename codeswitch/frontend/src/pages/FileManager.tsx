@@ -24,6 +24,8 @@ export default function FileManager() {
   const [selected, setSelected] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const load = async () => {
     try {
@@ -41,17 +43,21 @@ export default function FileManager() {
       setError('Filename is required.');
       return;
     }
+    setSaving(true);
     try {
       if (selected) {
         await updateFile(selected.id, form);
+        setFiles(prev => prev.map(f => f.id === selected.id ? { ...f, ...form } : f));
       } else {
-        await createFile(form);
+        const { data: newFile } = await createFile(form);
+        setFiles(prev => [...prev, newFile]);
       }
       setSelected(null);
       setForm(EMPTY_FORM);
-      await load();
     } catch {
       setError('Failed to save file. Please try again.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -62,11 +68,15 @@ export default function FileManager() {
 
   const handleDelete = async (id) => {
     setError(null);
+    setDeletingId(id);
     try {
       await deleteFile(id);
-      await load();
+      setFiles(prev => prev.filter(f => f.id !== id));
+      if (selected?.id === id) { setSelected(null); setForm(EMPTY_FORM); }
     } catch {
       setError('Failed to delete file. Please try again.');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -103,10 +113,11 @@ export default function FileManager() {
             <span className="flex-shrink-0" style={{ color: LANG_COLORS[f.language] || '#8b8b8b' }}>◆</span>
             <span className="flex-1 truncate text-sm">{f.filename || '(unnamed)'}</span>
             <button
-              className="ml-auto text-muted hover:text-danger text-sm flex-shrink-0 cursor-pointer border-none bg-transparent p-0"
+              className="ml-auto text-muted hover:text-danger text-sm flex-shrink-0 cursor-pointer border-none bg-transparent p-0 disabled:opacity-40"
               title="Delete"
+              disabled={deletingId === f.id}
               onClick={(e) => { e.stopPropagation(); handleDelete(f.id); }}
-            >×</button>
+            >{deletingId === f.id ? '…' : '×'}</button>
           </div>
         ))}
       </div>
@@ -132,9 +143,10 @@ export default function FileManager() {
         />
         <div className="flex gap-2">
           <button
-            className="bg-accent hover:bg-accent-h text-white border-none rounded px-5 py-2 text-sm font-semibold transition-colors self-start cursor-pointer"
+            className="bg-accent hover:bg-accent-h text-white border-none rounded px-5 py-2 text-sm font-semibold transition-colors self-start cursor-pointer disabled:opacity-50"
             onClick={handleSave}
-          >💾 Save</button>
+            disabled={saving}
+          >{saving ? 'Saving…' : '💾 Save'}</button>
           <button
             className="bg-transparent border border-border text-primary hover:bg-border rounded px-5 py-2 text-sm font-medium transition-colors self-start cursor-pointer disabled:opacity-40"
             onClick={handleDownload}
