@@ -19,9 +19,13 @@ const LANGUAGE_LABELS: Record<string, string> = {
 
 export default function LanguageSelector({ value, onChange, languages, label }: LanguageSelectorProps) {
   return (
-    <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)' }}>
+    <label className="flex items-center gap-2 text-muted text-sm">
       {label && <span>{label}</span>}
-      <select value={value} onChange={(e) => onChange(e.target.value)}>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="bg-surface border border-border text-primary rounded px-2 py-1.5 text-sm focus:outline-none focus:border-accent cursor-pointer"
+      >
         {languages.map((lang) => (
           <option key={lang} value={lang}>
             {LANGUAGE_LABELS[lang] || lang}
