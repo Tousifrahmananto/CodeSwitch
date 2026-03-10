@@ -1074,7 +1074,7 @@ button {
 }
 
 .lesson-content p {
-  color: var(--text-muted);
+  color: var(--text);
   line-height: 1.6;
   margin-bottom: 16px;
 }
