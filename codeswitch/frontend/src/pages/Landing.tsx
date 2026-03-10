@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
 
 // ─── Demo sequences shown in the hero code window ─────────────────────────────
@@ -212,6 +213,7 @@ function CodeDemo() {
 
 // ─── Main Landing page ────────────────────────────────────────────────────────
 export default function Landing({ onGetStarted }) {
+  const navigate = useNavigate();
   const featuresRef = useRef(null);
   const modulesRef = useRef(null);
   const [featuresIn, setFeaturesIn] = useState(false);
@@ -221,9 +223,7 @@ export default function Landing({ onGetStarted }) {
     document.title = 'CodeSwitch | Convert Code Between Python, Java & C';
   }, []);
 
-  const goToPlayground = () => {
-    window.location.href = window.location.pathname + '?playground';
-  };
+  const goToPlayground = () => navigate('/playground');
 
   // Intersection observers for scroll-triggered animations
   useEffect(() => {
@@ -333,7 +333,7 @@ export default function Landing({ onGetStarted }) {
         {[
           { value: '5', label: 'Languages Supported' },
           { value: '13', label: 'Learning Modules' },
-          { value: '100+', label: 'Code Patterns' },
+          { value: '50+', label: 'Reference Cards' },
           { value: 'AI', label: 'Powered Engine' },
         ].map(s => (
           <div key={s.label} className="flex flex-col items-center gap-1">
@@ -371,6 +371,79 @@ export default function Landing({ onGetStarted }) {
               <p className="text-sm text-muted leading-relaxed m-0">{f.desc}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* ── Product Preview ── */}
+      <section className="py-16 px-4 sm:px-8">
+        <div className="text-center mb-10">
+          <h2 className="text-2xl font-bold m-0 mb-2">See it in action</h2>
+          <p className="text-muted text-sm m-0">AI-powered conversion inside a full Monaco editor — no downloads needed.</p>
+        </div>
+
+        <div className="land-browser-mock max-w-4xl mx-auto">
+          {/* Browser chrome */}
+          <div className="land-browser-bar">
+            <div className="flex gap-1.5 flex-shrink-0">
+              <span className="w-3 h-3 rounded-full" style={{ background: '#f38ba8' }} />
+              <span className="w-3 h-3 rounded-full" style={{ background: '#f9e2af' }} />
+              <span className="w-3 h-3 rounded-full" style={{ background: '#a6e3a1' }} />
+            </div>
+            <div className="flex-1 flex justify-center">
+              <span className="text-xs text-muted bg-bg/60 rounded px-3 py-1 border border-border font-mono">
+                🔒 code-switch-learntoconquer.vercel.app/converter
+              </span>
+            </div>
+            <div className="w-16 flex-shrink-0" />
+          </div>
+
+          {/* App body */}
+          <div className="flex overflow-hidden" style={{ height: '260px' }}>
+            {/* Mock sidebar */}
+            <div className="land-mock-sidebar">
+              <div className="flex items-center gap-2 mb-4 px-1">
+                <Logo size={18} id="mock-brand" />
+                <span className="text-xs font-bold">CodeSwitch</span>
+              </div>
+              {['🏠 Dashboard', '💻 Converter', '📁 Files', '📚 Learn', '📖 Reference'].map((item, i) => (
+                <div key={item} className={`land-mock-nav-item${i === 1 ? ' active' : ''}`}>{item}</div>
+              ))}
+            </div>
+
+            {/* Converter panel */}
+            <div className="flex-1 p-4 overflow-hidden flex flex-col gap-3" style={{ background: 'var(--bg)' }}>
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-xs text-muted">From</span>
+                <span className="land-mock-pill" style={{ color: '#3b82f6', background: '#3b82f614', borderColor: '#3b82f640' }}>● Python</span>
+                <span className="text-muted text-sm">→</span>
+                <span className="bg-accent text-white text-xs font-semibold rounded px-3 py-1">Convert</span>
+                <span className="text-muted text-sm">→</span>
+                <span className="text-xs text-muted">To</span>
+                <span className="land-mock-pill" style={{ color: '#f59e0b', background: '#f59e0b14', borderColor: '#f59e0b40' }}>● Java</span>
+                <span className="ml-auto text-xs font-semibold rounded px-2 py-0.5" style={{ background: 'rgba(124,106,247,0.15)', color: 'var(--accent)', border: '1px solid var(--accent)' }}>✦ AI-powered</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 flex-1 min-h-0">
+                <div className="land-mock-code-panel">
+                  <div className="land-mock-panel-hdr" style={{ color: '#3b82f6' }}>Python · Input</div>
+                  <pre className="land-mock-code">
+                    <span style={{ color: '#c678dd' }}>def</span><span style={{ color: '#61afef' }}> factorial</span><span>(n):</span>{'\n'}
+                    <span style={{ color: '#c678dd' }}>    if</span><span> n </span><span style={{ color: '#56b6c2' }}>{'<='}</span><span style={{ color: '#d19a66' }}> 1</span><span>: </span><span style={{ color: '#c678dd' }}>return</span><span style={{ color: '#d19a66' }}> 1</span>{'\n'}
+                    <span style={{ color: '#c678dd' }}>    return</span><span> n </span><span style={{ color: '#56b6c2' }}>*</span><span style={{ color: '#61afef' }}> factorial</span><span>(n</span><span style={{ color: '#56b6c2' }}>-</span><span style={{ color: '#d19a66' }}>1</span><span>)</span>
+                  </pre>
+                </div>
+                <div className="land-mock-code-panel">
+                  <div className="land-mock-panel-hdr" style={{ color: '#f59e0b' }}>Java · Output</div>
+                  <pre className="land-mock-code">
+                    <span style={{ color: '#c678dd' }}>public static int</span><span style={{ color: '#61afef' }}> factorial</span><span>(</span><span style={{ color: '#c678dd' }}>int</span><span> n) {'{'}</span>{'\n'}
+                    <span style={{ color: '#c678dd' }}>    if</span><span> (n </span><span style={{ color: '#56b6c2' }}>{'<='}</span><span style={{ color: '#d19a66' }}> 1</span><span>) </span><span style={{ color: '#c678dd' }}>return</span><span style={{ color: '#d19a66' }}> 1</span><span>;</span>{'\n'}
+                    <span style={{ color: '#c678dd' }}>    return</span><span> n </span><span style={{ color: '#56b6c2' }}>*</span><span style={{ color: '#61afef' }}> factorial</span><span>(n</span><span style={{ color: '#56b6c2' }}>-</span><span style={{ color: '#d19a66' }}>1</span><span>);</span>{'\n'}
+                    <span>{'}'}</span>
+                  </pre>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

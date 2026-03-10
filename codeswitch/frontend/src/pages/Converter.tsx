@@ -66,6 +66,10 @@ export default function Converter() {
   const elapsedIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [convertElapsed, setConvertElapsed] = useState(0);
 
+  // Theme picker popover
+  const [showThemePicker, setShowThemePicker] = useState(false);
+  const themePickerRef = useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
     return () => {
       convertControllerRef.current?.abort();
@@ -73,6 +77,22 @@ export default function Converter() {
       if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current);
     };
   }, []);
+
+  // Close theme picker on outside click
+  useEffect(() => {
+    if (!showThemePicker) return;
+    const handler = (e: MouseEvent) => {
+      if (themePickerRef.current && !themePickerRef.current.contains(e.target as Node)) {
+        setShowThemePicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showThemePicker]);
+
+  // Keyboard shortcuts — Ctrl/Cmd+Enter to convert
+  const handleConvertRef = useRef<() => void>(() => {});
+  const handleRunRef = useRef<() => void>(() => {});
 
   const isQuotaError = (msg: string) =>
     msg.includes('All API keys exhausted') || msg.includes('AI_API_KEY not set');
@@ -154,7 +174,7 @@ export default function Converter() {
         output_code: outputCode,
         engine,
       });
-      const url = `${window.location.origin}${window.location.pathname}?share=${data.slug}`;
+      const url = `${window.location.origin}/share/${data.slug}`;
       await navigator.clipboard.writeText(url);
       setShareToast('Link copied!');
       setTimeout(() => setShareToast(''), 2500);
@@ -220,6 +240,28 @@ export default function Converter() {
     setHasUserKey(false);
   };
 
+  // Keep shortcut refs in sync with latest handlers
+  useEffect(() => { handleConvertRef.current = handleConvert; });
+  useEffect(() => { handleRunRef.current = handleRun; });
+
+  // Global keyboard shortcuts — Ctrl/Cmd+Enter to convert, Ctrl/Cmd+Shift+R to run
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        handleConvertRef.current();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'R') {
+        e.preventDefault();
+        handleRunRef.current();
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, []);
+
   // Compute output match badge when both sides are run
   const bothRan = runOutput !== null && runOutputTarget !== null;
   const outputsMatch = bothRan &&
@@ -256,6 +298,7 @@ export default function Converter() {
             className="bg-accent hover:bg-accent-h text-white border-none rounded px-5 py-2 text-sm font-semibold transition-colors cursor-pointer disabled:opacity-50"
             onClick={handleConvert}
             disabled={loading}
+            title="Convert (Ctrl+Enter)"
           >
             {loading
               ? convertElapsed > 3 ? `Converting… ${convertElapsed}s` : 'Converting…'
@@ -281,11 +324,38 @@ export default function Converter() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 ml-auto text-sm">
-          <label>Theme</label>
-          <select value={theme} onChange={e => handleThemeChange(e.target.value)}>
-            {THEMES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-          </select>
+        <div className="flex items-center gap-2 ml-auto">
+          {/* Theme picker — icon button with popover */}
+          <div className="relative" ref={themePickerRef}>
+            <button
+              className="flex items-center gap-1 text-xs text-muted border border-border rounded px-2.5 py-1.5 bg-transparent hover:bg-border transition-colors"
+              onClick={() => setShowThemePicker(p => !p)}
+              title="Editor theme"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+              </svg>
+              {THEMES.find(t => t.id === theme)?.label ?? 'Theme'}
+            </button>
+            {showThemePicker && (
+              <div className="absolute right-0 top-full mt-1 z-50 bg-surface border border-border rounded-lg shadow-lg overflow-hidden min-w-[130px]">
+                {THEMES.map(t => (
+                  <button
+                    key={t.id}
+                    className={`w-full text-left px-3 py-2 text-xs transition-colors bg-transparent border-none ${
+                      theme === t.id
+                        ? 'bg-accent/15 text-accent font-semibold'
+                        : 'text-primary hover:bg-border'
+                    }`}
+                    onClick={() => { handleThemeChange(t.id); setShowThemePicker(false); }}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           {hasUserKey && (
             <>
               <span className="text-xs bg-success/15 text-success border border-success/30 rounded px-2 py-1 whitespace-nowrap">✓ Your API key active</span>
@@ -340,7 +410,7 @@ export default function Converter() {
           ? 'inline-block text-xs font-semibold rounded px-3 py-1 mb-3 tracking-wide bg-accent/15 border border-accent text-accent-h'
           : 'inline-block text-xs font-semibold rounded px-3 py-1 mb-3 tracking-wide bg-warning/10 border border-warning text-warning'
         }>
-          {engine === 'ai' ? '✦ AI-powered conversion' : '⚙ Rule-based conversion (set AI_API_KEY in .env to enable AI)'}
+          {engine === 'ai' ? '✦ AI-powered conversion' : '⚙ Rule-based conversion'}
         </p>
       )}
 
