@@ -2545,6 +2545,43 @@ button {
   }
 }
 
+/* ── File Manager grid ──────────────────────────────────────────────────── */
+.file-manager-grid {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+}
+
+/* ── Mobile app layout ──────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  /* background-attachment: fixed causes scroll jank on iOS */
+  body {
+    background-attachment: scroll;
+  }
+
+  /* Learning: module cards 1-col */
+  .module-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Learning: lesson layout stacks vertically */
+  .lesson-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .lesson-sidebar {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding-right: 0;
+    padding-bottom: 12px;
+  }
+
+  /* File Manager: stack on mobile */
+  .file-manager-grid {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+}
+
 /* ── Editor: panel header with actions ─────────────── */
 .panel-header {
   display: flex;

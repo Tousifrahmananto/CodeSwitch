@@ -250,22 +250,22 @@ export default function Landing({ onGetStarted }) {
       <div className="land-orb land-orb-2" aria-hidden="true" />
 
       {/* ── Navbar ── */}
-      <nav className="sticky top-0 z-50 flex items-center justify-between px-8 py-4 border-b border-border bg-bg/80 backdrop-blur">
+      <nav className="sticky top-0 z-50 flex items-center justify-between px-4 sm:px-8 py-4 border-b border-border bg-bg/80 backdrop-blur">
         <div className="flex items-center gap-2.5">
           <Logo size={30} id="nav" />
           <span className="font-bold text-base text-primary">CodeSwitch</span>
         </div>
-        <div className="flex items-center gap-6">
+        <div className="hidden sm:flex items-center gap-6">
           <a href="#features" className="land-nav-link">Features</a>
           <a href="#modules" className="land-nav-link">Modules</a>
         </div>
         <div className="flex items-center gap-2">
           <button
-            className="bg-transparent border border-border text-primary hover:bg-border rounded px-4 py-1.5 text-sm font-medium transition-colors"
+            className="hidden sm:inline-flex bg-transparent border border-border text-primary hover:bg-border rounded px-4 py-1.5 text-sm font-medium transition-colors"
             onClick={goToPlayground}
           >Try Playground</button>
           <button
-            className="bg-transparent border border-border text-primary hover:bg-border rounded px-4 py-1.5 text-sm font-medium transition-colors"
+            className="hidden sm:inline-flex bg-transparent border border-border text-primary hover:bg-border rounded px-4 py-1.5 text-sm font-medium transition-colors"
             onClick={onGetStarted}
           >Sign In</button>
           <button
@@ -329,7 +329,7 @@ export default function Landing({ onGetStarted }) {
       </section>
 
       {/* ── Stats strip ── */}
-      <div className="flex items-center justify-center gap-12 py-6 border-y border-border bg-surface/50 land-fade-up land-delay-2">
+      <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-12 py-6 border-y border-border bg-surface/50 land-fade-up land-delay-2">
         {[
           { value: '5', label: 'Languages Supported' },
           { value: '13', label: 'Learning Modules' },
@@ -354,7 +354,7 @@ export default function Landing({ onGetStarted }) {
           <p className="text-muted text-sm m-0">Three core tools built for CS students and developers.</p>
         </div>
 
-        <div className="grid grid-cols-3 gap-5 px-8 max-w-5xl mx-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 px-4 sm:px-8 max-w-5xl mx-auto">
           {FEATURES.map((f, i) => (
             <div
               key={f.title}
@@ -385,7 +385,7 @@ export default function Landing({ onGetStarted }) {
           <p className="text-muted text-sm m-0">Structured learning with interactive examples and progress tracking.</p>
         </div>
 
-        <div className="grid gap-2 px-8 max-w-3xl mx-auto">
+        <div className="grid gap-2 px-4 sm:px-8 max-w-3xl mx-auto">
           {MODULES.map((m, i) => {
             const tc = TAG_COLORS[m.tag];
             return (

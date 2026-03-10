@@ -114,7 +114,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Stat Cards ── */}
-      <div className="grid grid-cols-4 gap-3 mb-5">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         <StatCard value={history.length} label="Conversions" />
         <StatCard value={completedLessons} label="Lessons Done" />
         <StatCard value={files.length} label="Files Saved" />
@@ -122,7 +122,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Bottom Two-Column ── */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
         {/* Recent Conversions */}
         <div className="bg-surface border border-border rounded p-4">
@@ -130,20 +130,22 @@ export default function Dashboard() {
           {history.length === 0 ? (
             <p className="text-sm text-muted py-2">No conversions yet. Try the Converter!</p>
           ) : (
-            <table className="w-full border-collapse text-sm">
-              <thead>
-                <tr><th>From</th><th>To</th><th>Date</th></tr>
-              </thead>
-              <tbody>
-                {history.slice(0, 8).map(h => (
-                  <tr key={h.id}>
-                    <td><LangChip lang={h.source_language} /></td>
-                    <td><LangChip lang={h.target_language} /></td>
-                    <td className="text-muted">{new Date(h.timestamp).toLocaleDateString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr><th>From</th><th>To</th><th>Date</th></tr>
+                </thead>
+                <tbody>
+                  {history.slice(0, 8).map(h => (
+                    <tr key={h.id}>
+                      <td><LangChip lang={h.source_language} /></td>
+                      <td><LangChip lang={h.target_language} /></td>
+                      <td className="text-muted">{new Date(h.timestamp).toLocaleDateString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
 
