@@ -14,6 +14,11 @@ export default function ShareView({ slug, onBack }) {
       .catch(() => setError('Snippet not found or has expired.'));
   }, [slug]);
 
+  useEffect(() => {
+    document.title = 'Shared Snippet | CodeSwitch';
+    return () => { document.title = 'CodeSwitch'; };
+  }, []);
+
   return (
     <div className="min-h-screen">
       <nav className="flex items-center justify-between px-5 py-3 border-b border-border">

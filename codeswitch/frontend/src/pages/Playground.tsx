@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import CodeEditor from '../components/CodeEditor';
 import LanguageSelector from '../components/LanguageSelector';
 import Logo from '../components/Logo';
@@ -27,6 +27,11 @@ export default function Playground({ onBack }) {
   const [runLoading, setRunLoading] = useState(false);
   const [runOutput, setRunOutput] = useState(null);
   const [runError, setRunError] = useState('');
+
+  useEffect(() => {
+    document.title = 'Playground | CodeSwitch — No Sign-In Required';
+    return () => { document.title = 'CodeSwitch'; };
+  }, []);
 
   // Save to Files state
   const [showSaveModal, setShowSaveModal] = useState(false);

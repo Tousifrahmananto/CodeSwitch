@@ -217,6 +217,10 @@ export default function Landing({ onGetStarted }) {
   const [featuresIn, setFeaturesIn] = useState(false);
   const [modulesIn, setModulesIn] = useState(false);
 
+  useEffect(() => {
+    document.title = 'CodeSwitch | Convert Code Between Python, Java & C';
+  }, []);
+
   const goToPlayground = () => {
     window.location.href = window.location.pathname + '?playground';
   };
