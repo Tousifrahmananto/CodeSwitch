@@ -8,7 +8,7 @@ from rest_framework import serializers
 from .services import convert_code
 from .ai_service import ai_explain_code
 from .models import ConversionHistory, SharedSnippet
-from .throttles import AIBurstThrottle, AISustainedThrottle, RunCodeAnonThrottle
+from .throttles import AIBurstThrottle, AISustainedThrottle, RunCodeAnonThrottle, SnippetAnonThrottle
 
 # ── Wandbox compiler list — fetched once, cached for the process lifetime ─────
 _wandbox_compilers = None
@@ -151,6 +151,7 @@ class CreateSnippetView(APIView):
 class GetSnippetView(APIView):
     """GET /api/snippets/<slug>/ — Retrieve a shared snippet (no auth required)."""
     permission_classes = [AllowAny]
+    throttle_classes = [SnippetAnonThrottle]  # Prevent UUID enumeration via rate limiting
 
     def get(self, request, slug):
         try:

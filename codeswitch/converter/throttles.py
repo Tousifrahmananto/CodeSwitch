@@ -14,3 +14,12 @@ class AISustainedThrottle(UserRateThrottle):
 class RunCodeAnonThrottle(AnonRateThrottle):
     """10 code-run requests per minute for anonymous users."""
     scope = 'run_anon'
+
+
+class SnippetAnonThrottle(AnonRateThrottle):
+    """
+    PUBLIC SNIPPET RETRIEVAL RATE LIMIT
+    Prevents UUID enumeration attacks (brute-forcing all snippet UUIDs).
+    Rate: 60 requests per minute per IP.
+    """
+    scope = 'snippet_anon'

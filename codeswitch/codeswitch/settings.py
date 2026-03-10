@@ -7,7 +7,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = config('SECRET_KEY', default='dev-secret-key-change-in-production')
 DEBUG = config('DEBUG', default=True, cast=bool)
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
+# ── ALLOWED_HOSTS Security ────────────────────────────────────────────────────
+# IMPORTANT: Use specific domain names only. Wildcards like ".vercel.app" allow any
+# subdomain to proxy your backend and are a Host Header Injection vector.
+# Example: ALLOWED_HOSTS="myapp.vercel.app,api.railway.app,localhost,127.0.0.1"
+_hosts_config = config('ALLOWED_HOSTS', default='localhost,127.0.0.1')
+ALLOWED_HOSTS = [h.strip() for h in _hosts_config.split(',') if h.strip()]
+# Security check: warn about wildcards
+if any('*' in host or (host.startswith('.') and not DEBUG) for host in ALLOWED_HOSTS):
+    import logging
+    logging.warning(
+        "SECURITY WARNING: ALLOWED_HOSTS contains wildcard patterns. "
+        "This may allow Host Header Injection attacks. Use specific domain names instead."
+    )
 
 # ── SECRET_KEY guard ──────────────────────────────────────────────────────────
 import sys as _sys
@@ -135,6 +147,7 @@ REST_FRAMEWORK = {
         'ai_burst':     '5/minute',
         'ai_sustained': '30/hour',
         'run_anon':     '10/minute',
+        'snippet_anon': '60/minute',  # PUBLIC snippet retrieval — prevent UUID enumeration
     },
 }
 
@@ -146,13 +159,36 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
-CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='http://localhost:3000').split(',')
+# ── CORS Security ────────────────────────────────────────────────────────────
+# CRITICAL: Wildcard origins are only safe when credentials are disabled.
+# When CORS_ALLOW_CREDENTIALS=True, MUST use explicit origin list only.
+def _parse_and_validate_origins(origins_str: str) -> list:
+    """Parse comma-separated origins and validate security constraints."""
+    origins = [o.strip() for o in origins_str.split(',') if o.strip()]
+    # Check for dangerous patterns
+    if '*' in origins and CORS_ALLOW_CREDENTIALS:
+        import sys
+        # ONLY raise on deploy, not during migrations
+        if not any(arg in sys.argv for arg in ['migrate', 'collectstatic', 'test']):
+            from django.core.exceptions import ImproperlyConfigured
+            raise ImproperlyConfigured(
+                "SECURITY ERROR: Wildcard CORS origins (*) cannot be used with "
+                "CORS_ALLOW_CREDENTIALS=True. Use explicit origins instead: "
+                "https://example.com,https://another.com"
+            )
+    return origins
+
+CORS_ALLOWED_ORIGINS = _parse_and_validate_origins(
+    config('CORS_ALLOWED_ORIGINS', default='http://localhost:3000')
+)
 # Credentials (cookies) must be sent cross-origin — requires explicit origin list (no wildcard)
 CORS_ALLOW_CREDENTIALS = True
 # Allow the user-provided API key header from the frontend
 from corsheaders.defaults import default_headers as _default_cors_headers
 CORS_ALLOW_HEADERS = list(_default_cors_headers) + ['X-User-Api-Key']
-CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='http://localhost:8000').split(',')
+CSRF_TRUSTED_ORIGINS = _parse_and_validate_origins(
+    config('CSRF_TRUSTED_ORIGINS', default='http://localhost:8000')
+)
 
 # ── Cookie security ───────────────────────────────────────────────────────────
 SESSION_COOKIE_HTTPONLY = True
@@ -176,7 +212,7 @@ SECURE_HSTS_PRELOAD = not DEBUG
 # Django over plain HTTP internally. Setting SECURE_SSL_REDIRECT=True causes an
 # infinite redirect loop. Instead, trust the X-Forwarded-Proto header so Django
 # knows the original request was HTTPS without redirecting itself.
-SECURE_SSL_REDIRECT = False
+SECURE_SSL_REDIRECT = not DEBUG  # Enforce HTTPS in production
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # ── Logging ───────────────────────────────────────────────────────────────────

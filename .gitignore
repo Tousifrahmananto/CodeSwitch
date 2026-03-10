@@ -19,3 +19,9 @@ desktop.ini
 *.swp
 .vercel
 .env*.local
+
+# Security documentation (local reference only)
+SECURITY_PATCH.md
+SECURITY_FIXES_DEPLOYED.md
+SECURITY_HARDENING_COMPLETE.md
+scripts/validate-security-fixes.sh
