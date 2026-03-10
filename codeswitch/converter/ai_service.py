@@ -22,6 +22,7 @@ the service automatically retries with the next available key.
 
 import os
 import re
+import logging
 
 import requests
 
@@ -30,6 +31,9 @@ try:
     _DECOUPLE_AVAILABLE = True
 except ImportError:
     _DECOUPLE_AVAILABLE = False
+
+# Setup logging for secure error tracking
+logger = logging.getLogger(__name__)
 
 
 def _get(key: str, default: str = '') -> str:
@@ -133,10 +137,14 @@ def ai_convert_code(source_lang: str, target_lang: str, code: str, user_key: str
     Returns:
         {'success': True,  'output': str, 'engine': 'ai'}
         {'success': False, 'error': str}
+
+    NOTE: Detailed errors are logged server-side for debugging.
+    Clients receive generic error messages for security.
     """
     api_keys = ([user_key.strip()] if user_key and user_key.strip() else []) + _get_api_keys()
     if not api_keys:
-        return {'success': False, 'error': 'AI_API_KEY not set in .env'}
+        logger.warning("AI_API_KEY not configured in .env")
+        return {'success': False, 'error': 'AI service unavailable'}
 
     provider = _get('AI_PROVIDER', 'gemini').lower().strip()
     model    = _get('AI_MODEL', _DEFAULT_MODELS.get(provider, 'gemini-2.0-flash-lite')).strip()
@@ -144,7 +152,7 @@ def ai_convert_code(source_lang: str, target_lang: str, code: str, user_key: str
 
     user_prompt = f'Convert the following {source_lang} code to {target_lang}.\n\n{code}'
 
-    last_error = 'All API keys exhausted.'
+    last_error_detail = 'All API keys exhausted.'
 
     for key_index, api_key in enumerate(api_keys):
         is_last_key = (key_index == len(api_keys) - 1)
@@ -162,7 +170,8 @@ def ai_convert_code(source_lang: str, target_lang: str, code: str, user_key: str
 
             except requests.HTTPError as exc:
                 status = exc.response.status_code if exc.response is not None else None
-                last_error = f'AI service error (key #{key_index + 1}): {exc}'
+                last_error_detail = f'HTTP {status} from {provider} (key #{key_index + 1}): {exc}'
+                logger.error(last_error_detail)
 
                 if status in _ROTATE_STATUSES:
                     if is_last_key and attempt == 0:
@@ -172,13 +181,17 @@ def ai_convert_code(source_lang: str, target_lang: str, code: str, user_key: str
                     break
                 else:
                     # Non-quota error (e.g. 500) — no point trying other keys
-                    return {'success': False, 'error': last_error}
+                    logger.error(f"Non-retryable AI service error: {last_error_detail}")
+                    return {'success': False, 'error': 'AI service temporarily unavailable'}
 
             except Exception as exc:
-                last_error = f'AI service error (key #{key_index + 1}): {exc}'
+                last_error_detail = f'Conversion service error (key #{key_index + 1}): {type(exc).__name__}: {exc}'
+                logger.error(last_error_detail)
                 break  # unexpected error — try next key
 
-    return {'success': False, 'error': last_error}
+    # All keys exhausted — return generic error to client, detailed error logged
+    logger.error(f"All AI conversion keys exhausted: {last_error_detail}")
+    return {'success': False, 'error': 'AI service unavailable. Please try again later.'}
 
 
 _EXPLAIN_SYSTEM_PROMPT = (
@@ -197,10 +210,13 @@ def ai_explain_code(source_lang: str, target_lang: str, input_code: str, output_
     Returns:
         {'success': True,  'explanation': str}
         {'success': False, 'error': str}
+
+    NOTE: Detailed errors logged server-side, generic messages sent to clients.
     """
     api_keys = ([user_key.strip()] if user_key and user_key.strip() else []) + _get_api_keys()
     if not api_keys:
-        return {'success': False, 'error': 'AI_API_KEY not set in .env'}
+        logger.warning("AI_API_KEY not configured in .env, cannot explain code")
+        return {'success': False, 'error': 'AI service unavailable'}
 
     provider = _get('AI_PROVIDER', 'gemini').lower().strip()
     model    = _get('AI_MODEL', _DEFAULT_MODELS.get(provider, 'gemini-2.0-flash-lite')).strip()
@@ -213,7 +229,7 @@ def ai_explain_code(source_lang: str, target_lang: str, input_code: str, output_
         f'--- {target_lang} (translated) ---\n{output_code}'
     )
 
-    last_error = 'All API keys exhausted.'
+    last_error_detail = 'All API keys exhausted.'
 
     for key_index, api_key in enumerate(api_keys):
         is_last_key = (key_index == len(api_keys) - 1)
@@ -257,17 +273,21 @@ def ai_explain_code(source_lang: str, target_lang: str, input_code: str, output_
 
             except requests.HTTPError as exc:
                 status_code = exc.response.status_code if exc.response is not None else None
-                last_error = f'AI service error (key #{key_index + 1}): {exc}'
+                last_error_detail = f'HTTP {status_code} from {provider} (key #{key_index + 1}): {exc}'
+                logger.error(last_error_detail)
 
                 if status_code in _ROTATE_STATUSES:
                     if is_last_key and attempt == 0:
                         continue
                     break
                 else:
-                    return {'success': False, 'error': last_error}
+                    logger.error(f"Non-retryable explanation service error: {last_error_detail}")
+                    return {'success': False, 'error': 'AI service temporarily unavailable'}
 
             except Exception as exc:
-                last_error = f'AI service error (key #{key_index + 1}): {exc}'
+                last_error_detail = f'Code explanation error (key #{key_index + 1}): {type(exc).__name__}: {exc}'
+                logger.error(last_error_detail)
                 break
 
-    return {'success': False, 'error': last_error}
+    logger.error(f"All explanation service keys exhausted: {last_error_detail}")
+    return {'success': False, 'error': 'AI service unavailable. Please try again later.'}

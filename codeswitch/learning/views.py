@@ -101,7 +101,7 @@ class GetProgressView(generics.ListAPIView):
 
 
 class GetLessonQuizView(APIView):
-    """GET /api/lessons/<lesson_id>/quiz/ — Fetch quiz for a lesson (options without is_correct)."""
+    """GET /api/lessons/<lesson_id>/quiz/ — Fetch quiz for a lesson (options without is_correct or explanations)."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request, lesson_id):
@@ -124,7 +124,13 @@ class GetLessonQuizView(APIView):
                     'question_text': q.question_text,
                     'order': q.order,
                     'options': [
-                        {'id': o.id, 'option_text': o.option_text, 'explanation': o.explanation or ''}
+                        {
+                            'id': o.id,
+                            'option_text': o.option_text,
+                            # SECURITY: Do NOT send explanations until quiz is submitted
+                            # This prevents students from inferring correct answers from explanations
+                            # 'explanation': o.explanation or ''
+                        }
                         for o in q.options.all()
                     ],
                 }
@@ -135,7 +141,7 @@ class GetLessonQuizView(APIView):
 
 
 class SubmitQuizAttemptView(APIView):
-    """POST /api/quizzes/<quiz_id>/submit/ — Submit answers and get score."""
+    """POST /api/quizzes/<quiz_id>/submit/ — Submit answers and get score with explanations."""
     permission_classes = [IsAuthenticated]
 
     def post(self, request, quiz_id):
@@ -150,6 +156,7 @@ class SubmitQuizAttemptView(APIView):
             return Response({'error': 'Quiz has no questions.'}, status=status.HTTP_400_BAD_REQUEST)
 
         correct_options = {}
+        explanations = {}  # Return explanations AFTER submission for learning
         correct_count = 0
         for q in questions:
             correct_option = next((o for o in q.options.all() if o.is_correct), None)
@@ -157,6 +164,13 @@ class SubmitQuizAttemptView(APIView):
                 correct_options[str(q.id)] = correct_option.id
                 if str(answers.get(str(q.id))) == str(correct_option.id):
                     correct_count += 1
+
+            # Collect explanations for all options (shown AFTER quiz submission)
+            for option in q.options.all():
+                if option.explanation:
+                    if str(q.id) not in explanations:
+                        explanations[str(q.id)] = {}
+                    explanations[str(q.id)][str(option.id)] = option.explanation
 
         score = round((correct_count / len(questions)) * 100)
         passed = score >= quiz.passing_score
@@ -171,4 +185,5 @@ class SubmitQuizAttemptView(APIView):
             'score': score,
             'passed': passed,
             'correct_options': correct_options,
+            'explanations': explanations,  # Now safe to show after submission
         })
