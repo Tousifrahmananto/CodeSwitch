@@ -30,16 +30,16 @@
 }
 
 [data-theme="light"] {
-  --bg: #e8ecef;
-  --surface: #dde2e6;
-  --border: #b5c5d0;
-  --accent: #1e3a52;
-  --accent-hover: #0a2233;
-  --text: #0d1a25;
-  --text-muted: #4a6070;
-  --success: #4a8c3f;
-  --danger: #be3a3a;
-  --warning: #9a6e00;
+  --bg: #f4f6f9;
+  --surface: #ffffff;
+  --border: #d0d7de;
+  --accent: #6d56f0;
+  --accent-hover: #5544d6;
+  --text: #111827;
+  --text-muted: #5a6a78;
+  --success: #1a7a3f;
+  --danger: #c0392b;
+  --warning: #b35c00;
 }
 
 body {
@@ -49,6 +49,10 @@ body {
   font-family: var(--font);
   font-size: 14px;
   min-height: 100vh;
+}
+
+[data-theme="light"] body {
+  background: linear-gradient(135deg, #f4f6f9 0%, #eaf0f6 100%);
 }
 
 button {
@@ -3931,4 +3935,88 @@ button {
   background: var(--surface);
   overflow-x: auto;
   white-space: pre;
+}
+/* ── Product Browser Mockup (Landing) ─────────────────────────────────────── */
+.land-browser-mock {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.land-browser-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.land-mock-sidebar {
+  width: 140px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.land-mock-nav-item {
+  font-size: 11px;
+  padding: 5px 8px;
+  border-radius: 5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.land-mock-nav-item.active {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.land-mock-code-panel {
+  background: #1e2533;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.land-mock-panel-hdr {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 5px 10px;
+  background: rgba(255,255,255,0.04);
+  border-bottom: 1px solid var(--border);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.land-mock-code {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  line-height: 1.65;
+  padding: 10px;
+  color: var(--text);
+  white-space: pre;
+  overflow: hidden;
+  flex: 1;
+  margin: 0;
+}
+
+.land-mock-pill {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 20px;
+  border: 1px solid;
 }
