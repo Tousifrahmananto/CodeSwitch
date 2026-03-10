@@ -96,7 +96,7 @@ export default function FileManager() {
   };
 
   return (
-    <div className="grid gap-5 h-[calc(100vh-56px)]" style={{ gridTemplateColumns: '260px 1fr' }}>
+    <div className="file-manager-grid gap-5 h-[calc(100vh-56px)]">
       {error && <p className="col-span-full bg-danger/10 border border-danger text-danger rounded p-2.5 text-sm mb-3">{error}</p>}
       <div className="bg-surface border border-border rounded p-4 overflow-y-auto">
         <h3 className="text-sm font-semibold text-primary mb-3">My Files</h3>

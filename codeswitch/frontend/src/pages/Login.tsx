@@ -103,9 +103,9 @@ export default function Login({ onLogin, onBack }: LoginProps) {
   const labelCls = 'text-[12px] font-semibold text-muted uppercase tracking-wide';
 
   return (
-    <div className="min-h-screen flex items-center justify-center"
+    <div className="min-h-screen flex items-center justify-center px-4"
       style={{ background: 'radial-gradient(ellipse 80% 50% at 50% -10%, rgba(124,106,247,0.18) 0%, transparent 70%), var(--bg)' }}>
-      <div className="bg-surface border border-accent/25 rounded-[16px] p-10 w-[420px] shadow-[0_24px_64px_rgba(0,0,0,0.45)]">
+      <div className="bg-surface border border-accent/25 rounded-[16px] p-6 sm:p-10 w-full max-w-[420px] shadow-[0_24px_64px_rgba(0,0,0,0.45)]">
 
         {/* Back to landing */}
         {onBack && (

@@ -79,6 +79,7 @@ export default function App() {
 
   const [page, setPage] = useState('dashboard');
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -194,12 +195,30 @@ export default function App() {
 
   return (
     <div className="flex h-screen overflow-hidden" data-theme={theme}>
-      {/* Sidebar */}
-      <nav className="w-sidebar bg-surface border-r border-border flex flex-col py-5 px-3 gap-1.5 flex-shrink-0">
+      {/* Mobile overlay backdrop */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 z-40 md:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Sidebar — fixed drawer on mobile, static on desktop */}
+      <nav className={`fixed md:static inset-y-0 left-0 z-50 md:z-auto w-sidebar bg-surface border-r border-border flex flex-col py-5 px-3 gap-1.5 flex-shrink-0 transition-transform duration-200 md:translate-x-0 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         {/* Brand */}
         <div className="flex items-center gap-2.5 mb-4">
           <Logo size={26} id="sidebar" />
           <h1 className="text-base font-bold text-primary tracking-tight">CodeSwitch</h1>
+          {/* Close button — mobile only */}
+          <button
+            className="md:hidden ml-auto bg-transparent border-none text-muted p-1 rounded hover:bg-border hover:text-primary transition-colors"
+            onClick={() => setMobileMenuOpen(false)}
+            aria-label="Close menu"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
         </div>
 
         {/* Nav items */}
@@ -210,7 +229,7 @@ export default function App() {
               ? 'bg-accent text-white font-semibold'
               : 'text-muted hover:bg-border hover:text-primary'
               }`}
-            onClick={() => setPage(key)}
+            onClick={() => { setPage(key); setMobileMenuOpen(false); }}
           >
             {label}
           </button>
@@ -234,11 +253,27 @@ export default function App() {
       </nav>
 
       {/* Main content — each page is isolated in its own ErrorBoundary */}
-      <main className="flex-1 overflow-y-auto p-7 px-8">
-        <ErrorBoundary key={page}>
-          {pages[page]}
-        </ErrorBoundary>
-      </main>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Mobile top bar */}
+        <div className="md:hidden flex items-center gap-3 px-4 h-12 bg-surface border-b border-border flex-shrink-0">
+          <button
+            className="bg-transparent border-none text-muted p-1 rounded hover:bg-border hover:text-primary transition-colors"
+            onClick={() => setMobileMenuOpen(true)}
+            aria-label="Open menu"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </button>
+          <Logo size={22} id="mobile-header" />
+          <span className="font-bold text-sm text-primary">CodeSwitch</span>
+        </div>
+        <main className="flex-1 overflow-y-auto p-7 px-8 max-md:p-4 max-md:px-4">
+          <ErrorBoundary key={page}>
+            {pages[page]}
+          </ErrorBoundary>
+        </main>
+      </div>
     </div>
   );
 }
