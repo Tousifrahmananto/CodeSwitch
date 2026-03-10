@@ -54,7 +54,7 @@ class ModuleListView(generics.ListAPIView):
 
 class ModuleDetailView(generics.RetrieveAPIView):
     """GET /api/modules/{id} — Get a module with its lessons."""
-    queryset = LearningModule.objects.prefetch_related('lessons')
+    queryset = LearningModule.objects.prefetch_related('lessons').annotate(lesson_count=Count('lessons'))
     serializer_class = ModuleDetailSerializer
     permission_classes = [IsAuthenticated]
 
