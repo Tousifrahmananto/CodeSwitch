@@ -84,6 +84,20 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
+  const PAGE_TITLES: Record<string, string> = {
+    dashboard: 'Dashboard | CodeSwitch',
+    editor: 'Code Converter | CodeSwitch',
+    files: 'My Files | CodeSwitch',
+    learning: 'Learning Modules | CodeSwitch',
+    reference: 'Language Reference | CodeSwitch',
+    profile: 'My Profile | CodeSwitch',
+    admin: 'Admin | CodeSwitch',
+  };
+
+  useEffect(() => {
+    document.title = PAGE_TITLES[page] ?? 'CodeSwitch';
+  }, [page]);
+
   // Silently validate the session cookie in the background.
   // The cached user is shown immediately; this corrects it if the session has expired.
   useEffect(() => {
