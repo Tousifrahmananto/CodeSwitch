@@ -6,7 +6,7 @@
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://code-switch-learntoconquer.vercel.app/?playground</loc>
+    <loc>https://code-switch-learntoconquer.vercel.app/playground</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
