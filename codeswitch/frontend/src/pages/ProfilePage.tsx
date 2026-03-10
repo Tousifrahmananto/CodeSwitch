@@ -42,7 +42,7 @@ export default function ProfilePage({ username, onBack, isOwner = false }) {
   }, [username, isOwner]);
 
   const handleCopyUrl = () => {
-    const url = `${window.location.origin}${window.location.pathname}?profile=${username}`;
+    const url = `${window.location.origin}/user/${username}`;
     navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
