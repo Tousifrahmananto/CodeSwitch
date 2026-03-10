@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 Disallow: /api/
-Sitemap: https://codeswitch.up.railway.app/sitemap.xml
+Sitemap: https://code-switch-learntoconquer.vercel.app/sitemap.xml
