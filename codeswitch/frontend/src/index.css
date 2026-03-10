@@ -13,16 +13,16 @@
 }
 
 :root {
-  --bg: #1e1e2e;
-  --surface: #313244;
-  --border: #45475a;
-  --accent: #cba6f7;
-  --accent-hover: #b4befe;
-  --text: #cdd6f4;
-  --text-muted: #6c7086;
-  --success: #a6e3a1;
-  --danger: #f38ba8;
-  --warning: #f9e2af;
+  --bg: #282c34;
+  --surface: #21252b;
+  --border: #3e4452;
+  --accent: #61afef;
+  --accent-hover: #4d78cc;
+  --text: #abb2bf;
+  --text-muted: #5c6370;
+  --success: #98c379;
+  --danger: #e06c75;
+  --warning: #d19a66;
   --font: 'Ubuntu', system-ui, sans-serif;
   --mono: 'Ubuntu Mono', 'Cascadia Code', 'Fira Code', monospace;
   --radius: 8px;
@@ -30,16 +30,16 @@
 }
 
 [data-theme="light"] {
-  --bg: #eff1f5;
-  --surface: #e6e9ef;
-  --border: #ccd0da;
-  --accent: #8839ef;
-  --accent-hover: #7287fd;
-  --text: #4c4f69;
-  --text-muted: #8c8fa1;
-  --success: #40a02b;
-  --danger: #d20f39;
-  --warning: #df8e1d;
+  --bg: #fafafa;
+  --surface: #f0f0f0;
+  --border: #d0d0d8;
+  --accent: #4078cc;
+  --accent-hover: #2963b5;
+  --text: #282c34;
+  --text-muted: #6b6b80;
+  --success: #4a8c3f;
+  --danger: #be3a3a;
+  --warning: #9a6e00;
 }
 
 body {
