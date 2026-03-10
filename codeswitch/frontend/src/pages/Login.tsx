@@ -122,9 +122,7 @@ export default function Login({ onLogin, onBack }: LoginProps) {
 
         {/* Brand */}
         <div className="flex flex-col items-center mb-7 gap-2">
-          <div className="w-14 h-14 rounded-[14px] bg-gradient-to-br from-accent to-violet-400 flex items-center justify-center shadow-[0_8px_24px_rgba(124,106,247,0.4)] mb-1">
-            <Logo size={40} id="auth" />
-          </div>
+          <Logo size={48} id="auth" />
           <h1 className="text-[22px] font-bold text-primary tracking-tight">CodeSwitch</h1>
           <p className="text-[13px] text-muted text-center">Translate code across languages instantly</p>
         </div>
@@ -135,8 +133,8 @@ export default function Login({ onLogin, onBack }: LoginProps) {
             <button
               key={m}
               className={`flex-1 border-none rounded-[7px] py-2 text-[13px] font-medium transition-colors ${mode === m
-                  ? 'bg-accent text-white font-semibold shadow-[0_2px_8px_rgba(124,106,247,0.35)]'
-                  : 'bg-transparent text-muted hover:text-primary'
+                ? 'bg-accent text-white font-semibold shadow-[0_2px_8px_rgba(124,106,247,0.35)]'
+                : 'bg-transparent text-muted hover:text-primary'
                 }`}
               onClick={() => switchMode(m)}
             >
