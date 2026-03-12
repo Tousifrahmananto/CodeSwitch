@@ -1,194 +1,207 @@
-# CodeSwitch – Multi-Language Code Conversion & Learning Platform
+# CodeSwitch – Backend
 
-## Project Overview
-A Django + React web application that allows users to convert code between Python, C, and Java, and learn programming through structured modules.
+Django REST API for the CodeSwitch multi-language code conversion and learning platform.
 
 ---
 
 ## Tech Stack
+
 | Layer | Technology |
-|-------|-----------|
+|---|---|
 | Backend | Django 4.x + Django REST Framework |
-| Frontend | React.js |
+| Auth | SimpleJWT — httpOnly cookie-based (custom `JWTCookieAuthentication`) |
 | Database | PostgreSQL (prod) / SQLite (dev) |
-| Auth | JWT (djangorestframework-simplejwt) |
-| Code Editor | Monaco Editor |
-| Deployment | Nginx + Gunicorn |
+| AI | Groq / OpenAI / Gemini with 3-key automatic failover rotation |
+| Brute-Force | `django-axes` (5 failed logins → 1-hour lockout) |
+| CSP | `django-csp` strict Content Security Policy headers |
+| Deployment | Gunicorn on Railway |
+
+---
+
+## Supported Languages
+
+Python, C, C++, Java, JavaScript
 
 ---
 
 ## Project Structure
+
 ```
 codeswitch/
 ├── manage.py
 ├── requirements.txt
+├── Procfile                    # Railway: migrate → seed → collectstatic → gunicorn
 ├── .env.example
-├── README.md
 │
-├── codeswitch/              # Django project config
+├── codeswitch/                 # Django project config
 │   ├── settings.py
 │   ├── urls.py
-│   ├── wsgi.py
-│   └── asgi.py
+│   ├── admin_views.py          # Staff-only admin API views
+│   └── wsgi.py
 │
-├── users/                   # Auth & user profiles
-│   ├── models.py
+├── users/                      # Auth & user profiles
+│   ├── authentication.py       # Custom httpOnly cookie JWT backend
+│   ├── models.py               # Extended AbstractUser (bio, avatar)
 │   ├── serializers.py
-│   ├── views.py
-│   └── urls.py
+│   └── views.py
 │
-├── converter/               # Code conversion engine
-│   ├── models.py
-│   ├── services.py          # Conversion logic lives here
-│   ├── views.py
-│   └── urls.py
+├── converter/                  # Code conversion engine
+│   ├── ai_service.py           # Multi-provider AI client with key rotation
+│   ├── services.py             # Rule-based regex conversion engine (fallback)
+│   ├── throttles.py            # Per-user AI burst/sustained + anon run throttles
+│   ├── models.py               # ConversionHistory, SharedSnippet
+│   └── views.py
 │
-├── files/                   # User file management
-│   ├── models.py
-│   ├── views.py
-│   └── urls.py
+├── files/                      # User file workspace
+│   ├── models.py               # CodeFile
+│   └── views.py
 │
-├── learning/                # Modules, lessons, progress
-│   ├── models.py
-│   ├── views.py
-│   └── urls.py
-│
-└── frontend/                # React app
-    ├── public/
-    └── src/
-        ├── App.jsx
-        ├── pages/
-        │   ├── Login.jsx
-        │   ├── Dashboard.jsx
-        │   ├── Editor.jsx
-        │   ├── FileManager.jsx
-        │   └── Learning.jsx
-        ├── components/
-        │   ├── CodeEditor.jsx
-        │   ├── LanguageSelector.jsx
-        │   └── ProgressTracker.jsx
-        └── api/
-            └── client.js
+└── learning/                   # Modules, lessons, quizzes, progress
+    ├── models.py               # LearningModule, Lesson, UserProgress, Quiz, QuizAttempt
+    ├── views.py
+    └── management/commands/    # Seed scripts (auto-run on deploy if DB is empty)
+        ├── seed_all_if_empty.py
+        ├── seed_learning.py
+        ├── seed_modules.py
+        ├── seed_advanced_modules.py
+        ├── seed_new_modules.py
+        ├── seed_quizzes.py
+        ├── seed_remaining_quizzes.py
+        └── seed_new_quizzes.py
 ```
 
 ---
 
 ## Quick Setup
 
-### 1. Clone & Install Backend
+### 1. Install dependencies
+
 ```bash
-git clone <repo-url>
-cd codeswitch
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 2. Environment Variables
+### 2. Configure environment
+
 ```bash
 cp .env.example .env
-# Edit .env with your settings
+# Edit .env with SECRET_KEY, AI keys, database config
 ```
 
-### 3. Database Setup
+### 3. Migrate and seed
+
 ```bash
-python manage.py makemigrations
 python manage.py migrate
+python manage.py seed_all_if_empty
 python manage.py createsuperuser
 ```
 
-### 4. Run Backend
+### 4. Run
+
 ```bash
 python manage.py runserver
-# API available at http://localhost:8000/api/
-```
-
-### 5. Run Frontend
-```bash
-cd frontend
-npm install
-npm start
-# App available at http://localhost:3000
+# API: http://localhost:8000/api/
+# Django admin: http://localhost:8000/admin/
 ```
 
 ---
 
-## API Endpoints Summary
+## API Endpoints
 
 ### Auth
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | /api/register | Register new user |
-| POST | /api/login | Login, returns JWT token |
-| POST | /api/logout | Logout |
-| GET | /api/profile | Get user profile |
+| Method | Endpoint | Auth |
+|---|---|---|
+| POST | `/api/register/` | No |
+| POST | `/api/login/` | No |
+| POST | `/api/logout/` | Yes |
+| POST | `/api/token/refresh/` | No |
+| GET | `/api/me/` | Yes |
+| GET/PUT | `/api/profile/` | Yes |
+| GET | `/api/users/<username>/` | No |
 
-### Code Conversion
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | /api/convert | Convert code between languages |
+### Conversion
+| Method | Endpoint | Auth |
+|---|---|---|
+| POST | `/api/convert/` | Yes |
+| GET | `/api/convert/history/` | Yes |
+| POST | `/api/run/` | No |
+| POST | `/api/explain/` | Yes |
+| POST | `/api/snippets/` | Yes |
+| GET | `/api/snippets/<slug>/` | No |
 
-### File Management
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | /api/files | List user's files |
-| POST | /api/files/create | Create new file |
-| GET | /api/files/{id} | Get file by ID |
-| PUT | /api/files/{id} | Update file |
-| DELETE | /api/files/{id} | Delete file |
+### Files
+| Method | Endpoint | Auth |
+|---|---|---|
+| GET/POST | `/api/files/` | Yes |
+| GET/PUT/DELETE | `/api/files/<id>/` | Yes |
 
 ### Learning
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | /api/modules | List all modules |
-| GET | /api/modules/{id} | Get module detail |
-| GET | /api/modules/{id}/lessons | Get lessons in a module |
-| POST | /api/progress/update | Mark lesson complete |
-| GET | /api/progress | Get user's progress |
+| Method | Endpoint | Auth |
+|---|---|---|
+| GET | `/api/modules/` | Yes |
+| GET | `/api/modules/<id>/` | Yes |
+| GET | `/api/lessons/<id>/` | Yes |
+| POST | `/api/progress/update/` | Yes |
+| GET | `/api/progress/` | Yes |
+| GET | `/api/lessons/<id>/quiz/` | Yes |
+| POST | `/api/quizzes/<id>/submit/` | Yes |
+
+### Admin (staff only)
+| Method | Endpoint |
+|---|---|
+| GET | `/api/admin/stats/` |
+| GET/POST | `/api/admin/users/` |
+| PATCH/DELETE | `/api/admin/users/<id>/` |
+| GET | `/api/admin/conversions/` |
+| GET/POST | `/api/admin/modules/` |
+| PUT/DELETE | `/api/admin/modules/<id>/` |
+| GET/PUT/DELETE | `/api/admin/lessons/<id>/` |
 
 ---
 
-## Functional Requirements Checklist
-- [x] FR1–FR4: Code conversion (input, source lang, target lang, output)
-- [x] FR5–FR6: Syntax-highlighted online editor
-- [x] FR7–FR10: File create, save, delete, organize
-- [x] FR11–FR14: Learning modules with exercises and progress tracking
-- [x] FR15–FR17: User signup, login, secure profiles
-- [x] FR18–FR20: Lesson completion, saved files, conversion history
+## Learning Modules (13 total)
+
+| Module | Level |
+|---|---|
+| CodeSwitch Learning Module | Beginner |
+| Working with Strings | Beginner |
+| Data Structures | Intermediate |
+| Object-Oriented Programming | Intermediate |
+| Error Handling and File I/O | Advanced |
+| Algorithms and Recursion | Advanced |
+| Advanced Sorting Algorithms | Intermediate |
+| Dynamic Programming | Advanced |
+| Graph Algorithms | Advanced |
+| Pointers & Memory Management | Advanced |
+| Linked Lists | Intermediate |
+| Stacks & Queues | Intermediate |
+| Hash Tables & Dictionaries | Intermediate |
 
 ---
 
-## Database Models Summary
+## Deployment (Railway)
 
-### User
-- id, username, email, password, date_joined
+The `Procfile` runs on every deploy:
 
-### CodeFile
-- id, user_id, filename, language, code_content, created_at, updated_at
+```
+web: python manage.py migrate && python manage.py seed_all_if_empty && python manage.py collectstatic --noinput && gunicorn codeswitch.wsgi --bind 0.0.0.0:$PORT
+```
 
-### ConversionHistory
-- id, user_id, source_language, target_language, input_code, output_code, timestamp
-
-### LearningModule
-- id, title, description, difficulty, language
-
-### Lesson
-- id, module_id, title, content, example_code, order
-
-### UserProgress
-- id, user_id, module_id, lesson_id, completed, completion_date
+Required Railway env vars: `DATABASE_URL`, `SECRET_KEY`, `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, `AI_PROVIDER`, `AI_API_KEY`, `AI_API_KEY_2`, `AI_API_KEY_3`, `AI_MODEL`, `DEBUG=False`.
 
 ---
 
-## Supported Languages (v1)
-- Python
-- C
-- Java
+## Functional Requirements
 
-## Future Enhancements
-- JavaScript, Go, Rust, C++ support
-- AI-based code explanation (AST parsing)
-- Real-time code execution
-- Collaborative workspace
-- Gamified learning modules
-- Instructor dashboards
+- [x] Code conversion: input, source lang, target lang, output (Python, C, C++, Java, JavaScript)
+- [x] AI conversion with Groq/OpenAI/Gemini + rule-based fallback
+- [x] Live code execution via Wandbox sandbox
+- [x] AI explanation of conversion differences
+- [x] Shareable snippet links (UUID slugs)
+- [x] File workspace: create, save, update, delete
+- [x] 13 learning modules with quizzes and progress tracking
+- [x] User registration, login, secure httpOnly JWT auth
+- [x] Public user profiles with stats
+- [x] Staff admin panel (user management, content CRUD, site stats)
+- [x] Brute-force lockout, rate limiting, CSP headers
