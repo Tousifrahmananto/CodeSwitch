@@ -33,7 +33,7 @@
 | **AI Code Explanation** | Plain-English explanation of what changed between source and output |
 | **Shareable Snippets** | Share any conversion as a permanent public UUID-slug URL |
 | **5 Editor Themes** | Dark, Light, High Contrast, Monokai, Dracula (Monaco Editor) |
-| **9 Learning Modules** | Beginner → Advanced topics with quizzes and in-lesson Monaco sandbox |
+| **13 Learning Modules** | Beginner → Advanced topics with quizzes and in-lesson Monaco sandbox |
 | **Progress Tracking** | Track completed lessons and quiz attempts per user |
 | **File Manager** | Save, edit, and organize code files in the cloud per language |
 | **Dashboard** | Conversion history, learning progress, and file stats in one view |
@@ -87,10 +87,13 @@ codeswitch_project/
 │   ├── files/                     # User file storage API
 │   ├── learning/                  # Modules, lessons, quizzes, progress tracking
 │   │   └── management/commands/   # Seed scripts (auto-run on deploy if DB is empty)
-│   ├── frontend/                  # React + TypeScript app (Vite)
+│   ├── frontend/                  # React + TypeScript app (Vite, dev port 3000)
 │   │   └── src/
-│   │       ├── pages/             # Converter, FileManager, Learning, Dashboard, Admin
-│   │       ├── components/        # CodeEditor, LanguageSelector, etc.
+│   │       ├── pages/             # Landing, Login, Dashboard, Converter, FileManager,
+│   │       │                      #   Learning, Reference, ProfilePage, AdminPanel,
+│   │       │                      #   Playground, ShareView
+│   │       ├── components/        # CodeEditor, DiffView, LanguageSelector, Logo
+│   │       ├── types/index.ts     # Shared TypeScript interfaces
 │   │       └── api/client.ts      # Axios instance with refresh interceptor + CSRF
 │   ├── .env.example               # Environment variable template
 │   ├── requirements.txt
@@ -146,8 +149,8 @@ Edit `.env` and fill in your values:
 SECRET_KEY=your-django-secret-key-min-50-chars
 DEBUG=True
 ALLOWED_HOSTS=localhost,127.0.0.1
-CORS_ALLOWED_ORIGINS=http://localhost:5173
-CSRF_TRUSTED_ORIGINS=http://localhost:5173
+CORS_ALLOWED_ORIGINS=http://localhost:3000
+CSRF_TRUSTED_ORIGINS=http://localhost:3000
 
 # Leave DATABASE_URL blank to use SQLite (recommended for dev)
 DATABASE_URL=
@@ -175,6 +178,8 @@ python manage.py seed_modules
 python manage.py seed_advanced_modules
 python manage.py seed_new_modules
 python manage.py seed_quizzes
+python manage.py seed_remaining_quizzes
+python manage.py seed_new_quizzes
 ```
 
 ### 6. Create an admin account
@@ -197,7 +202,7 @@ npm install
 npm run dev
 ```
 
-The frontend runs at **http://localhost:5173**
+The frontend runs at **http://localhost:3000**
 The API runs at **http://localhost:8000**
 The Django admin is at **http://localhost:8000/admin**
 
@@ -215,8 +220,8 @@ The Django admin is at **http://localhost:8000/admin**
 | `DB_USER` | PostgreSQL user | `postgres` |
 | `DB_PASSWORD` | PostgreSQL password | — |
 | `DB_HOST` | Database host | `localhost` |
-| `CORS_ALLOWED_ORIGINS` | Allowed CORS origins | `http://localhost:5173` |
-| `CSRF_TRUSTED_ORIGINS` | Trusted origins for CSRF | `http://localhost:5173` |
+| `CORS_ALLOWED_ORIGINS` | Allowed CORS origins | `http://localhost:3000` |
+| `CSRF_TRUSTED_ORIGINS` | Trusted origins for CSRF | `http://localhost:3000` |
 | `AI_PROVIDER` | AI provider (`groq`/`openai`/`gemini`) | `groq` |
 | `AI_API_KEY` | Primary AI API key | — |
 | `AI_API_KEY_2` | First failover AI key | — |
@@ -299,6 +304,10 @@ The Django admin is at **http://localhost:8000/admin**
 | Advanced Sorting Algorithms | Intermediate |
 | Dynamic Programming | Advanced |
 | Graph Algorithms | Advanced |
+| Pointers & Memory Management | Advanced |
+| Linked Lists | Intermediate |
+| Stacks & Queues | Intermediate |
+| Hash Tables & Dictionaries | Intermediate |
 
 Each module contains structured lessons with a built-in Monaco sandbox for live experimentation, followed by a quiz. Progress is tracked per user and visible on the dashboard and public profile.
 
