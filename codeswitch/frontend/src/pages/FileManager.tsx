@@ -3,11 +3,13 @@ import { useEffect, useState } from 'react';
 import { getFiles, createFile, updateFile, deleteFile } from '../api/client';
 import CodeEditor from '../components/CodeEditor';
 import LanguageSelector from '../components/LanguageSelector';
+import type { CodeFile } from '../types';
 
 const LANGUAGES = ['python', 'c', 'java', 'javascript', 'other'];
-const EMPTY_FORM = { filename: '', language: 'python', code_content: '' };
+type FileForm = { filename: string; language: string; code_content: string };
+const EMPTY_FORM: FileForm = { filename: '', language: 'python', code_content: '' };
 
-const LANG_COLORS = {
+const LANG_COLORS: Record<string, string> = {
   python: '#3572A5',
   javascript: '#f1e05a',
   java: '#b07219',
@@ -15,15 +17,15 @@ const LANG_COLORS = {
   other: '#8b8b8b',
 };
 
-const FILE_EXT = {
+const FILE_EXT: Record<string, string> = {
   python: '.py', c: '.c', java: '.java', javascript: '.js', other: '.txt',
 };
 
 export default function FileManager() {
-  const [files, setFiles] = useState([]);
-  const [selected, setSelected] = useState(null);
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [error, setError] = useState(null);
+  const [files, setFiles] = useState<CodeFile[]>([]);
+  const [selected, setSelected] = useState<CodeFile | null>(null);
+  const [form, setForm] = useState<FileForm>(EMPTY_FORM);
+  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
@@ -61,12 +63,12 @@ export default function FileManager() {
     }
   };
 
-  const handleSelect = (f) => {
+  const handleSelect = (f: CodeFile) => {
     setSelected(f);
     setForm({ filename: f.filename, language: f.language, code_content: f.code_content });
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: number) => {
     setError(null);
     setDeletingId(id);
     try {
@@ -137,7 +139,7 @@ export default function FileManager() {
         />
         <CodeEditor
           value={form.code_content}
-          onChange={(val) => setForm({ ...form, code_content: val })}
+          onChange={(val) => setForm({ ...form, code_content: val ?? '' })}
           language={form.language}
           height="380px"
         />

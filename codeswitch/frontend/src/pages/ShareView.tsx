@@ -3,9 +3,15 @@ import { useEffect, useState } from 'react';
 import { getSnippet } from '../api/client';
 import CodeEditor from '../components/CodeEditor';
 import Logo from '../components/Logo';
+import type { SharedSnippet } from '../types';
 
-export default function ShareView({ slug, onBack }) {
-  const [snippet, setSnippet] = useState(null);
+interface ShareViewProps {
+  slug: string;
+  onBack?: () => void;
+}
+
+export default function ShareView({ slug, onBack }: ShareViewProps) {
+  const [snippet, setSnippet] = useState<SharedSnippet | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -28,7 +34,7 @@ export default function ShareView({ slug, onBack }) {
         </div>
         <button
           className="text-sm text-muted hover:text-primary cursor-pointer border border-border rounded px-3 py-1.5 transition-colors bg-transparent"
-          onClick={onBack}
+          onClick={() => onBack?.()}
         >
           {onBack ? '← Back to app' : '← Home'}
         </button>

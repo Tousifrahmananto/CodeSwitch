@@ -4,10 +4,12 @@ import LanguageSelector from '../components/LanguageSelector';
 import Logo from '../components/Logo';
 import { runCode } from '../api/executor';
 import { createFile } from '../api/client';
+import type { RunResult } from '../types';
 
-const LANGUAGES = ['python', 'c', 'java', 'javascript', 'cpp'];
+const LANGUAGES = ['python', 'c', 'java', 'javascript', 'cpp'] as const;
+type PlaygroundLanguage = (typeof LANGUAGES)[number];
 
-const STARTER_CODE = {
+const STARTER_CODE: Record<PlaygroundLanguage, string> = {
   python:
     '# Python Playground\nprint("Hello, World!")\n\n# Try editing this code and click Run!\nfor i in range(1, 6):\n    print(f"Line {i}")',
   c:
@@ -20,12 +22,16 @@ const STARTER_CODE = {
     '// C++ Playground\n#include <iostream>\n\nint main() {\n    std::cout << "Hello, World!" << std::endl;\n\n    // Try editing this code and click Run!\n    for (int i = 1; i <= 5; i++) {\n        std::cout << "Line " << i << std::endl;\n    }\n    return 0;\n}',
 };
 
-export default function Playground({ onBack }) {
-  const [lang, setLang] = useState('python');
+interface PlaygroundProps {
+  onBack?: () => void;
+}
+
+export default function Playground({ onBack }: PlaygroundProps) {
+  const [lang, setLang] = useState<PlaygroundLanguage>('python');
   const [code, setCode] = useState(STARTER_CODE['python']);
   const [stdin, setStdin] = useState('');
   const [runLoading, setRunLoading] = useState(false);
-  const [runOutput, setRunOutput] = useState(null);
+  const [runOutput, setRunOutput] = useState<RunResult | null>(null);
   const [runError, setRunError] = useState('');
 
   useEffect(() => {
@@ -41,9 +47,10 @@ export default function Playground({ onBack }) {
 
   const isLoggedIn = !!localStorage.getItem('user');
 
-  const handleLangChange = (newLang) => {
-    setLang(newLang);
-    setCode(STARTER_CODE[newLang]);
+  const handleLangChange = (newLang: string) => {
+    const nextLang = newLang as PlaygroundLanguage;
+    setLang(nextLang);
+    setCode(STARTER_CODE[nextLang]);
     setRunOutput(null);
     setRunError('');
     setStdin('');
@@ -57,8 +64,9 @@ export default function Playground({ onBack }) {
     try {
       const result = await runCode(lang, code, stdin);
       setRunOutput(result);
-    } catch (err) {
-      setRunError(err.message || 'Could not reach execution server. Check your connection.');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Could not reach execution server. Check your connection.';
+      setRunError(message);
     } finally {
       setRunLoading(false);
     }
@@ -103,11 +111,11 @@ export default function Playground({ onBack }) {
           <span className="text-xs text-muted">Write and run code — no sign-in required</span>
           <button
             className="bg-transparent border border-border text-primary hover:bg-border rounded px-4 py-1.5 text-sm font-medium transition-colors"
-            onClick={onBack}
+            onClick={() => onBack?.()}
           >Sign In</button>
           <button
             className="bg-accent hover:bg-accent-h text-white border-none rounded px-4 py-1.5 text-sm font-semibold transition-colors"
-            onClick={onBack}
+            onClick={() => onBack?.()}
           >Get Started</button>
         </div>
       </header>
@@ -121,7 +129,7 @@ export default function Playground({ onBack }) {
             label="Language:"
             value={lang}
             onChange={handleLangChange}
-            languages={LANGUAGES}
+            languages={[...LANGUAGES]}
           />
           <button
             className="bg-accent hover:bg-accent-h text-white border-none rounded px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-50"
@@ -146,7 +154,7 @@ export default function Playground({ onBack }) {
         <div>
           <CodeEditor
             value={code}
-            onChange={setCode}
+            onChange={(value) => setCode(value ?? '')}
             language={lang}
             height="460px"
           />
@@ -241,7 +249,7 @@ export default function Playground({ onBack }) {
                   >Cancel</button>
                   <button
                     className="px-4 py-2 text-sm bg-accent hover:bg-accent-h text-white rounded border-none transition-colors"
-                    onClick={onBack}
+                    onClick={() => onBack?.()}
                   >Sign In / Register</button>
                 </div>
               </>

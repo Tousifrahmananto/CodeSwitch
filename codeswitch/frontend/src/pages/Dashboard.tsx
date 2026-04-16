@@ -1,23 +1,30 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getProfile, getConversionHistory, getProgress, getFiles, getModules } from '../api/client';
+import type { CodeFile, ConversionRecord, LearningModule, User, UserProgress } from '../types';
 
-const LANG_COLORS = {
+const LANG_COLORS: Record<string, string> = {
   c: '#aaaaaa', python: '#5ba8f5', java: '#e8a44a',
   javascript: '#f1e05a', cpp: '#f34b7d',
 };
-const LANG_BG = {
+const LANG_BG: Record<string, string> = {
   c: 'rgba(170,170,170,0.12)', python: 'rgba(91,168,245,0.12)', java: 'rgba(232,164,74,0.12)',
   javascript: 'rgba(241,224,90,0.12)', cpp: 'rgba(243,75,125,0.12)',
 };
 
 const _dashCache: {
-  data: { profile: any; history: any[]; progress: any[]; files: any[]; modules: any[] } | null;
+  data: {
+    profile: User;
+    history: ConversionRecord[];
+    progress: UserProgress[];
+    files: CodeFile[];
+    modules: LearningModule[];
+  } | null;
   ts: number;
 } = { data: null, ts: 0 };
 const CACHE_TTL = 5 * 60 * 1000;
 
-function LangChip({ lang }) {
+function LangChip({ lang }: { lang: string }) {
   return (
     <span
       className="inline-block text-xs font-semibold px-2 py-0.5 rounded font-mono"
@@ -31,7 +38,7 @@ function LangChip({ lang }) {
   );
 }
 
-function StatCard({ value, label, accent, icon }) {
+function StatCard({ value, label, accent, icon }: { value: string | number; label: string; accent?: string; icon: string }) {
   return (
     <div className="bg-surface border border-border rounded-lg p-5 flex flex-col gap-3">
       <div className="flex items-center justify-between">
@@ -54,11 +61,11 @@ export default function Dashboard() {
     ? _dashCache.data : null;
 
   const [profile, setProfile] = useState(fresh?.profile ?? null);
-  const [history, setHistory] = useState(fresh?.history ?? []);
-  const [progress, setProgress] = useState(fresh?.progress ?? []);
-  const [files, setFiles] = useState(fresh?.files ?? []);
-  const [modules, setModules] = useState(fresh?.modules ?? []);
-  const [loadError, setLoadError] = useState(null);
+  const [history, setHistory] = useState<ConversionRecord[]>(fresh?.history ?? []);
+  const [progress, setProgress] = useState<UserProgress[]>(fresh?.progress ?? []);
+  const [files, setFiles] = useState<CodeFile[]>(fresh?.files ?? []);
+  const [modules, setModules] = useState<LearningModule[]>(fresh?.modules ?? []);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(!fresh);
 
   useEffect(() => {
@@ -183,7 +190,7 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {history.slice(0, 8).map(h => (
+                  {history.slice(0, 8).map((h) => (
                     <tr
                       key={h.id}
                       className="cursor-pointer hover:bg-accent/5 transition-colors rounded"

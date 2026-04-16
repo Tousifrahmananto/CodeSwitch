@@ -1,26 +1,36 @@
 import { useEffect, useRef, useState } from 'react';
 import { getPublicProfile, getProfile, updateProfile } from '../api/client';
 import Logo from '../components/Logo';
+import type { ChangeEvent } from 'react';
+import type { PublicProfile, User } from '../types';
 
-const LANG_COLORS = {
+const LANG_COLORS: Record<string, string> = {
   python: '#3572A5', javascript: '#f1e05a', java: '#b07219', c: '#555555', cpp: '#f34b7d',
 };
 
 const MEDIA_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8000/api').replace('/api', '');
 
-export default function ProfilePage({ username, onBack, isOwner = false }) {
-  const [profile, setProfile] = useState(null);
+interface ProfilePageProps {
+  username: string;
+  onBack?: () => void;
+  isOwner?: boolean;
+}
+
+type ProfileData = PublicProfile & Partial<User>;
+
+export default function ProfilePage({ username, onBack, isOwner = false }: ProfilePageProps) {
+  const [profile, setProfile] = useState<ProfileData | null>(null);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
 
   // Edit state
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ first_name: '', last_name: '', bio: '' });
-  const [avatarFile, setAvatarFile] = useState(null);
-  const [avatarPreview, setAvatarPreview] = useState(null);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
-  const fileInputRef = useRef(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (isOwner) {
@@ -48,8 +58,8 @@ export default function ProfilePage({ username, onBack, isOwner = false }) {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleAvatarChange = (e) => {
-    const file = e.target.files[0];
+  const handleAvatarChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (!file) return;
     setAvatarFile(file);
     setAvatarPreview(URL.createObjectURL(file));
@@ -65,7 +75,7 @@ export default function ProfilePage({ username, onBack, isOwner = false }) {
       fd.append('bio', form.bio);
       if (avatarFile) fd.append('avatar', avatarFile);
       const r = await updateProfile(fd);
-      setProfile(prev => ({ ...prev, ...r.data }));
+      setProfile(prev => (prev ? { ...prev, ...r.data } : prev));
       setEditing(false);
       setAvatarFile(null);
       // keep preview so avatar shows immediately without full reload
@@ -77,6 +87,7 @@ export default function ProfilePage({ username, onBack, isOwner = false }) {
   };
 
   const handleCancel = () => {
+    if (!profile) return;
     setEditing(false);
     setSaveError('');
     setAvatarFile(null);
@@ -91,8 +102,11 @@ export default function ProfilePage({ username, onBack, isOwner = false }) {
 
   const initials = username ? username.slice(0, 2).toUpperCase() : '??';
 
-  const displayName = (profile?.first_name || profile?.last_name)
-    ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
+  const firstName = profile?.first_name || '';
+  const lastName = profile?.last_name || '';
+
+  const displayName = (firstName || lastName)
+    ? `${firstName} ${lastName}`.trim()
     : null;
 
   const avatarUrl = avatarPreview
@@ -112,7 +126,7 @@ export default function ProfilePage({ username, onBack, isOwner = false }) {
           </div>
           <button
             className="text-sm text-muted hover:text-primary cursor-pointer border border-border rounded px-3 py-1.5 transition-colors bg-transparent"
-            onClick={onBack}
+            onClick={() => onBack?.()}
           >← Back</button>
         </nav>
       )}

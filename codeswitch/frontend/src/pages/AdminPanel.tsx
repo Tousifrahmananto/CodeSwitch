@@ -2,6 +2,7 @@
 // Staff-only admin dashboard: stats, user management, conversion log, modules CRUD.
 
 import { useState, useEffect, useCallback } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import {
   adminGetStats, adminGetUsers, adminUpdateUser, adminDeleteUser,
   adminGetConversions, adminGetModules, adminCreateModule,
@@ -9,15 +10,24 @@ import {
   adminGetModuleLessons, adminGetLesson, adminCreateLesson,
   adminUpdateLesson, adminDeleteLesson,
 } from '../api/client';
+import type { AdminConversion, AdminLesson, AdminStats, AdminUser, LearningModule, Lesson, TabName } from '../types';
 
-const TABS = ['Overview', 'Users', 'Conversions', 'Modules'];
+const TABS: readonly TabName[] = ['Overview', 'Users', 'Conversions', 'Modules'];
 
-const LANGUAGES = ['python', 'c', 'java', 'general'];
-const DIFFICULTIES = ['beginner', 'intermediate', 'advanced'];
+const LANGUAGES = ['python', 'c', 'java', 'general'] as const;
+const DIFFICULTIES = ['beginner', 'intermediate', 'advanced'] as const;
+
+type ModuleForm = Pick<LearningModule, 'title' | 'description' | 'language' | 'difficulty'>;
+type LessonForm = Pick<Lesson, 'title' | 'content' | 'example_code' | 'order'>;
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  const maybe = error as { response?: { data?: { error?: string } }; message?: string };
+  return maybe.response?.data?.error || maybe.message || fallback;
+}
 
 // ── small helpers ─────────────────────────────────────────────────────────────
 
-function StatCard({ label, value, sub }) {
+function StatCard({ label, value, sub }: { label: string; value: string | number | null | undefined; sub?: string }) {
   return (
     <div style={styles.card}>
       <div style={styles.cardValue}>{value ?? '—'}</div>
@@ -27,13 +37,13 @@ function StatCard({ label, value, sub }) {
   );
 }
 
-function Badge({ children, color = '#555' }) {
+function Badge({ children, color = '#555' }: { children: ReactNode; color?: string }) {
   return (
     <span style={{ ...styles.badge, background: color }}>{children}</span>
   );
 }
 
-function ActionBtn({ children, onClick, danger, small }) {
+function ActionBtn({ children, onClick, danger = false, small = false }: { children: ReactNode; onClick: () => void; danger?: boolean; small?: boolean }) {
   return (
     <button
       onClick={onClick}
@@ -50,7 +60,7 @@ function ActionBtn({ children, onClick, danger, small }) {
 
 // ── tabs ──────────────────────────────────────────────────────────────────────
 
-function OverviewTab({ stats }) {
+function OverviewTab({ stats }: { stats: AdminStats | null }) {
   if (!stats) return <p style={styles.muted}>Loading stats…</p>;
   return (
     <div>
@@ -65,7 +75,11 @@ function OverviewTab({ stats }) {
   );
 }
 
-function UsersTab({ users, onUpdate, onDelete }) {
+function UsersTab({ users, onUpdate, onDelete }: {
+  users: AdminUser[] | null;
+  onUpdate: (id: number, patch: Partial<AdminUser>) => void;
+  onDelete: (id: number, username: string) => void;
+}) {
   if (!users) return <p style={styles.muted}>Loading users…</p>;
 
   return (
@@ -112,10 +126,10 @@ function UsersTab({ users, onUpdate, onDelete }) {
   );
 }
 
-function ConversionsTab({ conversions }) {
+function ConversionsTab({ conversions }: { conversions: AdminConversion[] | null }) {
   if (!conversions) return <p style={styles.muted}>Loading conversions…</p>;
 
-  const langColor = { python: '#3b7bbf', c: '#b45309', java: '#1d6b3a' };
+  const langColor: Record<string, string> = { python: '#3b7bbf', c: '#b45309', java: '#1d6b3a' };
 
   return (
     <div>
@@ -146,12 +160,12 @@ function ConversionsTab({ conversions }) {
   );
 }
 
-function LessonsPanel({ moduleId, onDone }) {
-  const emptyLesson = { title: '', content: '', example_code: '{}', order: '' };
-  const [lessons, setLessons] = useState(null);
-  const [editingId, setEditingId] = useState(null); // null = new, number = existing
+function LessonsPanel({ moduleId, onDone }: { moduleId: number; onDone: () => void }) {
+  const emptyLesson: LessonForm = { title: '', content: '', example_code: '{}', order: 1 };
+  const [lessons, setLessons] = useState<AdminLesson[] | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null); // null = new, number = existing
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState(emptyLesson);
+  const [form, setForm] = useState<LessonForm>(emptyLesson);
   const [formErr, setFormErr] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -173,7 +187,7 @@ function LessonsPanel({ moduleId, onDone }) {
     setShowForm(true);
   };
 
-  const startEdit = async (lessonId) => {
+  const startEdit = async (lessonId: number) => {
     try {
       const { data } = await adminGetLesson(lessonId);
       setEditingId(lessonId);
@@ -199,14 +213,14 @@ function LessonsPanel({ moduleId, onDone }) {
       cancelForm();
       loadLessons();
       onDone();
-    } catch (e) {
-      setFormErr(e.response?.data?.error || 'Save failed.');
+    } catch (e: unknown) {
+      setFormErr(getErrorMessage(e, 'Save failed.'));
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = async (id, title) => {
+  const handleDelete = async (id: number, title: string) => {
     if (!window.confirm(`Delete lesson "${title}"?`)) return;
     try {
       await adminDeleteLesson(id);
@@ -243,7 +257,7 @@ function LessonsPanel({ moduleId, onDone }) {
               placeholder="Order (number)"
               type="number"
               value={form.order}
-              onChange={e => setForm(f => ({ ...f, order: e.target.value }))}
+              onChange={e => setForm(f => ({ ...f, order: Number(e.target.value) || 0 }))}
             />
             <textarea
               style={{ ...styles.input, height: 120, resize: 'vertical', lineHeight: 1.5 }}
@@ -285,17 +299,17 @@ function LessonsPanel({ moduleId, onDone }) {
   );
 }
 
-function ModulesTab({ modules, onRefresh }) {
-  const emptyForm = { title: '', description: '', language: 'general', difficulty: 'beginner' };
-  const [form, setForm] = useState(emptyForm);
-  const [editing, setEditing] = useState(null); // module id being edited
+function ModulesTab({ modules, onRefresh }: { modules: LearningModule[] | null; onRefresh: () => void }) {
+  const emptyForm: ModuleForm = { title: '', description: '', language: 'general', difficulty: 'beginner' };
+  const [form, setForm] = useState<ModuleForm>(emptyForm);
+  const [editing, setEditing] = useState<number | null>(null); // module id being edited
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
-  const [expandedModuleId, setExpandedModuleId] = useState(null);
+  const [expandedModuleId, setExpandedModuleId] = useState<number | null>(null);
 
-  const toggleLessons = (id) => setExpandedModuleId(prev => prev === id ? null : id);
+  const toggleLessons = (id: number) => setExpandedModuleId(prev => prev === id ? null : id);
 
-  const startEdit = (mod) => {
+  const startEdit = (mod: LearningModule) => {
     setEditing(mod.id);
     setForm({ title: mod.title, description: mod.description, language: mod.language, difficulty: mod.difficulty });
     setError('');
@@ -315,14 +329,14 @@ function ModulesTab({ modules, onRefresh }) {
       }
       cancelEdit();
       onRefresh();
-    } catch (e) {
-      setError(e.response?.data?.error || 'Save failed.');
+    } catch (e: unknown) {
+      setError(getErrorMessage(e, 'Save failed.'));
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = async (id, title) => {
+  const handleDelete = async (id: number, title: string) => {
     if (!window.confirm(`Delete module "${title}"? This will also remove all its lessons.`)) return;
     try {
       await adminDeleteModule(id);
@@ -358,7 +372,7 @@ function ModulesTab({ modules, onRefresh }) {
           <select style={styles.input} value={form.language} onChange={e => setForm(f => ({ ...f, language: e.target.value }))}>
             {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
           </select>
-          <select style={styles.input} value={form.difficulty} onChange={e => setForm(f => ({ ...f, difficulty: e.target.value }))}>
+          <select style={styles.input} value={form.difficulty} onChange={e => setForm(f => ({ ...f, difficulty: e.target.value as ModuleForm['difficulty'] }))}>
             {DIFFICULTIES.map(d => <option key={d} value={d}>{d}</option>)}
           </select>
         </div>
@@ -416,14 +430,14 @@ function ModulesTab({ modules, onRefresh }) {
 // ── main component ────────────────────────────────────────────────────────────
 
 export default function AdminPanel() {
-  const [tab, setTab] = useState('Overview');
-  const [stats, setStats] = useState(null);
-  const [users, setUsers] = useState(null);
-  const [conversions, setConversions] = useState(null);
-  const [modules, setModules] = useState(null);
+  const [tab, setTab] = useState<TabName>('Overview');
+  const [stats, setStats] = useState<AdminStats | null>(null);
+  const [users, setUsers] = useState<AdminUser[] | null>(null);
+  const [conversions, setConversions] = useState<AdminConversion[] | null>(null);
+  const [modules, setModules] = useState<LearningModule[] | null>(null);
   const [error, setError] = useState('');
 
-  const load = useCallback(async (which) => {
+  const load = useCallback(async (which: TabName | 'all') => {
     setError('');
     try {
       if (which === 'Overview' || which === 'all') {
@@ -442,15 +456,15 @@ export default function AdminPanel() {
         const { data } = await adminGetModules();
         setModules(data);
       }
-    } catch (e) {
-      setError(e.response?.data?.error || 'Failed to load data.');
+    } catch (e: unknown) {
+      setError(getErrorMessage(e, 'Failed to load data.'));
     }
   }, []);
 
   // Load overview on mount, lazy-load tabs on first visit
   useEffect(() => { load('Overview'); }, [load]);
 
-  const handleTabChange = (t) => {
+  const handleTabChange = (t: TabName) => {
     setTab(t);
     const needsLoad =
       (t === 'Users' && !users) ||
@@ -459,22 +473,22 @@ export default function AdminPanel() {
     if (needsLoad) load(t);
   };
 
-  const handleUserUpdate = async (id, patch) => {
+  const handleUserUpdate = async (id: number, patch: Partial<AdminUser>) => {
     try {
       const { data } = await adminUpdateUser(id, patch);
-      setUsers(prev => prev.map(u => u.id === id ? { ...u, ...data } : u));
-    } catch (e) {
-      alert(e.response?.data?.error || 'Update failed.');
+      setUsers(prev => (prev ? prev.map(u => (u.id === id ? { ...u, ...data } : u)) : prev));
+    } catch (e: unknown) {
+      alert(getErrorMessage(e, 'Update failed.'));
     }
   };
 
-  const handleUserDelete = async (id, username) => {
+  const handleUserDelete = async (id: number, username: string) => {
     if (!window.confirm(`Permanently delete user "${username}"?`)) return;
     try {
       await adminDeleteUser(id);
-      setUsers(prev => prev.filter(u => u.id !== id));
-    } catch (e) {
-      alert(e.response?.data?.error || 'Delete failed.');
+      setUsers(prev => (prev ? prev.filter(u => u.id !== id) : prev));
+    } catch (e: unknown) {
+      alert(getErrorMessage(e, 'Delete failed.'));
     }
   };
 
@@ -513,7 +527,7 @@ export default function AdminPanel() {
 
 // ── styles ────────────────────────────────────────────────────────────────────
 
-const styles = {
+const styles: Record<string, CSSProperties> = {
   root: { padding: '24px', color: 'var(--text)', maxWidth: 1100 },
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
   title: { margin: 0, fontSize: 22, fontWeight: 700 },
