@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
+import type { CSSProperties } from 'react';
 
 // ─── Demo sequences shown in the hero code window ─────────────────────────────
 const DEMOS = [
@@ -75,13 +76,24 @@ const MODULES = [
   { n: '11', name: 'Linked Lists', tag: 'Intermediate' },
   { n: '12', name: 'Stacks & Queues', tag: 'Intermediate' },
   { n: '13', name: 'Hash Tables & Dicts', tag: 'Intermediate' },
-];
+] as const;
 
-const TAG_COLORS = {
+type ModuleTag = (typeof MODULES)[number]['tag'];
+
+const TAG_COLORS: Record<ModuleTag, { text: string; bg: string; border: string }> = {
   Beginner: { text: '#10b981', bg: '#10b98112', border: '#10b98140' },
   Intermediate: { text: '#f59e0b', bg: '#f59e0b12', border: '#f59e0b40' },
   Advanced: { text: '#f38ba8', bg: '#f38ba812', border: '#f38ba840' },
 };
+
+interface LandingProps {
+  onGetStarted?: () => void;
+}
+
+const featureCardStyle = (accent: string, delay: number): CSSProperties & { '--accent': string } => ({
+  '--accent': accent,
+  animationDelay: `${delay}s`,
+});
 
 // ─── Animated code demo component ─────────────────────────────────────────────
 function CodeDemo() {
@@ -212,7 +224,7 @@ function CodeDemo() {
 }
 
 // ─── Main Landing page ────────────────────────────────────────────────────────
-export default function Landing({ onGetStarted }) {
+export default function Landing({ onGetStarted }: LandingProps) {
   const navigate = useNavigate();
   const featuresRef = useRef(null);
   const modulesRef = useRef(null);
@@ -266,11 +278,11 @@ export default function Landing({ onGetStarted }) {
           >Try Playground</button>
           <button
             className="hidden sm:inline-flex bg-transparent border border-border text-primary hover:bg-border rounded px-4 py-1.5 text-sm font-medium transition-colors"
-            onClick={onGetStarted}
+            onClick={() => onGetStarted?.()}
           >Sign In</button>
           <button
             className="bg-accent hover:bg-accent-h text-white border-none rounded px-4 py-1.5 text-sm font-semibold transition-colors"
-            onClick={onGetStarted}
+            onClick={() => onGetStarted?.()}
           >Get Started</button>
         </div>
       </nav>
@@ -298,7 +310,7 @@ export default function Landing({ onGetStarted }) {
           <div className="flex items-center gap-3 flex-wrap">
             <button
               className="bg-accent hover:bg-accent-h text-white border-none rounded px-6 py-3 text-sm font-semibold transition-colors inline-flex items-center gap-2"
-              onClick={onGetStarted}
+              onClick={() => onGetStarted?.()}
             >
               Start for Free
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -359,7 +371,7 @@ export default function Landing({ onGetStarted }) {
             <div
               key={f.title}
               className="land-feat-card"
-              style={{ '--accent': f.accent, animationDelay: `${i * 0.13}s` }}
+              style={featureCardStyle(f.accent, i * 0.13)}
             >
               <div
                 className="w-11 h-11 rounded-lg flex items-center justify-center mb-4"
@@ -492,7 +504,7 @@ export default function Landing({ onGetStarted }) {
           </p>
           <button
             className="bg-accent hover:bg-accent-h text-white border-none rounded px-6 py-3 text-sm font-semibold transition-colors inline-flex items-center gap-2"
-            onClick={onGetStarted}
+            onClick={() => onGetStarted?.()}
           >
             Create Free Account
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

@@ -8,7 +8,8 @@ const LANG_META = {
     cpp: { label: 'C++', color: '#f34b7d' },
 };
 
-const ALL_LANGS = ['python', 'c', 'java', 'javascript', 'cpp'];
+const ALL_LANGS = ['python', 'c', 'java', 'javascript', 'cpp'] as const;
+type RefLanguage = (typeof ALL_LANGS)[number];
 
 const CONCEPTS = [
     {
@@ -598,17 +599,17 @@ try {
 
 export default function Reference() {
     const [search, setSearch] = useState('');
-    const [activeTab, setActiveTab] = useState({});  // conceptId -> lang
-    const [copied, setCopied] = useState({});         // conceptId -> bool
+    const [activeTab, setActiveTab] = useState<Record<string, RefLanguage>>({});  // conceptId -> lang
+    const [copied, setCopied] = useState<Record<string, boolean>>({});         // conceptId -> bool
 
     const filtered = CONCEPTS.filter(c =>
         c.title.toLowerCase().includes(search.toLowerCase()) ||
         c.description.toLowerCase().includes(search.toLowerCase())
     );
 
-    const getTab = (id) => activeTab[id] || 'python';
+    const getTab = (id: string): RefLanguage => activeTab[id] || 'python';
 
-    const handleCopy = (id, lang) => {
+    const handleCopy = (id: string, lang: RefLanguage) => {
         const concept = CONCEPTS.find(c => c.id === id);
         if (!concept) return;
         navigator.clipboard.writeText(concept.examples[lang]);

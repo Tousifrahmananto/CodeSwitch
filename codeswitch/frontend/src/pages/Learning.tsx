@@ -3,18 +3,22 @@ import { useEffect, useState, memo } from 'react';
 import { getModules, getModule, updateProgress, getProgress, convertCode, getLessonQuiz, submitQuiz } from '../api/client';
 import CodeEditor from '../components/CodeEditor';
 import { runCode, canRun } from '../api/executor';
+import type { CSSProperties, ReactNode } from 'react';
+import type { LearningModule, Lesson, Quiz, RunResult, UserProgress } from '../types';
 
-const LANG_COLORS = { c: '#555555', python: '#3572A5', java: '#b07219' };
+type LearningLanguage = 'c' | 'python' | 'java';
+const LANG_COLORS: Record<LearningLanguage, string> = { c: '#555555', python: '#3572A5', java: '#b07219' };
+const DIFFICULTY_LEVELS = ['all', 'beginner', 'intermediate', 'advanced'] as const;
 
-const formatCompletionDate = (iso) =>
+const formatCompletionDate = (iso: string | null | undefined): string =>
   iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
 
-const ContentRenderer = memo(function ContentRenderer({ text }) {
+const ContentRenderer = memo(function ContentRenderer({ text }: { text: string }) {
   if (!text) return null;
 
   // Parse inline formatting: **bold**, *italic*, `code`
-  function renderInline(str) {
-    const parts = [];
+  function renderInline(str: string): ReactNode[] | string {
+    const parts: ReactNode[] = [];
     const re = /(\*\*(.+?)\*\*|\*(.+?)\*|`([^`]+?)`)/g;
     let last = 0;
     let match;
@@ -84,13 +88,13 @@ const ContentRenderer = memo(function ContentRenderer({ text }) {
 });
 
 // Feature 3: copy to clipboard
-function CodeTabs({ code }) {
+function CodeTabs({ code }: { code: string }) {
   const [active, setActive] = useState(0);
   const [copied, setCopied] = useState(false);
-  let tabs;
+  let tabs: Array<{ lang: string; src: string }>;
   try {
-    const parsed = JSON.parse(code);
-    tabs = Object.entries(parsed).map(([lang, src]) => ({ lang, src }));
+    const parsed = JSON.parse(code) as Record<string, string>;
+    tabs = Object.entries(parsed).map(([lang, src]) => ({ lang, src: String(src) }));
   } catch {
     tabs = [{ lang: 'code', src: code }];
   }
@@ -109,7 +113,7 @@ function CodeTabs({ code }) {
           <button
             key={t.lang}
             className={`code-tab-btn${active === i ? ' active' : ''}`}
-            style={active === i ? { borderBottomColor: LANG_COLORS[t.lang] || 'var(--accent)' } : {}}
+            style={active === i ? { borderBottomColor: (LANG_COLORS as Record<string, string>)[t.lang] || 'var(--accent)' } : {}}
             onClick={() => setActive(i)}
           >
             {t.lang.toUpperCase()}
@@ -128,7 +132,7 @@ function CodeTabs({ code }) {
 }
 
 // Feature 1: Try It sandbox
-function TryItSandbox({ exampleCode }) {
+function TryItSandbox({ exampleCode }: { exampleCode: Record<string, string> }) {
   const languages = Object.keys(exampleCode);
   const [sandboxCode, setSandboxCode] = useState(exampleCode[languages[0]] || '');
   const [sandboxSource, setSandboxSource] = useState(languages[0]);
@@ -138,11 +142,11 @@ function TryItSandbox({ exampleCode }) {
   const [sandboxError, setSandboxError] = useState('');
 
   // Run state
-  const [runOutput, setRunOutput] = useState(null);
+  const [runOutput, setRunOutput] = useState<RunResult | null>(null);
   const [runLoading, setRunLoading] = useState(false);
   const [runError, setRunError] = useState('');
 
-  const handleSourceChange = (lang) => {
+  const handleSourceChange = (lang: string) => {
     setSandboxSource(lang);
     setSandboxCode(exampleCode[lang] || '');
     setSandboxOutput('');
@@ -165,8 +169,9 @@ function TryItSandbox({ exampleCode }) {
         code: sandboxCode,
       });
       setSandboxOutput(data.output);
-    } catch (err) {
-      setSandboxError(err.response?.data?.error || 'Conversion failed. Try again.');
+    } catch (err: unknown) {
+      const maybe = err as { response?: { data?: { error?: string } }; message?: string };
+      setSandboxError(maybe.response?.data?.error || maybe.message || 'Conversion failed. Try again.');
     } finally {
       setSandboxLoading(false);
     }
@@ -180,8 +185,9 @@ function TryItSandbox({ exampleCode }) {
     try {
       const result = await runCode(sandboxSource, sandboxCode);
       setRunOutput(result);
-    } catch (err) {
-      setRunError(err.message || 'Could not reach execution server.');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Could not reach execution server.';
+      setRunError(message);
     } finally {
       setRunLoading(false);
     }
@@ -194,7 +200,11 @@ function TryItSandbox({ exampleCode }) {
     setRunOutput(null);
   };
 
-  const LANG_META = { c: { label: 'C', color: '#6c757d' }, python: { label: 'Python', color: '#3572A5' }, java: { label: 'Java', color: '#b07219' } };
+  const LANG_META: Record<string, { label: string; color: string }> = { c: { label: 'C', color: '#6c757d' }, python: { label: 'Python', color: '#3572A5' }, java: { label: 'Java', color: '#b07219' } };
+
+  const getPillStyle = (color: string): CSSProperties & { '--pill-color': string } => ({
+    '--pill-color': color,
+  });
 
   return (
     <div className="try-it-sandbox">
@@ -225,7 +235,7 @@ function TryItSandbox({ exampleCode }) {
                 <button
                   key={lang}
                   className={`sandbox-lang-pill${sandboxSource === lang ? ' active' : ''}`}
-                  style={sandboxSource === lang ? { '--pill-color': meta.color } : {}}
+                  style={sandboxSource === lang ? getPillStyle(meta.color) : undefined}
                   onClick={() => handleSourceChange(lang)}
                   title={meta.label}
                 >
@@ -267,7 +277,7 @@ function TryItSandbox({ exampleCode }) {
                 <button
                   key={lang}
                   className={`sandbox-lang-pill${sandboxTarget === lang ? ' active' : ''}${sandboxSource === lang ? ' disabled' : ''}`}
-                  style={sandboxTarget === lang ? { '--pill-color': meta.color } : {}}
+                  style={sandboxTarget === lang ? getPillStyle(meta.color) : undefined}
                   onClick={() => sandboxSource !== lang && setSandboxTarget(lang)}
                   title={sandboxSource === lang ? `Same as source (${meta.label})` : meta.label}
                 >
@@ -286,7 +296,7 @@ function TryItSandbox({ exampleCode }) {
       {sandboxError && <p className="sandbox-error">{sandboxError}</p>}
       <CodeEditor
         value={sandboxCode}
-        onChange={setSandboxCode}
+        onChange={(value) => setSandboxCode(value ?? '')}
         language={sandboxSource}
         height="200px"
       />
@@ -322,10 +332,10 @@ function TryItSandbox({ exampleCode }) {
   );
 }
 
-function QuizPanel({ lessonId, onPass }) {
-  const [quiz, setQuiz] = useState(null);
-  const [answers, setAnswers] = useState({});
-  const [result, setResult] = useState(null);
+function QuizPanel({ lessonId, onPass }: { lessonId: number; onPass?: () => void }) {
+  const [quiz, setQuiz] = useState<Quiz | null>(null);
+  const [answers, setAnswers] = useState<Record<number, number>>({});
+  const [result, setResult] = useState<{ score: number; passed: boolean; correct_options: Record<string, number> } | null>(null);
   const [loading, setLoading] = useState(true);
   const [noQuiz, setNoQuiz] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -370,7 +380,7 @@ function QuizPanel({ lessonId, onPass }) {
     );
   }
 
-  const allAnswered = quiz.questions.every(q => answers[q.id]);
+  const allAnswered = quiz.questions.every(q => !!answers[q.id]);
 
   return (
     <div className="quiz-panel">
@@ -450,15 +460,15 @@ function QuizPanel({ lessonId, onPass }) {
 }
 
 export default function Learning() {
-  const [modules, setModules] = useState([]);
-  const [activeModule, setActiveModule] = useState(null);
-  const [activeLesson, setActiveLesson] = useState(null);
-  const [activeView, setActiveView] = useState('lesson'); // 'lesson' | 'quiz'
-  const [filterDifficulty, setFilterDifficulty] = useState('all');
+  const [modules, setModules] = useState<LearningModule[]>([]);
+  const [activeModule, setActiveModule] = useState<LearningModule | null>(null);
+  const [activeLesson, setActiveLesson] = useState<Lesson | null>(null);
+  const [activeView, setActiveView] = useState<'lesson' | 'quiz'>('lesson'); // 'lesson' | 'quiz'
+  const [filterDifficulty, setFilterDifficulty] = useState<'all' | 'beginner' | 'intermediate' | 'advanced'>('all');
   // Feature 5: Map<lessonId, completionDateISO> instead of Set
-  const [completedLessons, setCompletedLessons] = useState(new Map());
+  const [completedLessons, setCompletedLessons] = useState<Map<number, string | null>>(new Map());
   // Feature 2: { [module_title]: completed_count }
-  const [completedByModule, setCompletedByModule] = useState({});
+  const [completedByModule, setCompletedByModule] = useState<Record<string, number>>({});
   const [modulesLoading, setModulesLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [openingId, setOpeningId] = useState<number | null>(null);
@@ -471,7 +481,7 @@ export default function Learning() {
         // Feature 5: lesson_id → completion_date
         setCompletedLessons(new Map(completedRecords.map(p => [p.lesson_id, p.completion_date])));
         // Feature 2: count per module title
-        const byModule = {};
+        const byModule: Record<string, number> = {};
         completedRecords.forEach(p => {
           byModule[p.module_title] = (byModule[p.module_title] || 0) + 1;
         });
@@ -481,12 +491,12 @@ export default function Learning() {
       .finally(() => setModulesLoading(false));
   }, []);
 
-  const openModule = async (id) => {
+  const openModule = async (id: number) => {
     setOpeningId(id);
     try {
       const { data } = await getModule(id);
       setActiveModule(data);
-      setActiveLesson(data.lessons[0] || null);
+      setActiveLesson(data.lessons?.[0] || null);
       setActiveView('lesson');
     } catch {
       setLoadError('Failed to load module. Please try again.');
@@ -497,21 +507,22 @@ export default function Learning() {
 
   const goToNext = () => {
     if (!activeModule) return;
-    const idx = activeModule.lessons.findIndex(l => l.id === activeLesson?.id);
-    if (idx < activeModule.lessons.length - 1) {
-      setActiveLesson(activeModule.lessons[idx + 1]);
+    const lessons = activeModule.lessons || [];
+    const idx = lessons.findIndex(l => l.id === activeLesson?.id);
+    if (idx < lessons.length - 1) {
+      setActiveLesson(lessons[idx + 1]);
       setActiveView('lesson');
     }
   };
 
-  const markComplete = async (lessonId) => {
+  const markComplete = async (lessonId: number) => {
     try {
       await updateProgress(lessonId);
     } catch {
       // best-effort — progress sync failure doesn't block UI update
     }
     // Feature 5: store completion date in Map
-    setCompletedLessons(prev => new Map([...prev, [lessonId, new Date().toISOString()]]));
+    setCompletedLessons(prev => new Map<number, string | null>([...prev, [lessonId, new Date().toISOString()]]));
     // Feature 2: increment module count
     if (activeModule) {
       setCompletedByModule(prev => ({
@@ -521,25 +532,27 @@ export default function Learning() {
     }
     // Feature 4: auto-advance after 700ms if not the last lesson
     if (activeModule) {
-      const idx = activeModule.lessons.findIndex(l => l.id === lessonId);
-      if (idx < activeModule.lessons.length - 1) {
+      const lessons = activeModule.lessons || [];
+      const idx = lessons.findIndex(l => l.id === lessonId);
+      if (idx < lessons.length - 1) {
         setTimeout(goToNext, 700);
       }
     }
   };
 
   if (activeModule) {
-    const total = activeModule.lessons.length;
-    const done = activeModule.lessons.filter(l => completedLessons.has(l.id)).length;
+    const lessons = activeModule.lessons || [];
+    const total = lessons.length;
+    const done = lessons.filter(l => completedLessons.has(l.id)).length;
     const pct = total ? Math.round((done / total) * 100) : 0;
-    const isLast = activeLesson?.id === activeModule.lessons[activeModule.lessons.length - 1]?.id;
+    const isLast = activeLesson?.id === lessons[lessons.length - 1]?.id;
     const isCompleted = activeLesson && completedLessons.has(activeLesson.id);
 
     // Feature 1: parse example_code once per lesson render
     const parsedCode = (() => {
       if (!activeLesson?.example_code) return null;
-      try { return JSON.parse(activeLesson.example_code); } catch { return null; }
-    })();
+      try { return JSON.parse(activeLesson.example_code) as Record<string, string>; } catch { return null; }
+    })() as Record<string, string> | null;
 
     return (
       <div className="lesson-viewer">
@@ -553,7 +566,7 @@ export default function Learning() {
         </div>
         <div className="lesson-layout">
           <div className="lesson-sidebar">
-            {activeModule.lessons.map((l, idx) => {
+            {lessons.map((l, idx) => {
               const isDone = completedLessons.has(l.id);
               const isActive = activeLesson?.id === l.id;
               return (
@@ -649,7 +662,7 @@ export default function Learning() {
       <div className="module-list">
         <h2>Learning Modules</h2>
         <div className="learn-filter-bar">
-          {['all', 'beginner', 'intermediate', 'advanced'].map(level => (
+          {DIFFICULTY_LEVELS.map(level => (
             <button
               key={level}
               className={`learn-filter-pill${filterDifficulty === level ? ' active' : ''}`}

@@ -2,7 +2,7 @@ import type { Config } from 'tailwindcss';
 
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
-  darkMode: ['attribute', 'data-theme'],
+  darkMode: ['selector', '[data-theme="dark"]'],
   theme: {
     extend: {
       // Map Tailwind tokens directly to CSS variables so the existing

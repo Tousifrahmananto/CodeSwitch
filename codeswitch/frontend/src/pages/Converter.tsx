@@ -3,10 +3,13 @@ import { convertCode, createSnippet, explainCode } from '../api/client';
 import CodeEditor from '../components/CodeEditor';
 import DiffView from '../components/DiffView';
 import { runCode, canRun } from '../api/executor';
+import type { CSSProperties } from 'react';
+import type { RunResult } from '../types';
 
-const LANGUAGES = ['python', 'c', 'java', 'javascript', 'cpp'];
+const LANGUAGES = ['python', 'c', 'java', 'javascript', 'cpp'] as const;
+type ConverterLanguage = (typeof LANGUAGES)[number];
 
-const LANG_META = {
+const LANG_META: Record<ConverterLanguage, { label: string; color: string }> = {
   python: { label: 'Python', color: '#3572A5' },
   c: { label: 'C', color: '#6c757d' },
   java: { label: 'Java', color: '#b07219' },
@@ -23,8 +26,8 @@ const THEMES = [
 ];
 
 export default function Converter() {
-  const [sourceLang, setSourceLang] = useState('python');
-  const [targetLang, setTargetLang] = useState('c');
+  const [sourceLang, setSourceLang] = useState<ConverterLanguage>('python');
+  const [targetLang, setTargetLang] = useState<ConverterLanguage>('c');
   const [inputCode, setInputCode] = useState('');
   const [outputCode, setOutputCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -34,13 +37,13 @@ export default function Converter() {
 
   // Run source state
   const [runLoading, setRunLoading] = useState(false);
-  const [runOutput, setRunOutput] = useState(null);
+  const [runOutput, setRunOutput] = useState<RunResult | null>(null);
   const [runError, setRunError] = useState('');
   const [runStdin, setRunStdin] = useState('');
 
   // Run target state
   const [runLoadingTarget, setRunLoadingTarget] = useState(false);
-  const [runOutputTarget, setRunOutputTarget] = useState(null);
+  const [runOutputTarget, setRunOutputTarget] = useState<RunResult | null>(null);
   const [runErrorTarget, setRunErrorTarget] = useState('');
 
   // Diff state
@@ -91,8 +94,8 @@ export default function Converter() {
   }, [showThemePicker]);
 
   // Keyboard shortcuts — Ctrl/Cmd+Enter to convert
-  const handleConvertRef = useRef<() => void>(() => {});
-  const handleRunRef = useRef<() => void>(() => {});
+  const handleConvertRef = useRef<() => void>(() => { });
+  const handleRunRef = useRef<() => void>(() => { });
 
   const isQuotaError = (msg: string) =>
     msg.includes('All API keys exhausted') || msg.includes('AI_API_KEY not set');
@@ -141,8 +144,9 @@ export default function Converter() {
     try {
       const result = await runCode(sourceLang, inputCode, runStdin);
       setRunOutput(result);
-    } catch (err) {
-      setRunError(err.message || 'Could not reach execution server. Check your connection.');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Could not reach execution server. Check your connection.';
+      setRunError(message);
     } finally {
       setRunLoading(false);
     }
@@ -156,8 +160,9 @@ export default function Converter() {
     try {
       const result = await runCode(targetLang, outputCode, runStdin);
       setRunOutputTarget(result);
-    } catch (err) {
-      setRunErrorTarget(err.message || 'Could not reach execution server. Check your connection.');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Could not reach execution server. Check your connection.';
+      setRunErrorTarget(message);
     } finally {
       setRunLoadingTarget(false);
     }
@@ -219,10 +224,14 @@ export default function Converter() {
     }
   };
 
-  const handleThemeChange = (t) => {
+  const handleThemeChange = (t: string) => {
     setTheme(t);
     localStorage.setItem('editor_theme', t);
   };
+
+  const getPillStyle = (lang: ConverterLanguage): CSSProperties & { '--pill-color': string } => ({
+    '--pill-color': LANG_META[lang].color,
+  });
 
   const handleSaveUserKey = () => {
     const key = userKeyInput.trim();
@@ -280,7 +289,7 @@ export default function Converter() {
               <button
                 key={lang}
                 className={`sandbox-lang-pill${sourceLang === lang ? ' active' : ''}`}
-                style={{ '--pill-color': LANG_META[lang].color }}
+                style={getPillStyle(lang)}
                 onClick={() => setSourceLang(lang)}
               >
                 <span className="sandbox-lang-dot" />
@@ -313,7 +322,7 @@ export default function Converter() {
               <button
                 key={lang}
                 className={`sandbox-lang-pill${targetLang === lang ? ' active' : ''}${sourceLang === lang ? ' disabled' : ''}`}
-                style={{ '--pill-color': LANG_META[lang].color }}
+                style={getPillStyle(lang)}
                 onClick={() => sourceLang !== lang && setTargetLang(lang)}
                 disabled={sourceLang === lang}
               >
@@ -343,11 +352,10 @@ export default function Converter() {
                 {THEMES.map(t => (
                   <button
                     key={t.id}
-                    className={`w-full text-left px-3 py-2 text-xs transition-colors bg-transparent border-none ${
-                      theme === t.id
+                    className={`w-full text-left px-3 py-2 text-xs transition-colors bg-transparent border-none ${theme === t.id
                         ? 'bg-accent/15 text-accent font-semibold'
                         : 'text-primary hover:bg-border'
-                    }`}
+                      }`}
                     onClick={() => { handleThemeChange(t.id); setShowThemePicker(false); }}
                   >
                     {t.label}
@@ -429,7 +437,7 @@ export default function Converter() {
           </div>
           <CodeEditor
             value={inputCode}
-            onChange={setInputCode}
+            onChange={(value) => setInputCode(value ?? '')}
             language={sourceLang}
             height="420px"
             theme={theme}
