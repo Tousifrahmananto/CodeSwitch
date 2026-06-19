@@ -6,21 +6,21 @@ import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 // ─── Demo sequences shown in the hero code window ─────────────────────────────
 const DEMOS = [
   {
-    from: { lang: 'Python', color: '#3b82f6' },
+    from: { lang: 'Python', color: '#4b8bbe' },
     fromCode: `def factorial(n):\n    if n <= 1:\n        return 1\n    return n * factorial(n - 1)\n\nprint(factorial(5))`,
-    to: { lang: 'Java', color: '#f59e0b' },
+    to: { lang: 'Java', color: '#f89820' },
     toCode: `public static int factorial(int n) {\n    if (n <= 1) return 1;\n    return n * factorial(n - 1);\n}\n\nSystem.out.println(factorial(5));`,
   },
   {
-    from: { lang: 'Java', color: '#f59e0b' },
+    from: { lang: 'Java', color: '#f89820' },
     fromCode: `for (int i = 0; i < 5; i++) {\n    System.out.println(\n        "Item " + i);\n}`,
-    to: { lang: 'Python', color: '#3b82f6' },
+    to: { lang: 'Python', color: '#4b8bbe' },
     toCode: `for i in range(5):\n    print(f"Item {i}")`,
   },
   {
-    from: { lang: 'C', color: '#10b981' },
+    from: { lang: 'C', color: '#a8b9cc' },
     fromCode: `int sum(int arr[], int n) {\n    int total = 0;\n    for (int i = 0; i < n; i++)\n        total += arr[i];\n    return total;\n}`,
-    to: { lang: 'Python', color: '#3b82f6' },
+    to: { lang: 'Python', color: '#4b8bbe' },
     toCode: `def sum_arr(arr):\n    total = 0\n    for x in arr:\n        total += x\n    return total`,
   },
 ];
@@ -85,6 +85,14 @@ const TAG_COLORS: Record<ModuleTag, { text: string; bg: string; border: string }
   Intermediate: { text: '#f59e0b', bg: '#f59e0b12', border: '#f59e0b40' },
   Advanced: { text: '#f38ba8', bg: '#f38ba812', border: '#f38ba840' },
 };
+
+const LANGUAGE_ACCENTS = [
+  { name: 'Python', color: '#4b8bbe' },
+  { name: 'C', color: '#a8b9cc' },
+  { name: 'C++', color: '#659ad2' },
+  { name: 'Java', color: '#f89820' },
+  { name: 'JavaScript', color: '#f7df1e' },
+] as const;
 
 interface LandingProps {
   onGetStarted?: () => void;
@@ -181,12 +189,12 @@ function LanguageCube() {
     <div className="land-cube-wrap" aria-hidden="true">
       <div className="land-cube-glow" />
       <div className="land-code-cube">
-        <span className="land-cube-face land-cube-front">PY</span>
-        <span className="land-cube-face land-cube-back">JS</span>
-        <span className="land-cube-face land-cube-right">C++</span>
-        <span className="land-cube-face land-cube-left">C</span>
-        <span className="land-cube-face land-cube-top">AI</span>
-        <span className="land-cube-face land-cube-bottom">JAVA</span>
+        <span className="land-cube-face land-cube-front" style={{ '--face-color': '#4b8bbe' } as CSSProperties}>PY</span>
+        <span className="land-cube-face land-cube-back" style={{ '--face-color': '#f7df1e' } as CSSProperties}>JS</span>
+        <span className="land-cube-face land-cube-right" style={{ '--face-color': '#659ad2' } as CSSProperties}>C++</span>
+        <span className="land-cube-face land-cube-left" style={{ '--face-color': '#a8b9cc' } as CSSProperties}>C</span>
+        <span className="land-cube-face land-cube-top" style={{ '--face-color': '#a78bfa' } as CSSProperties}>AI</span>
+        <span className="land-cube-face land-cube-bottom" style={{ '--face-color': '#f89820' } as CSSProperties}>JAVA</span>
       </div>
     </div>
   );
@@ -352,8 +360,15 @@ export default function Landing({ onGetStarted }: LandingProps) {
           </div>
 
           <div className="land-language-list flex items-center flex-wrap gap-2 mt-1">
-            {['Python', 'C', 'C++', 'Java', 'JavaScript'].map(t => (
-              <span key={t} className="land-language-pill text-xs rounded px-2.5 py-1 font-mono">{t}</span>
+            {LANGUAGE_ACCENTS.map(language => (
+              <span
+                key={language.name}
+                className="land-language-pill text-xs rounded px-2.5 py-1 font-mono"
+                style={{ '--lang-color': language.color } as CSSProperties}
+              >
+                <i aria-hidden="true" />
+                {language.name}
+              </span>
             ))}
           </div>
         </div>
