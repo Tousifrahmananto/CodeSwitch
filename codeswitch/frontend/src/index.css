@@ -4512,10 +4512,21 @@ button {
 }
 
 .land-language-pill {
-  color: #bbb4ff;
-  border: 1px solid rgba(139, 124, 255, 0.24);
-  background: rgba(139, 124, 255, 0.08);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--lang-color);
+  border: 1px solid color-mix(in srgb, var(--lang-color) 35%, transparent);
+  background: color-mix(in srgb, var(--lang-color) 9%, transparent);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.land-language-pill i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--lang-color);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--lang-color) 65%, transparent);
 }
 
 .land-cube-wrap {
@@ -4532,7 +4543,18 @@ button {
 }
 
 .land-cube-face {
+  color: var(--face-color);
+  border-color: color-mix(in srgb, var(--face-color) 52%, transparent);
+  background: linear-gradient(145deg, rgba(31, 36, 58, 0.88), rgba(17, 23, 39, 0.82));
+  text-shadow: 0 0 14px color-mix(in srgb, var(--face-color) 72%, transparent);
   font-size: 11px;
+}
+
+[data-theme="light"] .land-cube-face {
+  color: var(--face-color);
+  border-color: color-mix(in srgb, var(--face-color) 50%, transparent);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(235, 238, 247, 0.9));
+  text-shadow: none;
 }
 
 .land-cube-front { transform: rotateY(0deg) translateZ(32px); }
