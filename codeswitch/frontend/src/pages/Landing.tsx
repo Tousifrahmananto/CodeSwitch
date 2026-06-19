@@ -97,59 +97,25 @@ const featureCardStyle = (accent: string, delay: number): CSSProperties & { '--a
 
 // ─── Animated code demo component ─────────────────────────────────────────────
 function CodeDemo() {
-  const [demoIdx, setDemoIdx] = useState(0);
-  const [phase, setPhase] = useState('showing-input');
-  // 'showing-input' → 'converting' → 'typing-output' → 'pausing' → 'transitioning'
-  const [typedOutput, setTypedOutput] = useState('');
+  const [demoIdx, setDemoIdx] = useState(2);
   const [visible, setVisible] = useState(true);
 
   const demo = DEMOS[demoIdx];
 
-  // Phase state machine
   useEffect(() => {
-    let t: ReturnType<typeof setTimeout> | undefined;
-    if (phase === 'showing-input') {
-      t = setTimeout(() => setPhase('converting'), 1800);
-    } else if (phase === 'converting') {
-      t = setTimeout(() => {
-        setTypedOutput('');
-        setPhase('typing-output');
-      }, 1300);
-    } else if (phase === 'pausing') {
-      t = setTimeout(() => {
-        setVisible(false);
-        setPhase('transitioning');
-      }, 2400);
-    } else if (phase === 'transitioning') {
-      t = setTimeout(() => {
+    let transitionTimer: ReturnType<typeof setTimeout> | undefined;
+    const cycleTimer = setInterval(() => {
+      setVisible(false);
+      transitionTimer = setTimeout(() => {
         setDemoIdx(i => (i + 1) % DEMOS.length);
-        setTypedOutput('');
         setVisible(true);
-        setPhase('showing-input');
-      }, 450);
-    }
-    return () => clearTimeout(t);
-  }, [phase]);
-
-  // Typewriter for output code
-  useEffect(() => {
-    if (phase !== 'typing-output') return;
-    const text = demo.toCode;
-    let i = 0;
-    setTypedOutput('');
-    const id = setInterval(() => {
-      i++;
-      setTypedOutput(text.slice(0, i));
-      if (i >= text.length) {
-        clearInterval(id);
-        setTimeout(() => setPhase('pausing'), 350);
-      }
-    }, 18);
-    return () => clearInterval(id);
-  }, [phase, demo.toCode]);
-
-  const isConverting = phase === 'converting';
-  const showOutput = phase === 'typing-output' || phase === 'pausing' || phase === 'transitioning';
+      }, 320);
+    }, 6500);
+    return () => {
+      clearInterval(cycleTimer);
+      clearTimeout(transitionTimer);
+    };
+  }, []);
 
   return (
     <div className={`land-demo${visible ? '' : ' land-demo-hidden'}`}>
@@ -179,20 +145,13 @@ function CodeDemo() {
           <pre className="land-demo-code">{demo.fromCode}</pre>
         </div>
 
-        {/* Center divider — arrow or spinner */}
+        {/* Finished conversion state: one clear input-to-output flow */}
         <div className="land-demo-mid">
-          {isConverting ? (
-            <div className="land-converting-wrap">
-              <span className="land-demo-spinner" />
-              <span className="land-converting-label">Converting</span>
-            </div>
-          ) : (
-            <div className="land-arrow-wrap">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M5 12h14M12 5l7 7-7 7" />
-              </svg>
-            </div>
-          )}
+          <div className="land-arrow-wrap">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12h14M12 5l7 7-7 7" />
+            </svg>
+          </div>
         </div>
 
         {/* Output panel */}
@@ -203,13 +162,7 @@ function CodeDemo() {
             </span>
             <span className="land-demo-panel-label">Output</span>
           </div>
-          <pre className="land-demo-code land-demo-output-code">
-            {showOutput
-              ? typedOutput
-              : <span className="land-demo-placeholder">Awaiting conversion...</span>
-            }
-            {phase === 'typing-output' && <span className="land-cursor-blink">▌</span>}
-          </pre>
+          <pre className="land-demo-code land-demo-output-code">{demo.toCode}</pre>
         </div>
       </div>
 
@@ -273,9 +226,6 @@ function HeroVisual() {
       <div className="land-orbit land-orbit-a" aria-hidden="true" />
       <div className="land-orbit land-orbit-b" aria-hidden="true" />
       <LanguageCube />
-      <span className="land-float-chip land-chip-python">Python</span>
-      <span className="land-float-chip land-chip-java">Java</span>
-      <span className="land-float-chip land-chip-js">JavaScript</span>
       <div className="land-demo-perspective">
         <div className="land-demo-depth" aria-hidden="true" />
         <CodeDemo />
@@ -347,7 +297,7 @@ export default function Landing({ onGetStarted }: LandingProps) {
         </div>
         <div className="flex items-center gap-2">
           <button
-            className="hidden sm:inline-flex bg-transparent border border-border text-primary hover:bg-border rounded px-4 py-1.5 text-sm font-medium transition-colors"
+            className="land-nav-playground hidden sm:inline-flex bg-transparent border-none text-muted hover:text-primary rounded px-3 py-1.5 text-sm font-medium transition-colors"
             onClick={goToPlayground}
           >Try Playground</button>
           <button
@@ -355,7 +305,7 @@ export default function Landing({ onGetStarted }: LandingProps) {
             onClick={() => onGetStarted?.()}
           >Sign In</button>
           <button
-            className="bg-accent hover:bg-accent-h text-white border-none rounded px-4 py-1.5 text-sm font-semibold transition-colors"
+            className="land-nav-primary text-white border-none rounded px-4 py-1.5 text-sm font-semibold transition-colors"
             onClick={() => onGetStarted?.()}
           >Get Started</button>
         </div>
@@ -366,7 +316,7 @@ export default function Landing({ onGetStarted }: LandingProps) {
         <div className="land-hero-text land-fade-up">
           <div className="land-hero-badge">
             <span className="land-badge-pulse" />
-            AI-Powered · Free to Use · Open Source
+            AI-powered · Run instantly · Learn as you go
           </div>
 
           <h1 className="land-v2-title mt-0 mb-5">
@@ -382,7 +332,7 @@ export default function Landing({ onGetStarted }: LandingProps) {
 
           <div className="flex items-center gap-3 flex-wrap">
             <button
-              className="bg-accent hover:bg-accent-h text-white border-none rounded px-6 py-3 text-sm font-semibold transition-colors inline-flex items-center gap-2"
+              className="land-primary-cta text-white border-none rounded px-6 py-3 text-sm font-semibold transition-colors inline-flex items-center gap-2"
               onClick={() => onGetStarted?.()}
             >
               Start for Free
@@ -401,9 +351,9 @@ export default function Landing({ onGetStarted }: LandingProps) {
             </button>
           </div>
 
-          <div className="flex items-center flex-wrap gap-2 mt-1">
-            {['Django', 'React 18', 'Monaco Editor', 'JWT Auth', 'Groq / OpenAI'].map(t => (
-              <span key={t} className="text-xs text-muted border border-border rounded px-2.5 py-1 font-mono">{t}</span>
+          <div className="land-language-list flex items-center flex-wrap gap-2 mt-1">
+            {['Python', 'C', 'C++', 'Java', 'JavaScript'].map(t => (
+              <span key={t} className="land-language-pill text-xs rounded px-2.5 py-1 font-mono">{t}</span>
             ))}
           </div>
         </div>
@@ -427,6 +377,22 @@ export default function Landing({ onGetStarted }: LandingProps) {
           </div>
         ))}
       </div>
+
+      <section className="land-how-strip" aria-label="How CodeSwitch works">
+        {[
+          { n: '01', title: 'Paste your code', text: 'Drop in a real snippet or open a saved file.' },
+          { n: '02', title: 'Choose a language', text: 'Switch between five supported languages.' },
+          { n: '03', title: 'Run and learn', text: 'Test the result and understand what changed.' },
+        ].map(step => (
+          <div className="land-how-step" key={step.n}>
+            <span>{step.n}</span>
+            <div>
+              <strong>{step.title}</strong>
+              <p>{step.text}</p>
+            </div>
+          </div>
+        ))}
+      </section>
 
       {/* ── Features ── */}
       <section
