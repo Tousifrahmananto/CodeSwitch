@@ -26,6 +26,7 @@ class ConversionHistory(models.Model):
 
     class Meta:
         ordering = ['-timestamp']
+        indexes = [models.Index(fields=['user', '-timestamp'], name='conv_user_time_idx')]
 
     def __str__(self):
         return f"{self.user.username}: {self.source_language} → {self.target_language} ({self.timestamp})"

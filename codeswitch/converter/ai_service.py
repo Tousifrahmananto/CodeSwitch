@@ -25,6 +25,7 @@ import re
 import logging
 
 import requests
+from codeswitch.observability import dependency_timer
 
 try:
     from decouple import config as _decouple_config
@@ -94,8 +95,9 @@ def _call_gemini(api_key: str, model: str, user_prompt: str) -> str:
         'contents': [{'parts': [{'text': user_prompt}]}],
         'generationConfig': {'temperature': 0.1, 'maxOutputTokens': 4096},
     }
-    resp = requests.post(url, json=payload, timeout=25)
-    resp.raise_for_status()
+    with dependency_timer('ai_gemini'):
+        resp = requests.post(url, json=payload, timeout=25)
+        resp.raise_for_status()
     data = resp.json()
     return data['candidates'][0]['content']['parts'][0]['text']
 
@@ -116,8 +118,9 @@ def _call_openai_compatible(api_key: str, base_url: str, model: str, user_prompt
         'temperature': 0.1,
         'max_tokens': 4096,
     }
-    resp = requests.post(url, json=payload, headers=headers, timeout=25)
-    resp.raise_for_status()
+    with dependency_timer('ai_openai_compatible'):
+        resp = requests.post(url, json=payload, headers=headers, timeout=25)
+        resp.raise_for_status()
     return resp.json()['choices'][0]['message']['content']
 
 
@@ -170,7 +173,7 @@ def ai_convert_code(source_lang: str, target_lang: str, code: str, user_key: str
 
             except requests.HTTPError as exc:
                 status = exc.response.status_code if exc.response is not None else None
-                last_error_detail = f'HTTP {status} from {provider} (key #{key_index + 1}): {exc}'
+                last_error_detail = f'HTTP {status} from {provider} (key slot #{key_index + 1})'
                 logger.error(last_error_detail)
 
                 if status in _ROTATE_STATUSES:
@@ -185,7 +188,7 @@ def ai_convert_code(source_lang: str, target_lang: str, code: str, user_key: str
                     return {'success': False, 'error': 'AI service temporarily unavailable'}
 
             except Exception as exc:
-                last_error_detail = f'Conversion service error (key #{key_index + 1}): {type(exc).__name__}: {exc}'
+                last_error_detail = f'Conversion service error (key slot #{key_index + 1}): {type(exc).__name__}'
                 logger.error(last_error_detail)
                 break  # unexpected error — try next key
 
@@ -273,7 +276,7 @@ def ai_explain_code(source_lang: str, target_lang: str, input_code: str, output_
 
             except requests.HTTPError as exc:
                 status_code = exc.response.status_code if exc.response is not None else None
-                last_error_detail = f'HTTP {status_code} from {provider} (key #{key_index + 1}): {exc}'
+                last_error_detail = f'HTTP {status_code} from {provider} (key slot #{key_index + 1})'
                 logger.error(last_error_detail)
 
                 if status_code in _ROTATE_STATUSES:
@@ -285,7 +288,7 @@ def ai_explain_code(source_lang: str, target_lang: str, input_code: str, output_
                     return {'success': False, 'error': 'AI service temporarily unavailable'}
 
             except Exception as exc:
-                last_error_detail = f'Code explanation error (key #{key_index + 1}): {type(exc).__name__}: {exc}'
+                last_error_detail = f'Code explanation error (key slot #{key_index + 1}): {type(exc).__name__}'
                 logger.error(last_error_detail)
                 break
 

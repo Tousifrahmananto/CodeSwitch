@@ -8,8 +8,12 @@ from .admin_views import (
     AdminConversionsView, AdminModulesView, AdminModuleDetailView,
     AdminModuleLessonsView, AdminLessonDetailView,
 )
+from .system_views import live, ready, metrics
 
 urlpatterns = [
+    path('health/live', live, name='health-live'),
+    path('health/ready', ready, name='health-ready'),
+    path('metrics', metrics, name='metrics'),
     path('admin/', admin.site.urls),
     path('api/', include('users.urls')),
     path('api/', include('converter.urls')),

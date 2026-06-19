@@ -55,7 +55,7 @@
 - `django-axes` — brute-force login lockout (5 attempts → 1-hour cooldown)
 - `django-csp` — strict Content Security Policy middleware
 - SQLite (dev) / PostgreSQL via `DATABASE_URL` (prod, Railway / Neon)
-- Gunicorn + Railway deployment; Procfile handles migrate + seed + collectstatic on every deploy
+- Gunicorn + Railway deployment; Railway pre-deploy handles migrations, seeding, and static collection
 
 ### Frontend
 - React 18 + TypeScript, built with Vite
@@ -97,7 +97,7 @@ codeswitch_project/
 │   │       └── api/client.ts      # Axios instance with refresh interceptor + CSRF
 │   ├── .env.example               # Environment variable template
 │   ├── requirements.txt
-│   ├── Procfile                   # Railway: migrate → seed → collectstatic → gunicorn
+│   ├── Procfile                   # Railway web process: Gunicorn only
 │   └── manage.py
 └── venv/                          # Not committed
 ```
@@ -384,9 +384,10 @@ Each module contains structured lessons with a built-in Monaco sandbox for live 
 ## Deployment
 
 ### Backend — Railway
-The `Procfile` runs the following on every deploy:
+Railway runs migrations, idempotent seeding, and static collection through
+`codeswitch/railway.json` before switching traffic. The `Procfile` starts only Gunicorn:
 ```
-web: python manage.py migrate && python manage.py seed_all_if_empty && python manage.py collectstatic --noinput && gunicorn codeswitch.wsgi
+web: gunicorn codeswitch.wsgi --bind 0.0.0.0:$PORT --access-logfile - --error-logfile -
 ```
 
 Set these Railway environment variables: `DATABASE_URL`, `SECRET_KEY`, `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, `AI_PROVIDER`, `AI_API_KEY`, `AI_API_KEY_2`, `AI_API_KEY_3`, `AI_MODEL`, `DEBUG=False`.

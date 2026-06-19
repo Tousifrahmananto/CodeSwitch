@@ -3,6 +3,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import serializers
 from .models import CodeFile
+from converter.throttles import TrackedUserThrottle, WriteThrottle
+from codeswitch.pagination import OptionalPageNumberPagination
 
 
 class CodeFileSerializer(serializers.ModelSerializer):
@@ -19,6 +21,8 @@ class FileListCreateView(generics.ListCreateAPIView):
     """
     serializer_class = CodeFileSerializer
     permission_classes = [IsAuthenticated]
+    throttle_classes = [TrackedUserThrottle, WriteThrottle]
+    pagination_class = OptionalPageNumberPagination
 
     def get_queryset(self):
         return CodeFile.objects.filter(user=self.request.user)
@@ -35,6 +39,7 @@ class FileDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
     serializer_class = CodeFileSerializer
     permission_classes = [IsAuthenticated]
+    throttle_classes = [TrackedUserThrottle, WriteThrottle]
 
     def get_queryset(self):
         # Users can only access their own files
