@@ -13,6 +13,10 @@ DEBUG = config('DEBUG', default=True, cast=bool)
 # Example: ALLOWED_HOSTS="myapp.vercel.app,api.railway.app,localhost,127.0.0.1"
 _hosts_config = config('ALLOWED_HOSTS', default='localhost,127.0.0.1')
 ALLOWED_HOSTS = [h.strip() for h in _hosts_config.split(',') if h.strip()]
+if not DEBUG and 'healthcheck.railway.app' not in ALLOWED_HOSTS:
+    # Railway sends readiness probes from this host, even when the app's own
+    # public Railway domain is configured separately.
+    ALLOWED_HOSTS.append('healthcheck.railway.app')
 # Security check: warn about wildcards
 if any('*' in host or (host.startswith('.') and not DEBUG) for host in ALLOWED_HOSTS):
     import logging
