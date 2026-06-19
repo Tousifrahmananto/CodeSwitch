@@ -4164,7 +4164,7 @@ button {
 .land-cube-wrap {
   position: absolute;
   top: 5px;
-  right: 58px;
+  right: 92px;
   width: 88px;
   height: 88px;
   perspective: 700px;
@@ -4259,9 +4259,9 @@ button {
   animation: chipDrift 4.5s ease-in-out infinite;
 }
 
-.land-chip-python { top: 66px; left: 3%; color: #70b7ff; }
-.land-chip-java { top: 32px; left: 34%; color: #f9b65d; animation-delay: -1.4s; }
-.land-chip-js { top: 168px; right: -6%; color: #f4df68; animation-delay: -2.7s; }
+.land-chip-python { top: 76px; left: 3%; color: #70b7ff; }
+.land-chip-java { top: 76px; left: 34%; color: #f9b65d; }
+.land-chip-js { top: 76px; right: -6%; color: #f4df68; }
 
 .land-visual-status {
   position: absolute;
@@ -4411,10 +4411,12 @@ button {
   }
 
   .land-chip-python {
+    top: 82px;
     left: 0;
   }
 
   .land-chip-java {
+    top: 82px;
     left: auto;
     right: 0;
   }
