@@ -68,9 +68,21 @@ export default function Dashboard() {
   const [modules, setModules] = useState<LearningModule[]>(fresh?.modules ?? []);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(!fresh);
+  const [avatarFailed, setAvatarFailed] = useState(false);
 
   useEffect(() => {
-    if (fresh) return;
+    if (fresh) {
+      // Profile data changes independently from dashboard statistics. Always
+      // refresh it so avatar/name edits are visible immediately on return.
+      getProfile().then(profileRes => {
+        setProfile(profileRes.data);
+        setAvatarFailed(false);
+        if (_dashCache.data) _dashCache.data.profile = profileRes.data;
+      }).catch(() => {
+        // Keep the cached profile if this lightweight refresh fails.
+      });
+      return;
+    }
     Promise.all([
       getProfile(),
       getConversionHistory(),
@@ -116,6 +128,10 @@ export default function Dashboard() {
   // Avatar — use uploaded image if available, else initials
   const avatarUrl = resolveMediaUrl(profile?.avatar);
 
+  useEffect(() => {
+    setAvatarFailed(false);
+  }, [avatarUrl]);
+
   return (
     <div className="p-5 max-w-5xl">
 
@@ -132,8 +148,13 @@ export default function Dashboard() {
       {/* ── Profile Header ── */}
       <div className="flex items-center gap-4 p-5 bg-surface border border-border rounded-lg mb-6">
         <div className="w-14 h-14 rounded-full bg-accent flex items-center justify-center flex-shrink-0 overflow-hidden">
-          {avatarUrl
-            ? <img src={avatarUrl} alt="avatar" className="w-full h-full object-cover" />
+          {avatarUrl && !avatarFailed
+            ? <img
+                src={avatarUrl}
+                alt={profile?.username ? profile.username + "'s profile" : 'Profile'}
+                className="w-full h-full object-cover"
+                onError={() => setAvatarFailed(true)}
+              />
             : <span className="text-white text-lg font-bold tracking-wide">{initials}</span>
           }
         </div>
