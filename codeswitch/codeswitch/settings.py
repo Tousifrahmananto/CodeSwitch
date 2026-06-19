@@ -124,8 +124,9 @@ APPEND_SLASH = False  # All API URLs are defined without trailing slashes; disab
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_URL = config('MEDIA_URL', default='/media/')
+_media_root = config('MEDIA_ROOT', default='').strip()
+MEDIA_ROOT = Path(_media_root) if _media_root else BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

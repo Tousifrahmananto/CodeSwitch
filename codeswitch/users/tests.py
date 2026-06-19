@@ -143,3 +143,13 @@ class ProfileTests(TestCase):
         self.user.refresh_from_db()
         self.assertEqual(self.user.first_name, 'Updated')
         self.assertEqual(self.user.bio, 'New bio')
+
+    def test_public_profile_includes_absolute_avatar_url(self):
+        self.user.avatar.name = 'avatars/test.png'
+        self.user.save(update_fields=['avatar'])
+        response = self.client.get('/api/profile/testuser/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.data['avatar'],
+            'http://testserver/media/avatars/test.png',
+        )

@@ -186,6 +186,7 @@ class PublicProfileView(APIView):
 
         return Response({
             'username': user.username,
+            'avatar': request.build_absolute_uri(user.avatar.url) if user.avatar else None,
             'date_joined': user.date_joined,
             'conversion_count': conversion_count,
             'lessons_completed': lessons_completed,

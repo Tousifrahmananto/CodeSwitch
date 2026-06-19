@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getProfile, getConversionHistory, getProgress, getFiles, getModules } from '../api/client';
+import { resolveMediaUrl } from '../api/media';
 import type { CodeFile, ConversionRecord, LearningModule, User, UserProgress } from '../types';
 
 const LANG_COLORS: Record<string, string> = {
@@ -113,7 +114,7 @@ export default function Dashboard() {
     : '';
 
   // Avatar — use uploaded image if available, else initials
-  const avatarUrl = profile?.avatar ? profile.avatar : null;
+  const avatarUrl = resolveMediaUrl(profile?.avatar);
 
   return (
     <div className="p-5 max-w-5xl">
