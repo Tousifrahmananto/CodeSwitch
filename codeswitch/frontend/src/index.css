@@ -4020,3 +4020,445 @@ button {
   border-radius: 20px;
   border: 1px solid;
 }
+/* Landing v2: dimensional product story */
+@keyframes cubeTurn {
+  0% { transform: rotateX(-18deg) rotateY(0deg); }
+  50% { transform: rotateX(16deg) rotateY(180deg); }
+  100% { transform: rotateX(-18deg) rotateY(360deg); }
+}
+
+@keyframes orbitTurn {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes chipDrift {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -10px, 18px); }
+}
+
+@keyframes statusPulse {
+  0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.6); }
+  70% { box-shadow: 0 0 0 7px rgba(52, 211, 153, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+}
+
+.land-v2 {
+  --hero-purple: #8b7cff;
+  --hero-blue: #55b7ff;
+  background:
+    radial-gradient(circle at 72% 10%, rgba(71, 98, 255, 0.16), transparent 32%),
+    radial-gradient(circle at 15% 25%, rgba(139, 124, 255, 0.13), transparent 30%),
+    var(--bg);
+}
+
+.landing > .land-v2-nav {
+  position: sticky;
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  border-color: rgba(152, 177, 200, 0.14);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+}
+
+.land-v2 .land-bg-grid {
+  background-image:
+    linear-gradient(rgba(139, 124, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139, 124, 255, 0.045) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 78%);
+}
+
+.land-v2 .land-hero {
+  max-width: 1380px;
+  gap: clamp(42px, 6vw, 88px);
+  padding-top: 90px;
+}
+
+.land-v2 .land-hero-text {
+  position: relative;
+  z-index: 5;
+}
+
+.land-v2-title {
+  max-width: 650px;
+  font-size: clamp(48px, 6.2vw, 82px);
+  font-weight: 850;
+  line-height: 0.98;
+  letter-spacing: -0.055em;
+  text-wrap: balance;
+}
+
+.land-v2-title span {
+  color: transparent;
+  background: linear-gradient(100deg, #a99cff 5%, #73c7ff 55%, #77f2d0 105%);
+  background-size: 180% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: shimmer 7s linear infinite;
+}
+
+.land-v2-sub {
+  max-width: 590px;
+  font-size: clamp(15px, 1.5vw, 18px);
+  line-height: 1.75;
+}
+
+.land-v2 .land-hero-badge {
+  color: #b9b1ff;
+  border-color: rgba(139, 124, 255, 0.35);
+  background: linear-gradient(90deg, rgba(139, 124, 255, 0.13), rgba(85, 183, 255, 0.07));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.land-visual-stage {
+  --tilt-x: 0deg;
+  --tilt-y: 0deg;
+  --light-x: 50%;
+  --light-y: 35%;
+  position: relative;
+  min-height: 500px;
+  perspective: 1200px;
+  transform-style: preserve-3d;
+  isolation: isolate;
+}
+
+.land-visual-stage::before {
+  content: '';
+  position: absolute;
+  inset: 6% -8% 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at var(--light-x) var(--light-y), rgba(139, 124, 255, 0.28), rgba(36, 105, 255, 0.08) 32%, transparent 68%);
+  filter: blur(18px);
+  z-index: -2;
+}
+
+.land-demo-perspective {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 118px;
+  transform-style: preserve-3d;
+  transform: rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
+  transition: transform 0.22s ease-out;
+  z-index: 3;
+}
+
+.land-demo-perspective .land-demo {
+  border-color: rgba(139, 124, 255, 0.27);
+  background: color-mix(in srgb, var(--surface) 91%, transparent);
+  backdrop-filter: blur(18px);
+  box-shadow:
+    0 38px 90px rgba(0, 0, 0, 0.48),
+    0 0 50px rgba(102, 90, 255, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.land-demo-depth {
+  position: absolute;
+  inset: 16px -14px -16px 14px;
+  border: 1px solid rgba(139, 124, 255, 0.13);
+  border-radius: 16px;
+  background: rgba(65, 58, 130, 0.11);
+  transform: translateZ(-35px);
+  z-index: -1;
+}
+
+.land-cube-wrap {
+  position: absolute;
+  top: 5px;
+  right: 58px;
+  width: 88px;
+  height: 88px;
+  perspective: 700px;
+  transform: translateZ(80px);
+  z-index: 7;
+}
+
+.land-code-cube {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  transform-style: preserve-3d;
+  animation: cubeTurn 16s linear infinite;
+}
+
+.land-cube-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(167, 156, 255, 0.52);
+  background: linear-gradient(145deg, rgba(94, 79, 191, 0.7), rgba(27, 34, 63, 0.74));
+  color: #e9e6ff;
+  font: 700 14px/1 var(--mono);
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 14px rgba(164, 151, 255, 0.9);
+  box-shadow: inset 0 0 22px rgba(139, 124, 255, 0.12);
+  backdrop-filter: blur(10px);
+  backface-visibility: visible;
+}
+
+.land-cube-front { transform: rotateY(0deg) translateZ(44px); }
+.land-cube-back { transform: rotateY(180deg) translateZ(44px); }
+.land-cube-right { transform: rotateY(90deg) translateZ(44px); }
+.land-cube-left { transform: rotateY(-90deg) translateZ(44px); }
+.land-cube-top { transform: rotateX(90deg) translateZ(44px); }
+.land-cube-bottom { transform: rotateX(-90deg) translateZ(44px); font-size: 10px; }
+
+.land-cube-glow {
+  position: absolute;
+  inset: -28px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(126, 106, 255, 0.4), transparent 66%);
+  filter: blur(12px);
+}
+
+.land-orbit {
+  position: absolute;
+  top: 44px;
+  right: 4px;
+  width: 205px;
+  height: 92px;
+  border: 1px solid rgba(125, 154, 255, 0.22);
+  border-radius: 50%;
+  transform: rotate(-12deg);
+  z-index: 1;
+}
+
+.land-orbit::after {
+  content: '';
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  left: 17px;
+  top: 11px;
+  border-radius: 50%;
+  background: #76e8ce;
+  box-shadow: 0 0 18px #76e8ce;
+}
+
+.land-orbit-a { animation: orbitTurn 15s linear infinite; }
+.land-orbit-b {
+  width: 158px;
+  height: 158px;
+  top: 8px;
+  right: 27px;
+  transform: rotate(62deg);
+  animation: orbitTurn 20s linear infinite reverse;
+}
+
+.land-float-chip {
+  position: absolute;
+  z-index: 6;
+  padding: 7px 11px;
+  border: 1px solid rgba(139, 124, 255, 0.25);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  color: var(--text-muted);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(12px);
+  font: 600 10px/1 var(--mono);
+  animation: chipDrift 4.5s ease-in-out infinite;
+}
+
+.land-chip-python { top: 66px; left: 3%; color: #70b7ff; }
+.land-chip-java { top: 32px; left: 34%; color: #f9b65d; animation-delay: -1.4s; }
+.land-chip-js { top: 168px; right: -6%; color: #f4df68; animation-delay: -2.7s; }
+
+.land-visual-status {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: 10px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 14px;
+  border: 1px solid rgba(52, 211, 153, 0.2);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  color: var(--text-muted);
+  font: 500 10px/1 var(--mono);
+  backdrop-filter: blur(12px);
+}
+
+.land-status-ping {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #34d399;
+  animation: statusPulse 2s infinite;
+}
+
+.land-status-latency {
+  margin-left: auto;
+  color: #6ee7c2;
+}
+
+.land-v2-stats {
+  position: relative;
+  max-width: 1080px;
+  margin: 0 auto 28px;
+  border: 1px solid rgba(139, 124, 255, 0.16);
+  border-radius: 18px;
+  background: linear-gradient(110deg, rgba(139, 124, 255, 0.08), rgba(85, 183, 255, 0.04));
+  backdrop-filter: blur(16px);
+}
+
+.land-v2 .land-feat-card {
+  transform-style: preserve-3d;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--surface) 95%, white 1%), var(--surface));
+}
+
+.land-v2 .land-feat-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% -20%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 55%);
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+}
+
+.land-v2 .land-feat-card:hover {
+  transform: perspective(900px) rotateX(2deg) translateY(-8px);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.land-v2 .land-feat-card:hover::after {
+  opacity: 1;
+}
+
+.land-preview-section .land-browser-mock {
+  opacity: 0;
+  transform: perspective(1200px) rotateX(7deg) translateY(35px) scale(0.97);
+  transform-origin: center top;
+  transition: opacity 0.8s ease, transform 1s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.land-preview-section.animate-in .land-browser-mock {
+  opacity: 1;
+  transform: perspective(1200px) rotateX(0deg) translateY(0) scale(1);
+}
+
+.land-v2-cta-card {
+  position: relative;
+  overflow: hidden;
+  padding: 64px 42px;
+  border: 1px solid rgba(139, 124, 255, 0.28);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(139, 124, 255, 0.2), transparent 52%),
+    color-mix(in srgb, var(--surface) 92%, transparent);
+  box-shadow: 0 40px 100px rgba(0, 0, 0, 0.28);
+  opacity: 0;
+  transform: translateY(28px) scale(0.97);
+  transition: opacity 0.7s ease, transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.land-v2-cta.animate-in .land-v2-cta-card {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+[data-theme="light"] .land-cube-face {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(218, 225, 255, 0.86));
+  color: #4d3ec9;
+  text-shadow: none;
+}
+
+@media (max-width: 1024px) {
+  .land-v2 .land-hero {
+    padding-top: 80px;
+  }
+
+  .land-visual-stage {
+    width: min(620px, 100%);
+    margin: 0 auto;
+  }
+
+  .land-v2-title {
+    max-width: 760px;
+  }
+
+  .land-v2-sub {
+    max-width: 680px;
+  }
+}
+
+@media (max-width: 640px) {
+  .land-v2-title {
+    font-size: clamp(42px, 14vw, 60px);
+  }
+
+  .land-visual-stage {
+    min-height: 620px;
+  }
+
+  .land-demo-perspective {
+    top: 128px;
+  }
+
+  .land-cube-wrap {
+    right: calc(50% - 44px);
+  }
+
+  .land-orbit {
+    right: calc(50% - 102px);
+  }
+
+  .land-orbit-b {
+    right: calc(50% - 79px);
+  }
+
+  .land-chip-python {
+    left: 0;
+  }
+
+  .land-chip-java {
+    left: auto;
+    right: 0;
+  }
+
+  .land-chip-js {
+    display: none;
+  }
+
+  .land-visual-status {
+    bottom: 0;
+    left: 4px;
+    right: 4px;
+  }
+
+  .land-status-latency {
+    display: none;
+  }
+
+  .land-v2-stats {
+    margin-inline: 16px;
+  }
+
+  .land-v2-cta-card {
+    padding: 48px 22px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .land-code-cube,
+  .land-orbit,
+  .land-float-chip,
+  .land-v2-title span,
+  .land-status-ping {
+    animation: none !important;
+  }
+
+  .land-demo-perspective {
+    transform: none !important;
+  }
+
+  .land-preview-section .land-browser-mock,
+  .land-v2-cta-card,
+  .land-feat-card,
+  .land-module-row {
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 
 // ─── Demo sequences shown in the hero code window ─────────────────────────────
 const DEMOS = [
@@ -223,6 +223,72 @@ function CodeDemo() {
   );
 }
 
+function LanguageCube() {
+  return (
+    <div className="land-cube-wrap" aria-hidden="true">
+      <div className="land-cube-glow" />
+      <div className="land-code-cube">
+        <span className="land-cube-face land-cube-front">PY</span>
+        <span className="land-cube-face land-cube-back">JS</span>
+        <span className="land-cube-face land-cube-right">C++</span>
+        <span className="land-cube-face land-cube-left">C</span>
+        <span className="land-cube-face land-cube-top">AI</span>
+        <span className="land-cube-face land-cube-bottom">JAVA</span>
+      </div>
+    </div>
+  );
+}
+
+function HeroVisual() {
+  const stageRef = useRef<HTMLDivElement>(null);
+
+  const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const rect = stage.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / rect.width - 0.5;
+    const y = (event.clientY - rect.top) / rect.height - 0.5;
+    stage.style.setProperty('--tilt-x', `${(-y * 7).toFixed(2)}deg`);
+    stage.style.setProperty('--tilt-y', `${(x * 9).toFixed(2)}deg`);
+    stage.style.setProperty('--light-x', `${((x + 0.5) * 100).toFixed(1)}%`);
+    stage.style.setProperty('--light-y', `${((y + 0.5) * 100).toFixed(1)}%`);
+  };
+
+  const resetTilt = () => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    stage.style.setProperty('--tilt-x', '0deg');
+    stage.style.setProperty('--tilt-y', '0deg');
+    stage.style.setProperty('--light-x', '50%');
+    stage.style.setProperty('--light-y', '35%');
+  };
+
+  return (
+    <div
+      ref={stageRef}
+      className="land-visual-stage"
+      onPointerMove={handlePointerMove}
+      onPointerLeave={resetTilt}
+    >
+      <div className="land-orbit land-orbit-a" aria-hidden="true" />
+      <div className="land-orbit land-orbit-b" aria-hidden="true" />
+      <LanguageCube />
+      <span className="land-float-chip land-chip-python">Python</span>
+      <span className="land-float-chip land-chip-java">Java</span>
+      <span className="land-float-chip land-chip-js">JavaScript</span>
+      <div className="land-demo-perspective">
+        <div className="land-demo-depth" aria-hidden="true" />
+        <CodeDemo />
+      </div>
+      <div className="land-visual-status">
+        <span className="land-status-ping" />
+        Conversion engine online
+        <span className="land-status-latency">AI + rules fallback</span>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Landing page ────────────────────────────────────────────────────────
 export default function Landing({ onGetStarted }: LandingProps) {
   const navigate = useNavigate();
@@ -230,6 +296,10 @@ export default function Landing({ onGetStarted }: LandingProps) {
   const modulesRef = useRef(null);
   const [featuresIn, setFeaturesIn] = useState(false);
   const [modulesIn, setModulesIn] = useState(false);
+  const previewRef = useRef(null);
+  const ctaRef = useRef(null);
+  const [previewIn, setPreviewIn] = useState(false);
+  const [ctaIn, setCtaIn] = useState(false);
 
   useEffect(() => {
     document.title = 'CodeSwitch | Convert Code Between Python, Java & C';
@@ -245,16 +315,20 @@ export default function Landing({ onGetStarted }: LandingProps) {
         if (e.isIntersecting) {
           if (e.target === featuresRef.current) setFeaturesIn(true);
           if (e.target === modulesRef.current) setModulesIn(true);
+          if (e.target === previewRef.current) setPreviewIn(true);
+          if (e.target === ctaRef.current) setCtaIn(true);
         }
       });
     }, opts);
     if (featuresRef.current) obs.observe(featuresRef.current);
     if (modulesRef.current) obs.observe(modulesRef.current);
+    if (previewRef.current) obs.observe(previewRef.current);
+    if (ctaRef.current) obs.observe(ctaRef.current);
     return () => obs.disconnect();
   }, []);
 
   return (
-    <div className="relative overflow-hidden min-h-screen">
+    <div className="landing land-v2">
 
       {/* ── Decorative background ── */}
       <div className="land-bg-grid" aria-hidden="true" />
@@ -262,7 +336,7 @@ export default function Landing({ onGetStarted }: LandingProps) {
       <div className="land-orb land-orb-2" aria-hidden="true" />
 
       {/* ── Navbar ── */}
-      <nav className="sticky top-0 z-50 flex items-center justify-between px-4 sm:px-8 py-4 border-b border-border bg-bg/80 backdrop-blur">
+      <nav className="land-v2-nav sticky top-0 z-50 flex items-center justify-between px-4 sm:px-8 py-4 border-b border-border bg-bg/80 backdrop-blur">
         <div className="flex items-center gap-2.5">
           <Logo size={30} id="nav" />
           <span className="font-bold text-base text-primary">CodeSwitch</span>
@@ -295,16 +369,15 @@ export default function Landing({ onGetStarted }: LandingProps) {
             AI-Powered · Free to Use · Open Source
           </div>
 
-          <h1 className="text-4xl font-bold leading-tight mt-0 mb-5">
-            Translate Code<br />
-            <span className="text-accent">Between Languages</span><br />
-            Instantly
+          <h1 className="land-v2-title mt-0 mb-5">
+            Translate ideas,<br />
+            <span>not syntax.</span>
           </h1>
 
-          <p className="text-muted text-base leading-relaxed mt-0 mb-8">
-            CodeSwitch converts Python, Java, and C with AI accuracy.
-            Learn programming with 13 structured modules, manage your
-            files in the cloud, and track your progress — all in one place.
+          <p className="land-v2-sub text-muted text-base leading-relaxed mt-0 mb-8">
+            Move real code between Python, C, C++, Java, and JavaScript.
+            Then run it, understand the changes, and learn the concepts behind
+            the translation in one focused workspace.
           </p>
 
           <div className="flex items-center gap-3 flex-wrap">
@@ -336,12 +409,12 @@ export default function Landing({ onGetStarted }: LandingProps) {
         </div>
 
         <div className="land-hero-demo land-fade-up land-delay-1">
-          <CodeDemo />
+          <HeroVisual />
         </div>
       </section>
 
       {/* ── Stats strip ── */}
-      <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-12 py-6 border-y border-border bg-surface/50 land-fade-up land-delay-2">
+      <div className="land-v2-stats flex flex-wrap items-center justify-center gap-6 sm:gap-12 py-6 border-y border-border bg-surface/50 land-fade-up land-delay-2">
         {[
           { value: '5', label: 'Languages Supported' },
           { value: '13', label: 'Learning Modules' },
@@ -387,7 +460,10 @@ export default function Landing({ onGetStarted }: LandingProps) {
       </section>
 
       {/* ── Product Preview ── */}
-      <section className="py-16 px-4 sm:px-8">
+      <section
+        ref={previewRef}
+        className={`land-preview-section py-16 px-4 sm:px-8${previewIn ? ' animate-in' : ''}`}
+      >
         <div className="text-center mb-10">
           <h2 className="text-2xl font-bold m-0 mb-2">See it in action</h2>
           <p className="text-muted text-sm m-0">AI-powered conversion inside a full Monaco editor — no downloads needed.</p>
@@ -494,8 +570,8 @@ export default function Landing({ onGetStarted }: LandingProps) {
       </section>
 
       {/* ── CTA ── */}
-      <section className="py-20 px-8 text-center">
-        <div className="max-w-lg mx-auto flex flex-col items-center gap-4">
+      <section ref={ctaRef} className={`land-v2-cta py-20 px-8 text-center${ctaIn ? ' animate-in' : ''}`}>
+        <div className="land-v2-cta-card max-w-2xl mx-auto flex flex-col items-center gap-4">
           <Logo size={52} id="cta" />
           <h2 className="text-2xl font-bold m-0">Ready to switch languages?</h2>
           <p className="text-muted text-sm m-0 leading-relaxed">
