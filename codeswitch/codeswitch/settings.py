@@ -252,7 +252,7 @@ SECURE_HSTS_PRELOAD = not DEBUG
 # Django over plain HTTP internally. Setting SECURE_SSL_REDIRECT=True causes an
 # infinite redirect loop. Instead, trust the X-Forwarded-Proto header so Django
 # knows the original request was HTTPS without redirecting itself.
-SECURE_SSL_REDIRECT = not DEBUG  # Enforce HTTPS in production
+SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=False, cast=bool)
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # ── Logging ───────────────────────────────────────────────────────────────────
