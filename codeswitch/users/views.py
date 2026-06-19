@@ -7,6 +7,7 @@ from rest_framework_simplejwt.exceptions import TokenError
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from .serializers import RegisterSerializer, UserProfileSerializer
+from converter.throttles import RegisterThrottle, LoginThrottle, TokenRefreshThrottle, PublicProfileThrottle
 
 User = get_user_model()
 
@@ -45,10 +46,12 @@ class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
+    throttle_classes = [RegisterThrottle]
 
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [LoginThrottle]
 
     def post(self, request):
         from django.contrib.auth import authenticate
@@ -102,6 +105,7 @@ class CookieTokenRefreshView(APIView):
     No request body required.
     """
     permission_classes = [AllowAny]
+    throttle_classes = [TokenRefreshThrottle]
 
     def post(self, request):
         refresh_token = request.COOKIES.get('refresh_token')
@@ -142,6 +146,7 @@ class ProfileView(generics.RetrieveUpdateAPIView):
 class PublicProfileView(APIView):
     """GET /api/profile/<username>/ — Public stats for any user (no auth required)."""
     permission_classes = [AllowAny]
+    throttle_classes = [PublicProfileThrottle]
 
     def get(self, request, username):
         try:

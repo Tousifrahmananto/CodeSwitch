@@ -25,6 +25,7 @@ class CodeFile(models.Model):
 
     class Meta:
         ordering = ['-updated_at']
+        indexes = [models.Index(fields=['user', '-updated_at'], name='file_user_time_idx')]
 
     def __str__(self):
         return f"{self.user.username}/{self.filename}"

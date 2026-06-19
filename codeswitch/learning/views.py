@@ -6,6 +6,7 @@ from rest_framework import serializers
 from django.db.models import Count
 from django.utils import timezone
 from .models import LearningModule, Lesson, UserProgress, Quiz, QuizAttempt
+from converter.throttles import WriteThrottle
 
 
 # ── Serializers ──────────────────────────────
@@ -71,6 +72,7 @@ class ModuleLessonsView(generics.ListAPIView):
 class UpdateProgressView(APIView):
     """POST /api/progress/update — Mark a lesson as complete."""
     permission_classes = [IsAuthenticated]
+    throttle_classes = [WriteThrottle]
 
     def post(self, request):
         lesson_id = request.data.get('lesson_id')
@@ -143,6 +145,7 @@ class GetLessonQuizView(APIView):
 class SubmitQuizAttemptView(APIView):
     """POST /api/quizzes/<quiz_id>/submit/ — Submit answers and get score with explanations."""
     permission_classes = [IsAuthenticated]
+    throttle_classes = [WriteThrottle]
 
     def post(self, request, quiz_id):
         try:

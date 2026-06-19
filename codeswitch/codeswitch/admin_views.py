@@ -8,6 +8,7 @@ from django.utils import timezone
 from datetime import timedelta
 
 from rest_framework.permissions import BasePermission, IsAuthenticated
+from converter.throttles import AdminThrottle
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
@@ -15,6 +16,7 @@ from rest_framework import status
 from converter.models import ConversionHistory
 from files.models import CodeFile
 from learning.models import LearningModule, Lesson
+from codeswitch.pagination import OptionalPageNumberPagination
 
 User = get_user_model()
 
@@ -30,6 +32,7 @@ class IsStaffUser(BasePermission):
 class AdminStatsView(APIView):
     """GET /api/admin/stats — overview counters for the dashboard."""
     permission_classes = [IsAuthenticated, IsStaffUser]
+    throttle_classes = [AdminThrottle]
 
     def get(self, request):
         week_ago = timezone.now() - timedelta(days=7)
@@ -48,22 +51,27 @@ class AdminStatsView(APIView):
 class AdminUsersView(APIView):
     """GET /api/admin/users — list all users."""
     permission_classes = [IsAuthenticated, IsStaffUser]
+    throttle_classes = [AdminThrottle]
 
     def get(self, request):
-        limit = min(int(request.query_params.get('limit', 100)), 500)
-        users = (
+        queryset = (
             User.objects
             .annotate(conversion_count=Count('conversions'))
             .order_by('-date_joined')
             .values('id', 'username', 'email', 'is_staff', 'is_active',
                     'date_joined', 'conversion_count')
-        )[:limit]
-        return Response(list(users))
+        )
+        paginator = OptionalPageNumberPagination()
+        users = paginator.paginate_queryset(queryset, request, view=self)
+        if users is not None:
+            return paginator.get_paginated_response(list(users))
+        return Response(list(queryset[:100]))
 
 
 class AdminUserDetailView(APIView):
     """PATCH /api/admin/users/:id — toggle staff/active. DELETE — remove user."""
     permission_classes = [IsAuthenticated, IsStaffUser]
+    throttle_classes = [AdminThrottle]
 
     def _get_user(self, pk):
         try:
@@ -108,14 +116,20 @@ class AdminUserDetailView(APIView):
 class AdminConversionsView(APIView):
     """GET /api/admin/conversions — latest 100 conversions across all users."""
     permission_classes = [IsAuthenticated, IsStaffUser]
+    throttle_classes = [AdminThrottle]
 
     def get(self, request):
-        qs = (
+        queryset = (
             ConversionHistory.objects
             .select_related('user')
-            .order_by('-timestamp')[:100]
+            .order_by('-timestamp')
         )
-        return Response([
+        paginator = OptionalPageNumberPagination()
+        qs = paginator.paginate_queryset(queryset, request, view=self)
+        paginated = qs is not None
+        if qs is None:
+            qs = queryset[:100]
+        data = [
             {
                 'id':              c.id,
                 'user':            c.user.username,
@@ -124,7 +138,8 @@ class AdminConversionsView(APIView):
                 'timestamp':       c.timestamp,
             }
             for c in qs
-        ])
+        ]
+        return paginator.get_paginated_response(data) if paginated else Response(data)
 
 
 # ── Learning Modules ──────────────────────────────────────────────────────────
@@ -132,6 +147,7 @@ class AdminConversionsView(APIView):
 class AdminModulesView(APIView):
     """GET /api/admin/modules — list. POST — create."""
     permission_classes = [IsAuthenticated, IsStaffUser]
+    throttle_classes = [AdminThrottle]
 
     def get(self, request):
         modules = (
@@ -159,6 +175,7 @@ class AdminModulesView(APIView):
 class AdminModuleDetailView(APIView):
     """PUT /api/admin/modules/:id — update. DELETE — remove."""
     permission_classes = [IsAuthenticated, IsStaffUser]
+    throttle_classes = [AdminThrottle]
 
     def _get_module(self, pk):
         try:
@@ -191,6 +208,7 @@ class AdminModuleDetailView(APIView):
 class AdminModuleLessonsView(APIView):
     """GET /api/admin/modules/:pk/lessons — list lessons. POST — create."""
     permission_classes = [IsAuthenticated, IsStaffUser]
+    throttle_classes = [AdminThrottle]
 
     def _get_module(self, pk):
         try:
@@ -239,6 +257,7 @@ class AdminModuleLessonsView(APIView):
 class AdminLessonDetailView(APIView):
     """GET /api/admin/lessons/:pk — get lesson. PUT — update. DELETE — remove."""
     permission_classes = [IsAuthenticated, IsStaffUser]
+    throttle_classes = [AdminThrottle]
 
     def _get_lesson(self, pk):
         try:

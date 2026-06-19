@@ -52,6 +52,7 @@ INSTALLED_APPS = [
 AUTH_USER_MODEL = 'users.User'
 
 MIDDLEWARE = [
+    'codeswitch.middleware.RequestObservabilityMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'csp.middleware.CSPMiddleware',              # Content-Security-Policy headers
@@ -136,6 +137,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
+    'EXCEPTION_HANDLER': 'codeswitch.exception_handler.api_exception_handler',
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
         'rest_framework.throttling.UserRateThrottle',
@@ -147,9 +149,42 @@ REST_FRAMEWORK = {
         'ai_burst':     '5/minute',
         'ai_sustained': '30/hour',
         'run_anon':     '10/minute',
+        'register': '5/hour',
+        'login': '10/minute',
+        'token_refresh': '30/minute',
+        'public_profile': '60/minute',
+        'run_user': '30/minute',
+        'snippet_ip': '60/minute',
+        'snippet_create': '20/hour',
+        'write': '60/minute',
+        'admin': '120/minute',
         'snippet_anon': '60/minute',  # PUBLIC snippet retrieval — prevent UUID enumeration
     },
 }
+
+REDIS_URL = config('REDIS_URL', default='').strip()
+if REDIS_URL:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': REDIS_URL,
+            'OPTIONS': {'CLIENT_CLASS': 'django_redis.client.DefaultClient'},
+            'KEY_PREFIX': config('CACHE_KEY_PREFIX', default='codeswitch'),
+        }
+    }
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'codeswitch-local',
+        }
+    }
+
+TRUSTED_PROXY_COUNT = config('TRUSTED_PROXY_COUNT', default=0, cast=int)
+REST_FRAMEWORK['NUM_PROXIES'] = TRUSTED_PROXY_COUNT
+METRICS_ENABLED = config('METRICS_ENABLED', default=True, cast=bool)
+METRICS_BEARER_TOKEN = config('METRICS_BEARER_TOKEN', default='')
+CONVERSION_HISTORY_RETENTION_DAYS = config('CONVERSION_HISTORY_RETENTION_DAYS', default=180, cast=int)
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=config('JWT_ACCESS_TOKEN_LIFETIME_MINUTES', default=60, cast=int)),
@@ -162,6 +197,7 @@ SIMPLE_JWT = {
 # ── CORS Security ────────────────────────────────────────────────────────────
 # CRITICAL: Wildcard origins are only safe when credentials are disabled.
 # When CORS_ALLOW_CREDENTIALS=True, MUST use explicit origin list only.
+CORS_ALLOW_CREDENTIALS = True
 def _parse_and_validate_origins(origins_str: str) -> list:
     """Parse comma-separated origins and validate security constraints."""
     origins = [o.strip() for o in origins_str.split(',') if o.strip()]
@@ -182,7 +218,6 @@ CORS_ALLOWED_ORIGINS = _parse_and_validate_origins(
     config('CORS_ALLOWED_ORIGINS', default='http://localhost:3000')
 )
 # Credentials (cookies) must be sent cross-origin — requires explicit origin list (no wildcard)
-CORS_ALLOW_CREDENTIALS = True
 # Allow the user-provided API key header from the frontend
 from corsheaders.defaults import default_headers as _default_cors_headers
 CORS_ALLOW_HEADERS = list(_default_cors_headers) + ['X-User-Api-Key']
@@ -221,10 +256,15 @@ LOGGING = {
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {'format': '{levelname} {asctime} {module} {message}', 'style': '{'},
+        'json': {'()': 'codeswitch.logging_config.JsonFormatter'},
     },
     'handlers': {
-        'console': {'class': 'logging.StreamHandler', 'formatter': 'verbose'},
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'json' if config('LOG_FORMAT', default='console') == 'json' else 'verbose',
+        },
     },
+    'root': {'handlers': ['console'], 'level': config('LOG_LEVEL', default='INFO')},
     'loggers': {
         'django.security': {'handlers': ['console'], 'level': 'WARNING', 'propagate': False},
         'axes':            {'handlers': ['console'], 'level': 'WARNING', 'propagate': False},
@@ -255,4 +295,7 @@ AXES_FAILURE_LIMIT           = 5       # Lock after 5 failed attempts
 AXES_COOLOFF_TIME            = 1       # Unlock after 1 hour
 AXES_LOCKOUT_PARAMETERS      = ['username', 'ip_address']
 AXES_RESET_ON_SUCCESS        = True
-AXES_IPWARE_META_PRECEDENCE_ORDER = ['HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR']
+AXES_IPWARE_PROXY_COUNT = TRUSTED_PROXY_COUNT
+AXES_IPWARE_META_PRECEDENCE_ORDER = (
+    ['HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR'] if TRUSTED_PROXY_COUNT > 0 else ['REMOTE_ADDR']
+)

@@ -130,6 +130,13 @@ class SnippetTests(TestCase):
         self.assertEqual(get_resp.status_code, 200)
         self.assertEqual(get_resp.data['source_language'], 'python')
 
+    def test_create_snippet_validates_language_and_size(self):
+        response = self.authed.post('/api/snippets/', {
+            'source_language': 'ruby', 'target_language': 'java',
+            'input_code': 'puts 1', 'output_code': SAMPLE_JAVA, 'engine': 'ai',
+        }, format='json')
+        self.assertEqual(response.status_code, 400)
+
     def test_get_nonexistent_snippet(self):
         response = self.anon.get('/api/snippets/does-not-exist/')
         self.assertEqual(response.status_code, 404)

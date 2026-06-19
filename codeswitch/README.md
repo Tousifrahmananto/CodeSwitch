@@ -30,7 +30,7 @@ Python, C, C++, Java, JavaScript
 codeswitch/
 ├── manage.py
 ├── requirements.txt
-├── Procfile                    # Railway: migrate → seed → collectstatic → gunicorn
+├── Procfile                    # Railway web process: Gunicorn only
 ├── .env.example
 │
 ├── codeswitch/                 # Django project config
@@ -182,10 +182,11 @@ python manage.py runserver
 
 ## Deployment (Railway)
 
-The `Procfile` runs on every deploy:
+`railway.json` runs migration, seeding, and static collection as a
+pre-deploy command. The `Procfile` starts only the web process:
 
 ```
-web: python manage.py migrate && python manage.py seed_all_if_empty && python manage.py collectstatic --noinput && gunicorn codeswitch.wsgi --bind 0.0.0.0:$PORT
+web: gunicorn codeswitch.wsgi --bind 0.0.0.0:$PORT --access-logfile - --error-logfile -
 ```
 
 Required Railway env vars: `DATABASE_URL`, `SECRET_KEY`, `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, `AI_PROVIDER`, `AI_API_KEY`, `AI_API_KEY_2`, `AI_API_KEY_3`, `AI_MODEL`, `DEBUG=False`.

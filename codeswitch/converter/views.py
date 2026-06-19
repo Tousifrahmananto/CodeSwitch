@@ -1,4 +1,5 @@
 import threading
+import time
 import requests as http_requests
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -8,11 +9,19 @@ from rest_framework import serializers
 from .services import convert_code
 from .ai_service import ai_explain_code
 from .models import ConversionHistory, SharedSnippet
-from .throttles import AIBurstThrottle, AISustainedThrottle, RunCodeAnonThrottle, SnippetAnonThrottle
+from .throttles import (
+    AIBurstThrottle, AISustainedThrottle, RunCodeAnonThrottle,
+    RunCodeUserThrottle, SnippetIPThrottle, SnippetCreateThrottle,
+)
+from .serializers import SharedSnippetCreateSerializer
+from codeswitch.observability import dependency_timer, record_conversion
+from codeswitch.pagination import OptionalPageNumberPagination
 
 # ── Wandbox compiler list — fetched once, cached for the process lifetime ─────
 _wandbox_compilers = None
+_wandbox_compilers_fetched_at = 0.0
 _wandbox_lock = threading.Lock()
+_WANDBOX_CACHE_TTL = 3600
 
 # Prefix used to identify each language's compiler in the Wandbox list
 _LANG_PREFIX = {
@@ -29,17 +38,20 @@ _LANG_OPTIONS = {
 
 
 def _get_wandbox_compilers():
-    global _wandbox_compilers
+    global _wandbox_compilers, _wandbox_compilers_fetched_at
     with _wandbox_lock:
-        if _wandbox_compilers is not None:
+        if _wandbox_compilers is not None and time.monotonic() - _wandbox_compilers_fetched_at < _WANDBOX_CACHE_TTL:
             return _wandbox_compilers
         try:
-            resp = http_requests.get('https://wandbox.org/api/list.json', timeout=10)
-            resp.raise_for_status()
-            _wandbox_compilers = resp.json()
+            with dependency_timer('wandbox_list'):
+                resp = http_requests.get('https://wandbox.org/api/list.json', timeout=10)
+                resp.raise_for_status()
+                _wandbox_compilers = resp.json()
+                _wandbox_compilers_fetched_at = time.monotonic()
         except Exception:
-            _wandbox_compilers = []
-        return _wandbox_compilers
+            # Keep stale successful data; otherwise retry on the next request.
+            return _wandbox_compilers or []
+        return _wandbox_compilers or []
 
 
 def _pick_compiler(language):
@@ -96,6 +108,7 @@ class ConvertCodeView(APIView):
         result = convert_code(source, target, code, user_key=user_key)
 
         if result['success']:
+            record_conversion(result.get('engine', 'rules'), 'success')
             # Save to history
             ConversionHistory.objects.create(
                 user=request.user,
@@ -109,6 +122,7 @@ class ConvertCodeView(APIView):
                 status=status.HTTP_200_OK
             )
         else:
+            record_conversion(result.get('engine', 'unknown'), 'error')
             return Response({'error': result['error']}, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -117,7 +131,12 @@ class ConversionHistoryView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        history = ConversionHistory.objects.filter(user=request.user).order_by('-timestamp')[:50]
+        queryset = ConversionHistory.objects.filter(user=request.user).order_by('-timestamp')
+        paginator = OptionalPageNumberPagination()
+        history = paginator.paginate_queryset(queryset, request, view=self)
+        paginated = history is not None
+        if history is None:
+            history = queryset[:50]
         data = [
             {
                 'id': h.id,
@@ -129,29 +148,25 @@ class ConversionHistoryView(APIView):
             }
             for h in history
         ]
-        return Response(data)
+        return paginator.get_paginated_response(data) if paginated else Response(data)
 
 
 class CreateSnippetView(APIView):
     """POST /api/snippets/ — Save a conversion as a shareable snippet."""
     permission_classes = [IsAuthenticated]
+    throttle_classes = [SnippetCreateThrottle]
 
     def post(self, request):
-        data = request.data
-        snippet = SharedSnippet.objects.create(
-            source_language=data.get('source_language', ''),
-            target_language=data.get('target_language', ''),
-            input_code=data.get('input_code', ''),
-            output_code=data.get('output_code', ''),
-            engine=data.get('engine', 'ai'),
-        )
+        serializer = SharedSnippetCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        snippet = serializer.save()
         return Response({'slug': str(snippet.slug)}, status=status.HTTP_201_CREATED)
 
 
 class GetSnippetView(APIView):
     """GET /api/snippets/<slug>/ — Retrieve a shared snippet (no auth required)."""
     permission_classes = [AllowAny]
-    throttle_classes = [SnippetAnonThrottle]  # Prevent UUID enumeration via rate limiting
+    throttle_classes = [SnippetIPThrottle]
 
     def get(self, request, slug):
         try:
@@ -176,9 +191,11 @@ class RunCodeView(APIView):
     Proxies code execution to Wandbox, picking the best available compiler.
     """
     permission_classes = [AllowAny]
-    throttle_classes = [RunCodeAnonThrottle]
+    throttle_classes = [RunCodeAnonThrottle, RunCodeUserThrottle]
     SUPPORTED = {'python', 'c', 'java', 'javascript', 'cpp'}
     MAX_CODE_LENGTH = 10_000
+    MAX_STDIN_LENGTH = 10_000
+    MAX_OUTPUT_LENGTH = 100_000
 
     def post(self, request):
         language = request.data.get('language', '').lower().strip()
@@ -198,6 +215,11 @@ class RunCodeView(APIView):
                 {'error': f'Code must be under {self.MAX_CODE_LENGTH:,} characters.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        if len(stdin) > self.MAX_STDIN_LENGTH:
+            return Response(
+                {'error': f'Standard input must be under {self.MAX_STDIN_LENGTH:,} characters.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         compiler = _pick_compiler(language)
         if not compiler:
@@ -208,18 +230,19 @@ class RunCodeView(APIView):
 
         options = _LANG_OPTIONS.get(language, '')
         try:
-            resp = http_requests.post(
-                'https://wandbox.org/api/compile.json',
-                json={'compiler': compiler, 'code': code, 'options': options, 'stdin': stdin},
-                timeout=30,
-            )
-            resp.raise_for_status()
-            result = resp.json()
+            with dependency_timer('wandbox_compile'):
+                resp = http_requests.post(
+                    'https://wandbox.org/api/compile.json',
+                    json={'compiler': compiler, 'code': code, 'options': options, 'stdin': stdin},
+                    timeout=30,
+                )
+                resp.raise_for_status()
+                result = resp.json()
         except http_requests.Timeout:
             return Response({'error': 'Execution timed out.'}, status=status.HTTP_504_GATEWAY_TIMEOUT)
-        except http_requests.RequestException as e:
+        except http_requests.RequestException:
             return Response(
-                {'error': f'Execution service unavailable: {e}'},
+                {'error': 'Execution service temporarily unavailable.'},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
@@ -228,6 +251,9 @@ class RunCodeView(APIView):
         compile_err = (result.get('compiler_output') or '').strip()
         runtime_err = (result.get('program_error') or '').strip()
         stderr = '\n'.join(s for s in [compile_err, runtime_err] if s)
+
+        stdout = stdout[:self.MAX_OUTPUT_LENGTH]
+        stderr = stderr[:self.MAX_OUTPUT_LENGTH]
 
         return Response({'stdout': stdout, 'stderr': stderr, 'code': exit_code})
 
