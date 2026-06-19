@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { getPublicProfile, getProfile, updateProfile } from '../api/client';
+import { resolveMediaUrl } from '../api/media';
 import Logo from '../components/Logo';
 import type { ChangeEvent } from 'react';
 import type { PublicProfile, User } from '../types';
@@ -7,8 +8,6 @@ import type { PublicProfile, User } from '../types';
 const LANG_COLORS: Record<string, string> = {
   python: '#3572A5', javascript: '#f1e05a', java: '#b07219', c: '#555555', cpp: '#f34b7d',
 };
-
-const MEDIA_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8000/api').replace('/api', '');
 
 interface ProfilePageProps {
   username: string;
@@ -30,6 +29,7 @@ export default function ProfilePage({ username, onBack, isOwner = false }: Profi
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [avatarFailed, setAvatarFailed] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -76,6 +76,7 @@ export default function ProfilePage({ username, onBack, isOwner = false }: Profi
       if (avatarFile) fd.append('avatar', avatarFile);
       const r = await updateProfile(fd);
       setProfile(prev => (prev ? { ...prev, ...r.data } : prev));
+      setAvatarFailed(false);
       setEditing(false);
       setAvatarFile(null);
       // keep preview so avatar shows immediately without full reload
@@ -109,8 +110,7 @@ export default function ProfilePage({ username, onBack, isOwner = false }: Profi
     ? `${firstName} ${lastName}`.trim()
     : null;
 
-  const avatarUrl = avatarPreview
-    || (profile?.avatar ? `${MEDIA_BASE}${profile.avatar}` : null);
+  const avatarUrl = avatarPreview || resolveMediaUrl(profile?.avatar);
 
   const joinedDate = profile?.date_joined
     ? new Date(profile.date_joined).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
@@ -140,8 +140,13 @@ export default function ProfilePage({ username, onBack, isOwner = false }: Profi
       {profile && (
         <div className="max-w-2xl mx-auto p-5 flex flex-col gap-5">
           <div className="flex items-center gap-5 bg-surface border border-border rounded p-5">
-            {avatarUrl
-              ? <img className="w-[72px] h-[72px] rounded-full object-cover flex-shrink-0" src={avatarUrl} alt="avatar" />
+            {avatarUrl && !avatarFailed
+              ? <img
+                  className="w-[72px] h-[72px] rounded-full object-cover flex-shrink-0"
+                  src={avatarUrl}
+                  alt={username + "'s profile"}
+                  onError={() => setAvatarFailed(true)}
+                />
               : <div className="w-[72px] h-[72px] rounded-full bg-accent text-white text-xl font-bold flex items-center justify-center flex-shrink-0 tracking-wide">{initials}</div>
             }
             <div className="flex flex-col gap-1">
