@@ -16,6 +16,25 @@ const LANG_COLORS: Record<LearningLanguage, string> = {
 };
 const DIFFICULTY_LEVELS = ['all', 'beginner', 'intermediate', 'advanced'] as const;
 
+const VISUALIZER_LANGUAGES = new Set(['python', 'c', 'java', 'javascript', 'cpp']);
+
+function normalizeVisualizerLanguage(lang: string): string {
+  const normalized = lang.toLowerCase().trim();
+  if (normalized === 'js') return 'javascript';
+  if (normalized === 'c++') return 'cpp';
+  return VISUALIZER_LANGUAGES.has(normalized) ? normalized : 'python';
+}
+
+function openInVisualizer(navigate: ReturnType<typeof useNavigate>, language: string, code: string) {
+  navigate('/visualizer', {
+    state: {
+      language: normalizeVisualizerLanguage(language),
+      code,
+      source: 'learn',
+    },
+  });
+}
+
 const formatCompletionDate = (iso: string | null | undefined): string =>
   iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
 
@@ -95,6 +114,7 @@ const ContentRenderer = memo(function ContentRenderer({ text }: { text: string }
 
 // Feature 3: copy to clipboard
 function CodeTabs({ code }: { code: string }) {
+  const navigate = useNavigate();
   const [active, setActive] = useState(0);
   const [copied, setCopied] = useState(false);
   let tabs: Array<{ lang: string; src: string }>;
@@ -131,6 +151,12 @@ function CodeTabs({ code }: { code: string }) {
         >
           {copied ? 'Copied!' : 'Copy'}
         </button>
+        <button
+          className="code-copy-btn"
+          onClick={() => openInVisualizer(navigate, tabs[active].lang, tabs[active].src)}
+        >
+          Visualize
+        </button>
       </div>
       <pre className="example-code"><code>{tabs[active].src}</code></pre>
     </div>
@@ -139,6 +165,7 @@ function CodeTabs({ code }: { code: string }) {
 
 // Feature 1: Try It sandbox
 function TryItSandbox({ exampleCode }: { exampleCode: Record<string, string> }) {
+  const navigate = useNavigate();
   const languages = Object.keys(exampleCode);
   const [sandboxCode, setSandboxCode] = useState(exampleCode[languages[0]] || '');
   const [sandboxSource, setSandboxSource] = useState(languages[0]);
@@ -228,6 +255,14 @@ function TryItSandbox({ exampleCode }: { exampleCode: Record<string, string> }) 
             title="Run code"
           >
             {runLoading ? '⏳' : '▶ Run'}
+          </button>
+          <button
+            className="btn-run"
+            onClick={() => openInVisualizer(navigate, sandboxSource, sandboxCode)}
+            disabled={!sandboxCode.trim()}
+            title="Open current editor code in Code Visualizer"
+          >
+            âœ¨ Visualize
           </button>
           <button className="btn-reset" onClick={handleReset}>Reset</button>
         </div>
@@ -633,7 +668,10 @@ export default function Learning() {
                     {parsedCode && (
                       <button
                         className="learn-visualizer-inline"
-                        onClick={() => navigate('/visualizer')}
+                        onClick={() => {
+                          const [lang, src] = Object.entries(parsedCode)[0] || ['python', ''];
+                          openInVisualizer(navigate, lang, String(src));
+                        }}
                       >
                         ✨ Open this in Code Visualizer
                       </button>

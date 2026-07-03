@@ -133,6 +133,12 @@ export interface VisualizationStep {
   visual: {
     focus: VisualizationStepKind;
     variables: VisualizationVariable[];
+    stack?: Array<{
+      name: string;
+      variables: VisualizationVariable[];
+    }>;
+    output?: string[];
+    return_value?: string;
     pulse?: 'loop' | 'branch' | 'output' | 'collection';
     iteration_label?: string;
   };
@@ -140,6 +146,7 @@ export interface VisualizationStep {
 
 export interface VisualizationTimeline {
   language: string;
+  mode?: 'execution_trace' | 'concept_trace';
   summary: string;
   concepts: string[];
   recommendations: string[];

@@ -4930,8 +4930,11 @@ h6,
   position: relative;
   min-height: 460px;
   display: grid;
-  place-items: center;
+  grid-template-columns: minmax(180px, 0.85fr) minmax(260px, 1.15fr);
+  align-items: center;
+  gap: 18px;
   overflow: hidden;
+  padding: 24px;
   background:
     radial-gradient(circle at 50% 25%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 42%),
     linear-gradient(180deg, color-mix(in srgb, var(--bg) 86%, transparent), var(--surface));
@@ -4960,6 +4963,7 @@ h6,
 .viz-core {
   position: relative;
   z-index: 3;
+  justify-self: center;
   width: 168px;
   height: 168px;
   display: flex;
@@ -5014,7 +5018,7 @@ h6,
 
 .viz-node-cloud {
   position: absolute;
-  inset: auto 22px 20px;
+  inset: auto 46% 20px 22px;
   z-index: 4;
   display: flex;
   justify-content: center;
@@ -5073,6 +5077,110 @@ h6,
   letter-spacing: 0.14em;
   text-transform: uppercase;
   animation: vizBeam 1.2s ease-in-out infinite;
+}
+
+.viz-python-tutor-panel {
+  position: relative;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  align-self: stretch;
+  min-width: 0;
+}
+
+.viz-stack-panel,
+.viz-output-panel {
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.20);
+  backdrop-filter: blur(14px);
+  overflow: hidden;
+}
+
+.viz-panel-title {
+  display: block;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--secondary);
+  font: 900 11px/1 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.viz-frame {
+  margin: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--bg) 66%, transparent);
+}
+
+.viz-frame strong {
+  display: block;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  font-size: 12px;
+}
+
+.viz-frame p {
+  display: grid;
+  grid-template-columns: minmax(80px, 0.7fr) minmax(0, 1fr);
+  gap: 8px;
+  margin: 0;
+  padding: 7px 10px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  color: var(--text);
+  font-size: 12px;
+}
+
+.viz-frame p:first-of-type {
+  border-top: none;
+}
+
+.viz-frame span {
+  color: var(--accent);
+  font-weight: 800;
+  font-family: var(--mono);
+}
+
+.viz-frame code,
+.viz-return-value code {
+  color: var(--text);
+  font-family: var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.viz-output-panel pre {
+  min-height: 72px;
+  margin: 0;
+  padding: 12px;
+  color: #86efac;
+  background: color-mix(in srgb, var(--bg) 72%, black 4%);
+  font: 13px/1.55 var(--mono);
+  white-space: pre-wrap;
+}
+
+.viz-return-value {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px;
+  padding: 9px 10px;
+  border: 1px solid rgba(167, 139, 250, 0.42);
+  border-radius: 10px;
+  background: rgba(167, 139, 250, 0.10);
+}
+
+.viz-return-value span {
+  color: #a78bfa;
+  font: 900 11px/1 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .viz-controls {
@@ -5251,6 +5359,15 @@ h6,
   .viz-grid,
   .viz-lower-grid {
     grid-template-columns: 1fr;
+  }
+
+  .viz-canvas {
+    grid-template-columns: 1fr;
+  }
+
+  .viz-node-cloud {
+    position: relative;
+    inset: auto;
   }
 
   .viz-hero {

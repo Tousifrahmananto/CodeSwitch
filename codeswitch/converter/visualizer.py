@@ -1,3 +1,5 @@
+import ast
+import operator
 import re
 
 
@@ -12,6 +14,34 @@ CONCEPT_RECOMMENDATIONS = {
     'arrays': ['Arrays', 'Lists'],
     'returns': ['Functions', 'Return Values'],
     'output': ['Input and Output'],
+}
+
+MAX_TRACE_STEPS = 120
+MAX_LOOP_ITERATIONS = 40
+
+
+class _ReturnSignal(Exception):
+    def __init__(self, value):
+        self.value = value
+
+
+_BIN_OPS = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+    ast.FloorDiv: operator.floordiv,
+    ast.Mod: operator.mod,
+    ast.Pow: operator.pow,
+}
+
+_COMPARE_OPS = {
+    ast.Eq: operator.eq,
+    ast.NotEq: operator.ne,
+    ast.Lt: operator.lt,
+    ast.LtE: operator.le,
+    ast.Gt: operator.gt,
+    ast.GtE: operator.ge,
 }
 
 
@@ -128,6 +158,243 @@ def _description_for(kind, line, language):
     return 'This statement advances the program state.'
 
 
+def _safe_repr(value):
+    text = repr(value)
+    return text if len(text) <= 80 else f'{text[:77]}...'
+
+
+def _target_name(target):
+    if isinstance(target, ast.Name):
+        return target.id
+    if isinstance(target, ast.Subscript) and isinstance(target.value, ast.Name):
+        return target.value.id
+    return None
+
+
+def _concepts_from_steps(steps):
+    concepts = []
+    for step in steps:
+        concept = _concept_for_kind(step['kind'])
+        if concept and concept not in concepts:
+            concepts.append(concept)
+    return concepts
+
+
+class _PythonTraceBuilder:
+    def __init__(self, code):
+        self.code = code
+        self.lines = code.splitlines()
+        self.steps = []
+        self.output = []
+        self.functions = {}
+
+    def trace(self):
+        tree = ast.parse(self.code)
+        module_frame = {'name': '<module>', 'locals': {}}
+        for node in tree.body:
+            if isinstance(node, ast.FunctionDef):
+                self.functions[node.name] = node
+                self._record(node, 'function', module_frame, 'Function definition',
+                             f'{node.name} is stored so it can be called later.')
+            else:
+                self._exec_stmt(node, module_frame, [module_frame])
+            if len(self.steps) >= MAX_TRACE_STEPS:
+                break
+        return self.steps
+
+    def _line(self, node):
+        lineno = getattr(node, 'lineno', 1)
+        if 1 <= lineno <= len(self.lines):
+            return self.lines[lineno - 1].strip()
+        return ''
+
+    def _frame_state(self, stack):
+        return [
+            {
+                'name': frame['name'],
+                'variables': [
+                    {'name': key, 'value': _safe_repr(value)}
+                    for key, value in frame['locals'].items()
+                    if not key.startswith('__')
+                ],
+            }
+            for frame in stack
+        ]
+
+    def _record(self, node, kind, frame, title, description, stack=None, return_value=None):
+        if len(self.steps) >= MAX_TRACE_STEPS:
+            return
+        stack = stack or [frame]
+        variables = self._frame_state(stack)[-1]['variables'] if stack else []
+        visual = {
+            'focus': kind,
+            'variables': variables,
+            'stack': self._frame_state(stack),
+            'output': list(self.output),
+        }
+        if return_value is not None:
+            visual['return_value'] = _safe_repr(return_value)
+        if kind == 'loop':
+            visual['pulse'] = 'loop'
+        elif kind == 'condition':
+            visual['pulse'] = 'branch'
+        elif kind == 'output':
+            visual['pulse'] = 'output'
+        elif kind == 'array':
+            visual['pulse'] = 'collection'
+
+        self.steps.append({
+            'id': f'step-{len(self.steps) + 1}',
+            'line': getattr(node, 'lineno', 1),
+            'kind': kind,
+            'title': title,
+            'description': description,
+            'code': self._line(node),
+            'visual': visual,
+        })
+
+    def _eval_expr(self, node, frame, stack):
+        if isinstance(node, ast.Constant):
+            return node.value
+        if isinstance(node, ast.Name):
+            for candidate in reversed(stack):
+                if node.id in candidate['locals']:
+                    return candidate['locals'][node.id]
+            return f'<unknown {node.id}>'
+        if isinstance(node, ast.List):
+            return [self._eval_expr(item, frame, stack) for item in node.elts]
+        if isinstance(node, ast.Tuple):
+            return tuple(self._eval_expr(item, frame, stack) for item in node.elts)
+        if isinstance(node, ast.UnaryOp):
+            value = self._eval_expr(node.operand, frame, stack)
+            if isinstance(node.op, ast.USub):
+                return -value
+            if isinstance(node.op, ast.UAdd):
+                return +value
+            if isinstance(node.op, ast.Not):
+                return not value
+        if isinstance(node, ast.BinOp):
+            left = self._eval_expr(node.left, frame, stack)
+            right = self._eval_expr(node.right, frame, stack)
+            fn = _BIN_OPS.get(type(node.op))
+            if fn:
+                return fn(left, right)
+        if isinstance(node, ast.Compare):
+            left = self._eval_expr(node.left, frame, stack)
+            for op, comparator in zip(node.ops, node.comparators):
+                right = self._eval_expr(comparator, frame, stack)
+                fn = _COMPARE_OPS.get(type(op))
+                if not fn or not fn(left, right):
+                    return False
+                left = right
+            return True
+        if isinstance(node, ast.Call):
+            return self._call(node, frame, stack)
+        return ast.unparse(node) if hasattr(ast, 'unparse') else '<expression>'
+
+    def _call(self, node, frame, stack):
+        name = None
+        if isinstance(node.func, ast.Name):
+            name = node.func.id
+        if name == 'print':
+            values = [self._eval_expr(arg, frame, stack) for arg in node.args]
+            text = ' '.join(str(value) for value in values)
+            self.output.append(text)
+            self._record(node, 'output', frame, 'Output produced', f'print displays {_safe_repr(text)}.', stack)
+            return None
+        if name == 'range':
+            args = [self._eval_expr(arg, frame, stack) for arg in node.args]
+            return range(*args)
+        if name in self.functions:
+            func = self.functions[name]
+            args = [self._eval_expr(arg, frame, stack) for arg in node.args]
+            local_frame = {'name': name, 'locals': {}}
+            for param, value in zip(func.args.args, args):
+                local_frame['locals'][param.arg] = value
+            call_stack = stack + [local_frame]
+            self._record(node, 'call', local_frame, 'Function call',
+                         f'{name} is called and a new stack frame is created.', call_stack)
+            try:
+                for stmt in func.body:
+                    self._exec_stmt(stmt, local_frame, call_stack)
+            except _ReturnSignal as signal:
+                self._record(node, 'return', local_frame, 'Return value',
+                             f'{name} returns {_safe_repr(signal.value)} to its caller.',
+                             call_stack, return_value=signal.value)
+                return signal.value
+            return None
+        return f'<call {name or "function"}>'
+
+    def _exec_stmt(self, node, frame, stack):
+        if len(self.steps) >= MAX_TRACE_STEPS:
+            return
+        if isinstance(node, ast.Assign):
+            value = self._eval_expr(node.value, frame, stack)
+            for target in node.targets:
+                name = _target_name(target)
+                if name:
+                    frame['locals'][name] = value
+            kind = 'array' if isinstance(value, (list, tuple, dict, set)) else 'assignment'
+            self._record(node, kind, frame, _line_title(kind),
+                         f'{", ".join(_target_name(t) or "value" for t in node.targets)} becomes {_safe_repr(value)}.',
+                         stack)
+            return
+        if isinstance(node, ast.AnnAssign):
+            value = self._eval_expr(node.value, frame, stack) if node.value else None
+            name = _target_name(node.target)
+            if name:
+                frame['locals'][name] = value
+            self._record(node, 'assignment', frame, 'Variable update',
+                         f'{name or "value"} becomes {_safe_repr(value)}.', stack)
+            return
+        if isinstance(node, ast.Expr):
+            self._eval_expr(node.value, frame, stack)
+            if not isinstance(node.value, ast.Call) or getattr(node.value.func, 'id', '') != 'print':
+                self._record(node, 'statement', frame, 'Statement executed',
+                             'This expression is evaluated.', stack)
+            return
+        if isinstance(node, ast.For):
+            iterable = list(self._eval_expr(node.iter, frame, stack))
+            target = _target_name(node.target) or 'item'
+            for idx, item in enumerate(iterable[:MAX_LOOP_ITERATIONS], start=1):
+                frame['locals'][target] = item
+                self._record(node, 'loop', frame, 'Loop iteration',
+                             f'Iteration {idx}: {target} is {_safe_repr(item)}.', stack)
+                for stmt in node.body:
+                    self._exec_stmt(stmt, frame, stack)
+            return
+        if isinstance(node, ast.While):
+            count = 0
+            while self._eval_expr(node.test, frame, stack) and count < MAX_LOOP_ITERATIONS:
+                count += 1
+                self._record(node, 'loop', frame, 'While loop',
+                             f'Iteration {count}: the condition is true.', stack)
+                for stmt in node.body:
+                    self._exec_stmt(stmt, frame, stack)
+            return
+        if isinstance(node, ast.If):
+            result = bool(self._eval_expr(node.test, frame, stack))
+            self._record(node, 'condition', frame, 'Decision point',
+                         f'The condition is {result}. The {"if" if result else "else"} branch runs.', stack)
+            for stmt in (node.body if result else node.orelse):
+                self._exec_stmt(stmt, frame, stack)
+            return
+        if isinstance(node, ast.Return):
+            value = self._eval_expr(node.value, frame, stack) if node.value else None
+            self._record(node, 'return', frame, 'Return value',
+                         f'The function returns {_safe_repr(value)}.', stack, return_value=value)
+            raise _ReturnSignal(value)
+        self._record(node, 'statement', frame, 'Statement executed',
+                     'This statement is reached during execution.', stack)
+
+
+def _build_python_trace(code):
+    try:
+        return _PythonTraceBuilder(code).trace()
+    except Exception:
+        return None
+
+
 def build_visualization(language, code):
     language = (language or '').lower().strip()
     code = code or ''
@@ -142,6 +409,24 @@ def build_visualization(language, code):
     steps = []
     concepts = []
     variables = {}
+
+    if language == 'python':
+        traced_steps = _build_python_trace(code.replace('\x00', ''))
+        if traced_steps:
+            concepts = _concepts_from_steps(traced_steps)
+            recommendations = []
+            for concept in concepts:
+                for title in CONCEPT_RECOMMENDATIONS.get(concept, []):
+                    if title not in recommendations:
+                        recommendations.append(title)
+            return {
+                'language': language,
+                'mode': 'execution_trace',
+                'summary': f'Traced {len(traced_steps)} Python execution steps with stack frames and output.',
+                'concepts': concepts,
+                'recommendations': recommendations[:6],
+                'steps': traced_steps[:80],
+            }
 
     for index, line in enumerate(lines, start=1):
         kind = _statement_kind(line, language)
@@ -199,6 +484,7 @@ def build_visualization(language, code):
 
     return {
         'language': language,
+        'mode': 'concept_trace',
         'summary': f'Generated {len(steps)} visual steps covering {len(concepts)} concept{"s" if len(concepts) != 1 else ""}.',
         'concepts': concepts,
         'recommendations': recommendations[:6],

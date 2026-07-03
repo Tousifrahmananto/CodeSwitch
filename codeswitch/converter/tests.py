@@ -122,11 +122,24 @@ class VisualizeCodeTests(TestCase):
             format='json')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['language'], 'python')
+        self.assertEqual(response.data['mode'], 'execution_trace')
         self.assertIn('loops', response.data['concepts'])
         self.assertIn('variables', response.data['concepts'])
         self.assertGreaterEqual(len(response.data['steps']), 4)
         self.assertEqual(response.data['steps'][0]['line'], 1)
         self.assertIn('visual', response.data['steps'][0])
+        self.assertIn('stack', response.data['steps'][0]['visual'])
+
+    def test_visualize_python_return_negative_one_is_normal_return(self):
+        code = 'def find(x):\n    if x > 0:\n        return x\n    return -1\n\nresult = find(0)\nprint(result)\n'
+        response = self.client.post('/api/visualize',
+            {'language': 'python', 'code': code},
+            format='json')
+        self.assertEqual(response.status_code, 200)
+        return_steps = [step for step in response.data['steps'] if step['kind'] == 'return']
+        self.assertTrue(return_steps)
+        self.assertTrue(any(step['visual'].get('return_value') == '-1' for step in return_steps))
+        self.assertFalse(any('error' in step['title'].lower() for step in return_steps))
 
     def test_visualize_c_family_detects_output_and_conditionals(self):
         code = 'int x = 3;\nif (x > 2) {\n  printf("%d", x);\n}\n'
