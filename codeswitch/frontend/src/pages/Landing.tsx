@@ -36,7 +36,7 @@ const FEATURES = [
     ),
     title: 'AI-Powered Conversion',
     desc: 'Convert code between Python, Java, and C with AI accuracy. A rule-based fallback engine ensures conversions always work, even offline.',
-    accent: '#e86c2f',
+    accent: '#4f8ef7',
   },
   {
     icon: (
@@ -47,7 +47,7 @@ const FEATURES = [
     ),
     title: '13 Learning Modules',
     desc: 'Structured curriculum from Python basics to graph algorithms. Interactive examples, live sandbox, and per-lesson progress tracking.',
-    accent: '#c9a84c',
+    accent: '#818cf8',
   },
   {
     icon: (
@@ -193,7 +193,7 @@ function LanguageCube() {
         <span className="land-cube-face land-cube-back" style={{ '--face-color': '#f7df1e' } as CSSProperties}>JS</span>
         <span className="land-cube-face land-cube-right" style={{ '--face-color': '#659ad2' } as CSSProperties}>C++</span>
         <span className="land-cube-face land-cube-left" style={{ '--face-color': '#a8b9cc' } as CSSProperties}>C</span>
-        <span className="land-cube-face land-cube-top" style={{ '--face-color': '#c9a84c' } as CSSProperties}>AI</span>
+        <span className="land-cube-face land-cube-top" style={{ '--face-color': '#818cf8' } as CSSProperties}>AI</span>
         <span className="land-cube-face land-cube-bottom" style={{ '--face-color': '#f89820' } as CSSProperties}>JAVA</span>
       </div>
     </div>
@@ -489,7 +489,7 @@ export default function Landing({ onGetStarted }: LandingProps) {
                 <span className="text-muted text-sm">→</span>
                 <span className="text-xs text-muted">To</span>
                 <span className="land-mock-pill" style={{ color: '#f59e0b', background: '#f59e0b14', borderColor: '#f59e0b40' }}>● Java</span>
-                <span className="ml-auto text-xs font-semibold rounded px-2 py-0.5" style={{ background: 'rgba(232,108,47,0.15)', color: 'var(--accent)', border: '1px solid var(--accent)' }}>✦ AI-powered</span>
+                <span className="ml-auto text-xs font-semibold rounded px-2 py-0.5" style={{ background: 'rgba(79,142,247,0.16)', color: 'var(--accent)', border: '1px solid var(--accent)' }}>✦ AI-powered</span>
               </div>
 
               <div className="grid grid-cols-2 gap-3 flex-1 min-h-0">

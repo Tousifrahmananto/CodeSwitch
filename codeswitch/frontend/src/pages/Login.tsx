@@ -99,12 +99,12 @@ export default function Login({ onLogin, onBack }: LoginProps) {
     if (e.key === 'Enter') handleSubmit();
   };
 
-  const inputCls = 'w-full bg-bg border border-border rounded text-primary px-3 py-2.5 text-sm outline-none transition-colors focus:border-accent focus:shadow-[0_0_0_3px_rgba(232,108,47,0.14)] placeholder:text-muted';
+  const inputCls = 'w-full bg-bg border border-border rounded text-primary px-3 py-2.5 text-sm outline-none transition-colors focus:border-accent focus:shadow-[0_0_0_3px_rgba(79,142,247,0.16)] placeholder:text-muted';
   const labelCls = 'text-[12px] font-semibold text-muted uppercase tracking-wide';
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4"
-      style={{ background: 'radial-gradient(ellipse 80% 50% at 50% -10%, rgba(232,108,47,0.16) 0%, transparent 70%), var(--bg)' }}>
+      style={{ background: 'radial-gradient(ellipse 80% 50% at 50% -10%, rgba(79,142,247,0.18) 0%, transparent 70%), var(--bg)' }}>
       <div className="bg-surface border border-accent/25 rounded-[16px] p-6 sm:p-10 w-full max-w-[420px] shadow-[0_24px_64px_rgba(0,0,0,0.45)]">
 
         {/* Back to landing */}
@@ -133,7 +133,7 @@ export default function Login({ onLogin, onBack }: LoginProps) {
             <button
               key={m}
               className={`flex-1 border-none rounded-[7px] py-2 text-[13px] font-medium transition-colors ${mode === m
-                ? 'bg-accent text-white font-semibold shadow-[0_2px_8px_rgba(232,108,47,0.30)]'
+                ? 'bg-accent text-white font-semibold shadow-[0_2px_8px_rgba(79,142,247,0.32)]'
                 : 'bg-transparent text-muted hover:text-primary'
                 }`}
               onClick={() => switchMode(m)}
