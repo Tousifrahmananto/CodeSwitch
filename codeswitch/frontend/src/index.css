@@ -32,18 +32,18 @@
 }
 
 [data-theme="light"] {
-  --bg: #060810;
-  --surface: #0d1021;
-  --border: #1a1d35;
-  --accent: #4f8ef7;
-  --accent-hover: #6aa3ff;
-  --secondary: #818cf8;
-  --text: #e2e8f0;
-  --text-heading: #e2e8f0;
-  --text-muted: #475569;
-  --success: #98c379;
-  --danger: #e06c75;
-  --warning: #818cf8;
+  --bg: #f6f8ff;
+  --surface: #ffffff;
+  --border: #d8e0f0;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --secondary: #6366f1;
+  --text: #1e293b;
+  --text-heading: #0f172a;
+  --text-muted: #64748b;
+  --success: #16803d;
+  --danger: #dc2626;
+  --warning: #b7791f;
 }
 
 body {
@@ -60,8 +60,8 @@ body {
 
 [data-theme="light"] body {
   background:
-    radial-gradient(circle at 72% 8%, rgba(79, 142, 247, 0.12), transparent 32%),
-    radial-gradient(circle at 16% 18%, rgba(129, 140, 248, 0.08), transparent 28%),
+    radial-gradient(circle at 72% 8%, rgba(37, 99, 235, 0.12), transparent 32%),
+    radial-gradient(circle at 16% 18%, rgba(99, 102, 241, 0.10), transparent 28%),
     var(--bg);
 }
 

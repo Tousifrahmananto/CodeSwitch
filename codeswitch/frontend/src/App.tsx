@@ -361,7 +361,7 @@ export default function App() {
   };
 
   const handleLogout = () => {
-    localStorage.clear();
+    localStorage.removeItem('user');
     setUser(null);
     logout().catch(() => {});
   };
