@@ -171,10 +171,10 @@ export default function ProfilePage({ username, onBack, isOwner = false }: Profi
           </div>
 
           {isOwner && editing && (
-            <div className="bg-surface border border-border rounded p-4 flex flex-col gap-3">
+            <div className="profile-edit-form">
               <h4>Edit Profile</h4>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1">
+              <div className="profile-form-row">
+                <div className="profile-form-field">
                   <label>First Name</label>
                   <input
                     type="text"
@@ -183,7 +183,7 @@ export default function ProfilePage({ username, onBack, isOwner = false }: Profi
                     placeholder="First name"
                   />
                 </div>
-                <div className="flex flex-col gap-1">
+                <div className="profile-form-field">
                   <label>Last Name</label>
                   <input
                     type="text"
@@ -193,7 +193,7 @@ export default function ProfilePage({ username, onBack, isOwner = false }: Profi
                   />
                 </div>
               </div>
-              <div className="flex flex-col gap-1">
+              <div className="profile-form-field">
                 <label>Bio</label>
                 <textarea
                   rows={3}
@@ -202,13 +202,14 @@ export default function ProfilePage({ username, onBack, isOwner = false }: Profi
                   placeholder="Tell others about yourself..."
                 />
               </div>
-              <div className="flex flex-col gap-1">
+              <div className="profile-form-field">
                 <label>Profile Photo</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div className="profile-file-row">
                   {avatarPreview && (
-                    <img className="w-12 h-12 rounded-full object-cover" src={avatarPreview} alt="preview" />
+                    <img className="profile-avatar-preview" src={avatarPreview} alt="preview" />
                   )}
                   <input
+                    className="profile-file-input"
                     ref={fileInputRef}
                     type="file"
                     accept="image/*"
@@ -216,14 +217,14 @@ export default function ProfilePage({ username, onBack, isOwner = false }: Profi
                   />
                 </div>
               </div>
-              {saveError && <p className="text-sm text-danger m-0">{saveError}</p>}
-              <div className="flex gap-2 justify-end">
+              {saveError && <p className="profile-save-error">{saveError}</p>}
+              <div className="profile-form-actions">
                 <button
-                  className="px-4 py-2 text-sm border border-border rounded text-muted hover:text-primary cursor-pointer bg-transparent transition-colors"
+                  className="profile-form-cancel"
                   onClick={handleCancel}
                 >Cancel</button>
                 <button
-                  className="px-4 py-2 text-sm bg-accent hover:bg-accent-h text-white rounded border-none cursor-pointer transition-colors disabled:opacity-50"
+                  className="profile-form-save"
                   onClick={handleSave}
                   disabled={saving}
                 >
