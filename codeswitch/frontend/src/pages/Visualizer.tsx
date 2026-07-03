@@ -129,6 +129,97 @@ function VisualCanvas({ step, total, index }: { step?: VisualizationStep; total:
   );
 }
 
+function TutorTraceBoard({
+  step,
+  total,
+  index,
+  codeLines,
+}: {
+  step?: VisualizationStep;
+  total: number;
+  index: number;
+  codeLines: string[];
+}) {
+  const meta = kindMeta(step?.kind || 'statement');
+  const stack = step?.visual.stack || [];
+  const output = step?.visual.output || [];
+  const activeLine = step?.line;
+
+  return (
+    <div className="viz-tutor-board">
+      <div className="viz-tutor-code">
+        <div className="viz-tutor-section-title">
+          <span>Code</span>
+          <small>{activeLine ? `Now executing line ${activeLine}` : 'Generate a trace to begin'}</small>
+        </div>
+        <pre>
+          {codeLines.map((line, lineIndex) => {
+            const lineNumber = lineIndex + 1;
+            const active = activeLine === lineNumber;
+            return (
+              <span key={`${lineNumber}-${line}`} className={active ? 'active' : ''}>
+                <b>{active ? '➜' : ' '}</b>
+                <em>{lineNumber}</em>
+                <code>{line || ' '}</code>
+              </span>
+            );
+          })}
+        </pre>
+      </div>
+
+      <div className="viz-tutor-state">
+        <div className="viz-tutor-explainer" style={{ '--step-color': meta.color } as CSSProperties & { '--step-color': string }}>
+          <div>
+            <span>{kindMeta(step?.kind || 'statement').label}</span>
+            <strong>{step?.title || 'Ready to trace'}</strong>
+          </div>
+          <p>{step?.description || 'Generate the animation to walk through the code one executed step at a time.'}</p>
+          <small>Step {Math.min(index + 1, total || 1)} of {total || 1}</small>
+        </div>
+
+        <div className="viz-tutor-memory">
+          <div className="viz-tutor-section-title">
+            <span>Frames / Variables</span>
+            <small>call stack</small>
+          </div>
+          {stack.length ? stack.map((frame, frameIndex) => (
+            <div key={`${frame.name}-${frameIndex}`} className="viz-tutor-frame">
+              <strong>{frame.name}</strong>
+              {frame.variables.length ? frame.variables.map(variable => (
+                <p key={`${frame.name}-${variable.name}`}>
+                  <span>{variable.name}</span>
+                  <code>{variable.value}</code>
+                </p>
+              )) : (
+                <p>
+                  <span>empty</span>
+                  <code>{'{}'}</code>
+                </p>
+              )}
+            </div>
+          )) : (
+            <div className="viz-tutor-empty">No frame data yet.</div>
+          )}
+        </div>
+
+        <div className="viz-tutor-output">
+          <div className="viz-tutor-section-title">
+            <span>Output</span>
+            <small>printed text</small>
+          </div>
+          <pre>{output.length ? output.join('\n') : '(nothing printed yet)'}</pre>
+          {step?.visual.return_value !== undefined && (
+            <div className="viz-tutor-return">
+              <span>return value</span>
+              <code>{step.visual.return_value}</code>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Visualizer() {
   const location = useLocation();
   const incomingState = location.state as VisualizerLocationState | null;
@@ -210,6 +301,7 @@ export default function Visualizer() {
 
   const stepCount = timeline?.steps.length || 0;
   const progress = stepCount > 1 ? (activeIndex / (stepCount - 1)) * 100 : 0;
+  const isExecutionTrace = timeline?.mode === 'execution_trace';
 
   return (
     <div className="viz-page">
@@ -257,10 +349,19 @@ export default function Visualizer() {
 
         <section className="viz-card">
           <div className="viz-card-header">
-            <span>Animation Canvas</span>
+            <span>{isExecutionTrace ? 'Tutor Trace' : 'Animation Canvas'}</span>
             <small>{timeline?.summary || 'Generate a timeline to begin'}</small>
           </div>
-          <VisualCanvas step={activeStep} total={stepCount} index={activeIndex} />
+          {isExecutionTrace ? (
+            <TutorTraceBoard
+              step={activeStep}
+              total={stepCount}
+              index={activeIndex}
+              codeLines={codeLines}
+            />
+          ) : (
+            <VisualCanvas step={activeStep} total={stepCount} index={activeIndex} />
+          )}
 
           <div className="viz-controls">
             <button onClick={() => setActiveIndex(0)} disabled={!stepCount}>Reset</button>
