@@ -1,7 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { gsap } from 'gsap';
+import { ScrambleTextPlugin } from 'gsap/ScrambleTextPlugin';
 import Logo from '../components/Logo';
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
+
+gsap.registerPlugin(ScrambleTextPlugin);
 
 // ─── Demo sequences shown in the hero code window ─────────────────────────────
 const DEMOS = [
@@ -34,8 +38,8 @@ const FEATURES = [
         <polyline points="8 6 2 12 8 18" />
       </svg>
     ),
-    title: 'AI-Powered Conversion',
-    desc: 'Convert code between Python, Java, and C with AI accuracy. A rule-based fallback engine ensures conversions always work, even offline.',
+    title: 'Multi-language conversion',
+    desc: 'Paste code in Python, C, C++, Java, or JavaScript and get a working translation that preserves logic and structure.',
     accent: '#4f8ef7',
   },
   {
@@ -45,8 +49,8 @@ const FEATURES = [
         <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
       </svg>
     ),
-    title: '13 Learning Modules',
-    desc: 'Structured curriculum from Python basics to graph algorithms. Interactive examples, live sandbox, and per-lesson progress tracking.',
+    title: 'Monaco editor',
+    desc: 'Write inside the same editor foundation that powers VS Code, with syntax highlighting, line numbers, and a real coding feel.',
     accent: '#818cf8',
   },
   {
@@ -55,9 +59,44 @@ const FEATURES = [
         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
       </svg>
     ),
-    title: 'Cloud File Manager',
-    desc: 'Save and revisit your code from anywhere. Supports Python, Java, C, and JavaScript files with a built-in Monaco editor.',
+    title: 'Run output directly',
+    desc: 'Execute supported snippets after converting them, inspect stdout and stderr, and test behavior without leaving the workspace.',
     accent: '#10b981',
+  },
+  {
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M20 6 9 17l-5-5" />
+      </svg>
+    ),
+    title: 'Save your work',
+    desc: 'Keep files and conversion history in your account so the dashboard becomes a real record of your learning.',
+    accent: '#f59e0b',
+  },
+  {
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 3h18v18H3z" />
+        <path d="M8 8h8M8 12h5M8 16h7" />
+      </svg>
+    ),
+    title: 'Code visualizer',
+    desc: 'Step through beginner Python with current-line focus, stack frames, variables, output, and return values.',
+    accent: '#a78bfa',
+  },
+  {
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 20h9" />
+        <path d="M12 4h9" />
+        <path d="M4 9h16" />
+        <path d="M4 15h16" />
+        <path d="M4 4v16" />
+      </svg>
+    ),
+    title: 'Learning bridge',
+    desc: 'Move from conversion into lessons that explain the concepts behind loops, functions, memory, scope, and data structures.',
+    accent: '#34d399',
   },
 ];
 
@@ -94,6 +133,32 @@ const LANGUAGE_ACCENTS = [
   { name: 'JavaScript', color: '#f7df1e' },
 ] as const;
 
+const HOW_STEPS = [
+  {
+    n: '01',
+    title: 'Paste your code',
+    text: 'Drop any snippet into the Monaco editor and pick Python, C, C++, Java, or JavaScript.',
+  },
+  {
+    n: '02',
+    title: 'Choose a target',
+    text: 'Select where it should go. The converter keeps the logic intact instead of doing a literal syntax swap.',
+  },
+  {
+    n: '03',
+    title: 'Run it and learn',
+    text: 'Execute the result, inspect the output, then open the lessons or visualizer to understand what changed.',
+  },
+] as const;
+
+const CONVERSION_STEPS = [
+  'Detecting source language... Python identified.',
+  'Parsing function signatures and scope.',
+  'Mapping standard library calls.',
+  'Translating syntax and control flow.',
+  'Done. Output ready.',
+] as const;
+
 interface LandingProps {
   onGetStarted?: () => void;
 }
@@ -104,6 +169,49 @@ const featureCardStyle = (accent: string, delay: number): CSSProperties & { '--a
 });
 
 // ─── Animated code demo component ─────────────────────────────────────────────
+function ScrambleText({ text }: { text: string }) {
+  const textRef = useRef<HTMLSpanElement | null>(null);
+
+  const startScramble = () => {
+    if (!textRef.current) return;
+    gsap.killTweensOf(textRef.current);
+    gsap.to(textRef.current, {
+      duration: 0.72,
+      ease: 'power2.out',
+      scrambleText: {
+        text,
+        chars: 'upperAndLowerCase',
+        speed: 0.55,
+        revealDelay: 0.06,
+      },
+    });
+  };
+
+  useEffect(() => {
+    const parent = textRef.current?.parentElement;
+    parent?.addEventListener('mouseenter', startScramble);
+    parent?.addEventListener('focus', startScramble, true);
+
+    return () => {
+      parent?.removeEventListener('mouseenter', startScramble);
+      parent?.removeEventListener('focus', startScramble, true);
+      if (textRef.current) gsap.killTweensOf(textRef.current);
+    };
+  });
+
+  return (
+    <span
+      ref={textRef}
+      className="land-scramble-text"
+      onMouseEnter={startScramble}
+      onFocus={startScramble}
+      style={{ '--scramble-chars': text.length } as CSSProperties & { '--scramble-chars': number }}
+    >
+      {text}
+    </span>
+  );
+}
+
 function CodeDemo() {
   const [demoIdx, setDemoIdx] = useState(2);
   const [visible, setVisible] = useState(true);
@@ -178,6 +286,63 @@ function CodeDemo() {
       <div className="land-demo-nav-dots">
         {DEMOS.map((_, i) => (
           <span key={i} className={`land-nav-dot${i === demoIdx ? ' active' : ''}`} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ConversionStepReveal() {
+  const [visibleCount, setVisibleCount] = useState(0);
+
+  useEffect(() => {
+    const delay = visibleCount >= CONVERSION_STEPS.length ? 2500 : 850;
+    const timer = setTimeout(() => {
+      setVisibleCount(current => current >= CONVERSION_STEPS.length ? 0 : current + 1);
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [visibleCount]);
+
+  return (
+    <div className="land-conversion-log" aria-label="Live conversion steps">
+      <div className="land-conversion-log-head">
+        <span>Agent thoughts</span>
+        <strong>{Math.min(visibleCount, CONVERSION_STEPS.length)}/{CONVERSION_STEPS.length}</strong>
+      </div>
+      <div className="land-conversion-log-body">
+        {CONVERSION_STEPS.map((step, index) => (
+          <div
+            key={step}
+            className={`land-conversion-step${index < visibleCount ? ' visible' : ''}${index === CONVERSION_STEPS.length - 1 && visibleCount >= CONVERSION_STEPS.length ? ' done' : ''}`}
+          >
+            <span>{index + 1}</span>
+            <p>{step}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function LanguageMarquee() {
+  const items = [
+    'Python',
+    'Java',
+    'JavaScript',
+    'C',
+    'C++',
+    '5 languages',
+    '13 modules',
+    'Code visualizer',
+    'Run output',
+  ];
+  const repeated = [...items, ...items];
+
+  return (
+    <div className="land-marquee" aria-label="Supported languages and product stats">
+      <div className="land-marquee-track">
+        {repeated.map((item, index) => (
+          <span key={`${item}-${index}`}>{item}</span>
         ))}
       </div>
     </div>
@@ -295,27 +460,30 @@ export default function Landing({ onGetStarted }: LandingProps) {
 
       {/* ── Navbar ── */}
       <nav className="land-v2-nav sticky top-0 z-50 flex items-center justify-between px-4 sm:px-8 py-4 border-b border-border bg-bg/80 backdrop-blur">
-        <div className="flex items-center gap-2.5">
+        <div className="land-nav-brand-v2 flex items-center gap-2.5">
           <Logo size={30} id="nav" />
           <span className="font-bold text-base text-primary">CodeSwitch</span>
         </div>
-        <div className="hidden sm:flex items-center gap-6">
+        <div className="land-nav-center hidden sm:flex items-center gap-6">
           <a href="#features" className="land-nav-link">Features</a>
           <a href="#modules" className="land-nav-link">Modules</a>
+          <a href="#visualizer" className="land-nav-link">Visualizer</a>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="land-nav-actions-v2 flex items-center gap-2">
           <button
             className="land-nav-playground hidden sm:inline-flex bg-transparent border-none text-muted hover:text-primary rounded px-3 py-1.5 text-sm font-medium transition-colors"
             onClick={goToPlayground}
           >Try Playground</button>
           <button
-            className="hidden sm:inline-flex bg-transparent border border-border text-primary hover:bg-border rounded px-4 py-1.5 text-sm font-medium transition-colors"
+            className="land-nav-signin hidden sm:inline-flex bg-transparent border border-border text-primary hover:bg-border rounded px-4 py-1.5 text-sm font-medium transition-colors"
             onClick={() => onGetStarted?.()}
-          >Sign In</button>
+            aria-label="Sign In"
+          ><ScrambleText text="Sign In" /></button>
           <button
             className="land-nav-primary text-white border-none rounded px-4 py-1.5 text-sm font-semibold transition-colors"
             onClick={() => onGetStarted?.()}
-          >Get Started</button>
+            aria-label="Get Started"
+          ><ScrambleText text="Get Started" /></button>
         </div>
       </nav>
 
@@ -327,10 +495,35 @@ export default function Landing({ onGetStarted }: LandingProps) {
             AI-powered · Run instantly · Learn as you go
           </div>
 
-          <h1 className="land-v2-title mt-0 mb-5">
-            Translate ideas,<br />
-            <span>not syntax.</span>
+          <h1 className="land-v2-title mt-0 mb-5" aria-label="Translate ideas, not syntax.">
+            <span className="land-title-line">
+              <span className="land-title-word">Translate</span>
+              <span className="land-title-word land-title-delay-1">ideas,</span>
+            </span>
+            <span className="land-title-line">
+              <span className="land-title-word land-title-accent land-title-delay-2">not syntax.</span>
+            </span>
           </h1>
+
+          <div className="land-verb-rail" aria-label="CodeSwitch workflow">
+            <span>Convert</span>
+            <span>Run</span>
+            <span>Visualize</span>
+            <span>Learn</span>
+          </div>
+
+          <div className="land-flip-line" aria-label="CodeSwitch helps you convert, run, visualize, and learn code.">
+            <span>CodeSwitch helps you</span>
+            <div className="land-flip-window" aria-hidden="true">
+              <div className="land-flip-stack">
+                <strong>convert code</strong>
+                <strong>run outputs</strong>
+                <strong>visualize logic</strong>
+                <strong>learn concepts</strong>
+                <strong>convert code</strong>
+              </div>
+            </div>
+          </div>
 
           <p className="land-v2-sub text-muted text-base leading-relaxed mt-0 mb-8">
             Move real code between Python, C, C++, Java, and JavaScript.
@@ -341,12 +534,15 @@ export default function Landing({ onGetStarted }: LandingProps) {
           <div className="flex items-center gap-3 flex-wrap">
             <button
               className="land-primary-cta text-white border-none rounded px-6 py-3 text-sm font-semibold transition-colors inline-flex items-center gap-2"
-              onClick={() => onGetStarted?.()}
-            >
-              Start for Free
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M5 12h14M12 5l7 7-7 7" />
-              </svg>
+            onClick={() => onGetStarted?.()}
+            aria-label="Start for Free"
+          >
+              <ScrambleText text="Start for Free" />
+              <span className="land-cta-arrow" aria-hidden="true">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.7" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M5 12h14M12 5l7 7-7 7" />
+                </svg>
+              </span>
             </button>
             <button
               className="bg-transparent border border-border text-primary hover:bg-border/50 rounded px-6 py-3 text-sm font-medium transition-colors inline-flex items-center gap-2"
@@ -375,8 +571,11 @@ export default function Landing({ onGetStarted }: LandingProps) {
 
         <div className="land-hero-demo land-fade-up land-delay-1">
           <HeroVisual />
+          <ConversionStepReveal />
         </div>
       </section>
+
+      <LanguageMarquee />
 
       {/* ── Stats strip ── */}
       <div className="land-v2-stats flex flex-wrap items-center justify-center gap-6 sm:gap-12 py-6 border-y border-border bg-surface/50 land-fade-up land-delay-2">
@@ -393,20 +592,20 @@ export default function Landing({ onGetStarted }: LandingProps) {
         ))}
       </div>
 
-      <section className="land-how-strip" aria-label="How CodeSwitch works">
-        {[
-          { n: '01', title: 'Paste your code', text: 'Drop in a real snippet or open a saved file.' },
-          { n: '02', title: 'Choose a language', text: 'Switch between five supported languages.' },
-          { n: '03', title: 'Run and learn', text: 'Test the result and understand what changed.' },
-        ].map(step => (
-          <div className="land-how-step" key={step.n}>
-            <span>{step.n}</span>
-            <div>
-              <strong>{step.title}</strong>
-              <p>{step.text}</p>
+      <section className="land-section-block land-how-block" aria-label="How CodeSwitch works">
+        <div className="land-section-kicker">How it works</div>
+        <h2>Three steps. Real code in, real code out.</h2>
+        <div className="land-how-strip">
+          {HOW_STEPS.map(step => (
+            <div className="land-how-step" key={step.n}>
+              <span>{step.n}</span>
+              <div>
+                <strong>{step.title}</strong>
+                <p>{step.text}</p>
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </section>
 
       {/* ── Features ── */}
@@ -416,8 +615,9 @@ export default function Landing({ onGetStarted }: LandingProps) {
         ref={featuresRef}
       >
         <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold m-0 mb-2">Everything you need to learn and convert code</h2>
-          <p className="text-muted text-sm m-0">Three core tools built for CS students and developers.</p>
+          <div className="land-section-kicker">Features</div>
+          <h2 className="text-2xl font-bold m-0 mb-2">Everything in one place, nothing you do not need.</h2>
+          <p className="text-muted text-sm m-0">Convert, run, save, visualize, and learn from the same focused workspace.</p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 px-4 sm:px-8 max-w-5xl mx-auto">
@@ -446,6 +646,7 @@ export default function Landing({ onGetStarted }: LandingProps) {
         className={`land-preview-section py-16 px-4 sm:px-8${previewIn ? ' animate-in' : ''}`}
       >
         <div className="text-center mb-10">
+          <div className="land-section-kicker">Product preview</div>
           <h2 className="text-2xl font-bold m-0 mb-2">See it in action</h2>
           <p className="text-muted text-sm m-0">AI-powered conversion inside a full Monaco editor — no downloads needed.</p>
         </div>
@@ -517,11 +718,49 @@ export default function Landing({ onGetStarted }: LandingProps) {
       </section>
 
       {/* ── Modules ── */}
+      <section id="visualizer" className="land-visualizer-section">
+        <div className="land-visualizer-copy">
+          <div className="land-section-kicker">Visualizer</div>
+          <h2>Watch your code think.</h2>
+          <p>
+            Step through code line by line, see the current instruction, inspect variables,
+            follow stack frames, and connect output back to the exact line that produced it.
+          </p>
+          <button
+            className="land-primary-cta text-white border-none rounded px-6 py-3 text-sm font-semibold transition-colors inline-flex items-center gap-2"
+            onClick={() => navigate('/visualizer')}
+          >
+            Try the Visualizer
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12h14M12 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+        <div className="land-tutor-preview" aria-hidden="true">
+          <div className="land-tutor-code">
+            <span><b>➜</b><em>1</em><code>total = 0</code></span>
+            <span><b> </b><em>2</em><code>for n in [1, 2, 3]:</code></span>
+            <span><b> </b><em>3</em><code>    total = total + n</code></span>
+            <span><b> </b><em>4</em><code>print(total)</code></span>
+          </div>
+          <div className="land-tutor-state">
+            <strong>Stack frame</strong>
+            <p><span>total</span><code>0</code></p>
+            <p><span>output</span><code>(nothing yet)</code></p>
+          </div>
+        </div>
+      </section>
+
       <section
         id="modules"
         className={`land-modules-section${modulesIn ? ' animate-in' : ''}`}
         ref={modulesRef}
       >
+        <div className="text-center mb-8 land-module-brief-heading">
+          <div className="land-section-kicker">Learn</div>
+          <h2 className="text-2xl font-bold m-0 mb-2">Convert it once. Understand it for good.</h2>
+          <p className="text-muted text-sm m-0">Structured modules explain translation decisions with annotated examples and progress tracking.</p>
+        </div>
         <div className="text-center mb-8">
           <h2 className="text-2xl font-bold m-0 mb-2">13 modules — from basics to algorithms</h2>
           <p className="text-muted text-sm m-0">Structured learning with interactive examples and progress tracking.</p>
@@ -554,16 +793,15 @@ export default function Landing({ onGetStarted }: LandingProps) {
       <section ref={ctaRef} className={`land-v2-cta py-20 px-8 text-center${ctaIn ? ' animate-in' : ''}`}>
         <div className="land-v2-cta-card max-w-2xl mx-auto flex flex-col items-center gap-4">
           <Logo size={52} id="cta" />
-          <h2 className="text-2xl font-bold m-0">Ready to switch languages?</h2>
+          <h2 className="text-2xl font-bold m-0">Start converting. It is free.</h2>
           <p className="text-muted text-sm m-0 leading-relaxed">
-            Join students and developers already using CodeSwitch to learn,
-            convert, and build.
+            No credit card. No setup. Pick a language pair and paste your first snippet in under a minute.
           </p>
           <button
             className="bg-accent hover:bg-accent-h text-white border-none rounded px-6 py-3 text-sm font-semibold transition-colors inline-flex items-center gap-2"
             onClick={() => onGetStarted?.()}
           >
-            Create Free Account
+            Get Started
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M5 12h14M12 5l7 7-7 7" />
             </svg>
@@ -576,6 +814,13 @@ export default function Landing({ onGetStarted }: LandingProps) {
         <div className="flex items-center justify-center gap-2 mb-1">
           <Logo size={22} id="footer" />
           <span className="font-semibold text-sm">CodeSwitch</span>
+        </div>
+        <div className="land-footer-links">
+          <a href="#features">Features</a>
+          <a href="#modules">Modules</a>
+          <a href="#visualizer">Visualizer</a>
+          <button onClick={goToPlayground}>Playground</button>
+          <button onClick={() => onGetStarted?.()}>Sign In</button>
         </div>
         <p className="text-xs text-muted m-0">
           Built with Django, React 18, and Monaco Editor. A full-stack project for code learning and translation.

@@ -66,6 +66,11 @@ desktop.ini
 .vercel
 .env*.local
 
+# JavaScript dependencies and local package dumps
+node_modules/
+**/node_modules/
+gsap-public/
+
 # Security documentation (local reference only)
 SECURITY_PATCH.md
 SECURITY_FIXES_DEPLOYED.md

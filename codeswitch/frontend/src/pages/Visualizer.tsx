@@ -51,6 +51,26 @@ function normalizeIncomingLanguage(language?: string): VisualizerLanguage {
     : 'python';
 }
 
+function inferLanguageFromCode(code: string, fallback: VisualizerLanguage): VisualizerLanguage {
+  const trimmed = code.trim();
+  if (/^def\s+\w+\s*\(/m.test(trimmed) || /\bprint\s*\(/.test(trimmed) || /:\n\s+/.test(trimmed)) {
+    return 'python';
+  }
+  if (/\bconsole\.log\s*\(/.test(trimmed) || /\b(let|const|var)\s+\w+/.test(trimmed)) {
+    return 'javascript';
+  }
+  if (/\bpublic\s+class\b|\bSystem\.out\.print/.test(trimmed)) {
+    return 'java';
+  }
+  if (/#include\s*<iostream>|\bstd::|cout\s*<</.test(trimmed)) {
+    return 'cpp';
+  }
+  if (/#include\s*<stdio\.h>|printf\s*\(/.test(trimmed)) {
+    return 'c';
+  }
+  return fallback;
+}
+
 function VisualCanvas({ step, total, index }: { step?: VisualizationStep; total: number; index: number }) {
   const meta = kindMeta(step?.kind || 'statement');
   const variables = step?.visual.variables || [];
@@ -284,11 +304,15 @@ export default function Visualizer() {
       setError('Please enter code to visualize.');
       return;
     }
+    const detectedLanguage = inferLanguageFromCode(code, language);
+    if (detectedLanguage !== language) {
+      setLanguage(detectedLanguage);
+    }
     setLoading(true);
     setError('');
     setIsPlaying(false);
     try {
-      const { data } = await visualizeCode({ language, code });
+      const { data } = await visualizeCode({ language: detectedLanguage, code });
       setTimeline(data);
       setActiveIndex(0);
     } catch (err: unknown) {
@@ -340,7 +364,13 @@ export default function Visualizer() {
           </div>
           <CodeEditor
             value={code}
-            onChange={value => setCode(value ?? '')}
+            onChange={value => {
+              setCode(value ?? '');
+              setTimeline(null);
+              setActiveIndex(0);
+              setIsPlaying(false);
+              setError('');
+            }}
             language={language}
             height="460px"
             theme="vs-dark"

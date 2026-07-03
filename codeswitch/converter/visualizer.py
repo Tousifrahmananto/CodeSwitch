@@ -265,6 +265,19 @@ class _PythonTraceBuilder:
             return [self._eval_expr(item, frame, stack) for item in node.elts]
         if isinstance(node, ast.Tuple):
             return tuple(self._eval_expr(item, frame, stack) for item in node.elts)
+        if isinstance(node, ast.Dict):
+            return {
+                self._eval_expr(key, frame, stack): self._eval_expr(value, frame, stack)
+                for key, value in zip(node.keys, node.values)
+                if key is not None
+            }
+        if isinstance(node, ast.Subscript):
+            value = self._eval_expr(node.value, frame, stack)
+            index = self._eval_expr(node.slice, frame, stack)
+            try:
+                return value[index]
+            except Exception:
+                return f'<{ast.unparse(node) if hasattr(ast, "unparse") else "subscript"}>'
         if isinstance(node, ast.UnaryOp):
             value = self._eval_expr(node.operand, frame, stack)
             if isinstance(node.op, ast.USub):
@@ -273,12 +286,21 @@ class _PythonTraceBuilder:
                 return +value
             if isinstance(node.op, ast.Not):
                 return not value
+        if isinstance(node, ast.BoolOp):
+            values = [self._eval_expr(value, frame, stack) for value in node.values]
+            if isinstance(node.op, ast.And):
+                return all(values)
+            if isinstance(node.op, ast.Or):
+                return any(values)
         if isinstance(node, ast.BinOp):
             left = self._eval_expr(node.left, frame, stack)
             right = self._eval_expr(node.right, frame, stack)
             fn = _BIN_OPS.get(type(node.op))
             if fn:
-                return fn(left, right)
+                try:
+                    return fn(left, right)
+                except Exception:
+                    return ast.unparse(node) if hasattr(ast, 'unparse') else '<expression>'
         if isinstance(node, ast.Compare):
             left = self._eval_expr(node.left, frame, stack)
             for op, comparator in zip(node.ops, node.comparators):
@@ -305,6 +327,23 @@ class _PythonTraceBuilder:
         if name == 'range':
             args = [self._eval_expr(arg, frame, stack) for arg in node.args]
             return range(*args)
+        if name in {'len', 'sum', 'min', 'max', 'list', 'str', 'int', 'float', 'bool'}:
+            args = [self._eval_expr(arg, frame, stack) for arg in node.args]
+            builtins = {
+                'len': len,
+                'sum': sum,
+                'min': min,
+                'max': max,
+                'list': list,
+                'str': str,
+                'int': int,
+                'float': float,
+                'bool': bool,
+            }
+            try:
+                return builtins[name](*args)
+            except Exception:
+                return f'<call {name}>'
         if name in self.functions:
             func = self.functions[name]
             args = [self._eval_expr(arg, frame, stack) for arg in node.args]
@@ -346,6 +385,20 @@ class _PythonTraceBuilder:
                 frame['locals'][name] = value
             self._record(node, 'assignment', frame, 'Variable update',
                          f'{name or "value"} becomes {_safe_repr(value)}.', stack)
+            return
+        if isinstance(node, ast.AugAssign):
+            name = _target_name(node.target)
+            current = frame['locals'].get(name, 0) if name else 0
+            value = self._eval_expr(node.value, frame, stack)
+            fn = _BIN_OPS.get(type(node.op))
+            try:
+                updated = fn(current, value) if fn else value
+            except Exception:
+                updated = value
+            if name:
+                frame['locals'][name] = updated
+            self._record(node, 'assignment', frame, 'Variable update',
+                         f'{name or "value"} becomes {_safe_repr(updated)}.', stack)
             return
         if isinstance(node, ast.Expr):
             self._eval_expr(node.value, frame, stack)

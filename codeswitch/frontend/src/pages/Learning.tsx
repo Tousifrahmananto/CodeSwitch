@@ -665,11 +665,11 @@ export default function Learning() {
                     {parsedCode && Object.keys(parsedCode).length >= 2 && (
                       <TryItSandbox key={`sandbox-${activeLesson.id}`} exampleCode={parsedCode} />
                     )}
-                    {parsedCode && (
+                    {false && parsedCode && (
                       <button
                         className="learn-visualizer-inline"
                         onClick={() => {
-                          const [lang, src] = Object.entries(parsedCode)[0] || ['python', ''];
+                          const [lang, src] = Object.entries(parsedCode ?? {})[0] || ['python', ''];
                           openInVisualizer(navigate, lang, String(src));
                         }}
                       >
