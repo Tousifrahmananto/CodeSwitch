@@ -1,4 +1,11 @@
+import json
+
+from django.db import OperationalError
+from django.http import JsonResponse
+from django.test import RequestFactory
 from django.test import TestCase, override_settings
+
+from .middleware import RequestObservabilityMiddleware
 
 
 class HealthAndRequestIdTests(TestCase):
@@ -27,3 +34,34 @@ class HealthAndRequestIdTests(TestCase):
     @override_settings(METRICS_ENABLED=False)
     def test_disabled_metrics_are_hidden(self):
         self.assertEqual(self.client.get('/metrics').status_code, 404)
+
+    @override_settings(DB_REQUEST_RETRY_ATTEMPTS=2, DB_REQUEST_RETRY_DELAY_SECONDS=0)
+    def test_transient_database_startup_error_is_retried(self):
+        calls = {'count': 0}
+
+        def get_response(request):
+            calls['count'] += 1
+            if calls['count'] == 1:
+                raise OperationalError('the database system is starting up')
+            return JsonResponse({'status': 'ok'})
+
+        middleware = RequestObservabilityMiddleware(get_response)
+        response = middleware(RequestFactory().get('/api/me/'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(calls['count'], 2)
+
+    @override_settings(DB_REQUEST_RETRY_ATTEMPTS=1, DB_REQUEST_RETRY_DELAY_SECONDS=0)
+    def test_transient_database_startup_error_returns_503_after_retries(self):
+        def get_response(request):
+            raise OperationalError('the database system is not yet accepting connections')
+
+        middleware = RequestObservabilityMiddleware(get_response)
+        response = middleware(RequestFactory().get('/api/me/'))
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response['Retry-After'], '2')
+        self.assertEqual(
+            json.loads(response.content.decode()),
+            {'error': 'Service temporarily unavailable. Please retry shortly.'},
+        )
