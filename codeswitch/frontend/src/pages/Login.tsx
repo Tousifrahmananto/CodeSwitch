@@ -14,7 +14,11 @@ declare global {
           initialize: (config: {
             client_id: string;
             callback: (response: { credential?: string }) => void;
-            use_fedcm_for_prompt?: boolean;
+            auto_select?: boolean;
+            context?: 'signin' | 'signup' | 'use';
+            itp_support?: boolean;
+            ux_mode?: 'popup' | 'redirect';
+            use_fedcm_for_button?: boolean;
           }) => void;
           renderButton: (
             parent: HTMLElement,
@@ -87,6 +91,7 @@ export default function Login({ onLogin, onBack }: LoginProps) {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [googleReady, setGoogleReady] = useState(false);
   const googleButtonRef = useRef<HTMLDivElement | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -153,19 +158,29 @@ export default function Login({ onLogin, onBack }: LoginProps) {
 
     const renderGoogleButton = () => {
       if (cancelled || !window.google || !googleButtonRef.current) return;
-      googleButtonRef.current.innerHTML = '';
-      window.google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: response => handleGoogleCredential(response.credential),
-        use_fedcm_for_prompt: true,
-      });
-      window.google.accounts.id.renderButton(googleButtonRef.current, {
-        theme: 'outline',
-        size: 'large',
-        width: 340,
-        text: 'continue_with',
-        shape: 'rectangular',
-      });
+      try {
+        googleButtonRef.current.innerHTML = '';
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: response => handleGoogleCredential(response.credential),
+          auto_select: false,
+          context: 'signin',
+          itp_support: true,
+          ux_mode: 'popup',
+          use_fedcm_for_button: true,
+        });
+        window.google.accounts.id.renderButton(googleButtonRef.current, {
+          theme: 'outline',
+          size: 'large',
+          width: 340,
+          text: 'continue_with',
+          shape: 'rectangular',
+        });
+        setGoogleReady(true);
+      } catch {
+        setGoogleReady(false);
+        setError('Google sign-in could not initialize. Check the Google client ID and allowed origins.');
+      }
     };
 
     const existingScript = document.querySelector<HTMLScriptElement>(`script[src="${GOOGLE_SCRIPT_SRC}"]`);
@@ -180,6 +195,7 @@ export default function Login({ onLogin, onBack }: LoginProps) {
       script.defer = true;
       script.onload = renderGoogleButton;
       script.onerror = () => {
+        setGoogleReady(false);
         if (!cancelled) setError('Could not load Google sign-in. Please try again later.');
       };
       document.head.appendChild(script);
@@ -244,6 +260,9 @@ export default function Login({ onLogin, onBack }: LoginProps) {
             <div className="flex justify-center min-h-[44px]">
               <div ref={googleButtonRef} aria-label="Continue with Google" />
             </div>
+            {!googleReady && !error && (
+              <p className="text-center text-xs text-muted mt-2 m-0">Loading Google sign-in...</p>
+            )}
             {googleLoading && (
               <p className="text-center text-xs text-muted mt-2 m-0">Signing in with Google...</p>
             )}
