@@ -175,7 +175,7 @@ export default function Playground({ onBack }: PlaygroundProps) {
 
         {/* ── Terminal output ── */}
         {(runOutput !== null || runError) && (
-          <div className="bg-[#0d1117] border border-border rounded overflow-hidden">
+          <div className="bg-bg border border-border rounded overflow-hidden">
             <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-surface text-xs text-muted">
               <span>Terminal</span>
               <button

@@ -13,16 +13,18 @@
 }
 
 :root {
-  --bg: #0d1117;
-  --surface: #161c26;
-  --border: #253545;
-  --accent: #98b1c8;
-  --accent-hover: #b0c8d8;
-  --text: #e8eef3;
-  --text-muted: #7a9db8;
+  --bg: #0e0f0f;
+  --surface: #161718;
+  --border: #2a2a2b;
+  --accent: #e86c2f;
+  --accent-hover: #f08145;
+  --secondary: #c9a84c;
+  --text: #c4c4c0;
+  --text-heading: #f0efe8;
+  --text-muted: #6b6b6b;
   --success: #98c379;
   --danger: #e06c75;
-  --warning: #d19a66;
+  --warning: #c9a84c;
   --font: 'Ubuntu', system-ui, sans-serif;
   --mono: 'Ubuntu Mono', 'Cascadia Code', 'Fira Code', monospace;
   --radius: 8px;
@@ -43,7 +45,10 @@
 }
 
 body {
-  background: linear-gradient(135deg, #0d1117 0%, #0a2b49 100%);
+  background:
+    radial-gradient(circle at 72% 8%, rgba(232, 108, 47, 0.10), transparent 32%),
+    radial-gradient(circle at 16% 18%, rgba(201, 168, 76, 0.06), transparent 28%),
+    var(--bg);
   background-attachment: fixed;
   color: var(--text);
   font-family: var(--font);
@@ -58,6 +63,16 @@ body {
 button {
   cursor: pointer;
   font-family: var(--font);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.text-primary {
+  color: var(--text-heading);
 }
 
 /* ── App Layout ──────────────────────────────── */
@@ -161,17 +176,17 @@ button {
   align-items: center;
   justify-content: center;
   background:
-    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(124, 106, 247, 0.18) 0%, transparent 70%),
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(232, 108, 47, 0.16) 0%, transparent 70%),
     var(--bg);
 }
 
 .auth-box {
   background: var(--surface);
-  border: 1px solid rgba(124, 106, 247, 0.25);
+  border: 1px solid rgba(232, 108, 47, 0.25);
   border-radius: 16px;
   padding: 40px 40px 36px;
   width: 420px;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(124, 106, 247, 0.08);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(232, 108, 47, 0.08);
 }
 
 /* Back to landing button */
@@ -206,11 +221,11 @@ button {
   width: 56px;
   height: 56px;
   border-radius: 14px;
-  background: linear-gradient(135deg, var(--accent) 0%, #a78bfa 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--secondary) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8px 24px rgba(124, 106, 247, 0.4);
+  box-shadow: 0 8px 24px rgba(232, 108, 47, 0.35);
   margin-bottom: 4px;
 }
 
@@ -265,7 +280,7 @@ button {
   background: var(--accent);
   color: #fff;
   font-weight: 600;
-  box-shadow: 0 2px 8px rgba(124, 106, 247, 0.35);
+  box-shadow: 0 2px 8px rgba(232, 108, 47, 0.30);
 }
 
 /* Fields */
@@ -304,7 +319,7 @@ button {
 
 .auth-field input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(124, 106, 247, 0.15);
+  box-shadow: 0 0 0 3px rgba(232, 108, 47, 0.14);
 }
 
 .auth-field input::placeholder {
@@ -351,7 +366,7 @@ button {
 
 .auth-submit:hover:not(:disabled) {
   background: var(--accent-hover);
-  box-shadow: 0 4px 16px rgba(124, 106, 247, 0.35);
+  box-shadow: 0 4px 16px rgba(232, 108, 47, 0.30);
 }
 
 .auth-submit:disabled {
@@ -594,7 +609,7 @@ button {
 }
 
 .history-table tr:hover td {
-  background: rgba(124, 106, 247, 0.04);
+  background: rgba(232, 108, 47, 0.05);
 }
 
 .lang-chip {
@@ -777,7 +792,7 @@ button {
 }
 
 .badge-ai {
-  background: rgba(124, 106, 247, 0.15);
+  background: rgba(232, 108, 47, 0.14);
   border: 1px solid var(--accent);
   color: var(--accent-hover);
 }
@@ -837,7 +852,7 @@ button {
 }
 
 .file-item.active {
-  background: rgba(124, 106, 247, 0.15);
+  background: rgba(232, 108, 47, 0.14);
 }
 
 .file-icon {
@@ -995,7 +1010,7 @@ button {
 
 .module-card.active {
   border-color: var(--accent);
-  background: rgba(124, 106, 247, 0.08);
+  background: rgba(232, 108, 47, 0.08);
 }
 
 .module-card h4 {
@@ -1192,7 +1207,7 @@ button {
 }
 
 .lesson-nav-item.active {
-  background: rgba(124, 106, 247, 0.12);
+  background: rgba(232, 108, 47, 0.12);
 }
 
 .lesson-nav-item.done .lesson-num {
@@ -1349,7 +1364,7 @@ button {
   font-size: 10px;
   padding: 2px 7px;
   border-radius: 99px;
-  background: rgba(124, 106, 247, 0.12);
+  background: rgba(232, 108, 47, 0.12);
   border: 1px solid var(--accent);
   color: var(--accent);
   margin-left: auto;
@@ -1701,7 +1716,7 @@ button {
 .land-bg-grid {
   position: fixed;
   inset: 0;
-  background-image: radial-gradient(circle, rgba(124, 106, 247, 0.10) 1px, transparent 1px);
+  background-image: radial-gradient(circle, rgba(232, 108, 47, 0.08) 1px, transparent 1px);
   background-size: 30px 30px;
   pointer-events: none;
   z-index: 0;
@@ -1720,7 +1735,7 @@ button {
   height: 560px;
   top: -160px;
   left: -120px;
-  background: radial-gradient(circle, rgba(124, 106, 247, 0.22) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(232, 108, 47, 0.18) 0%, transparent 70%);
   animation: floatOrb 9s ease-in-out infinite;
 }
 
@@ -1729,7 +1744,7 @@ button {
   height: 480px;
   bottom: -80px;
   right: -80px;
-  background: radial-gradient(circle, rgba(59, 130, 246, 0.16) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(201, 168, 76, 0.12) 0%, transparent 70%);
   animation: floatOrb 12s ease-in-out infinite reverse;
 }
 
@@ -1751,10 +1766,10 @@ button {
   justify-content: space-between;
   padding: 0 40px;
   height: 60px;
-  background: rgba(30, 30, 46, 0.82);
+  background: rgba(14, 15, 15, 0.84);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  border-bottom: 1px solid rgba(58, 58, 85, 0.7);
+  border-bottom: 1px solid rgba(42, 42, 43, 0.86);
 }
 
 .land-nav-brand {
@@ -1812,7 +1827,7 @@ button {
 
 .land-btn-primary:hover {
   background: var(--accent-hover);
-  box-shadow: 0 4px 20px rgba(124, 106, 247, 0.4);
+  box-shadow: 0 4px 20px rgba(232, 108, 47, 0.35);
   transform: translateY(-1px);
 }
 
@@ -1839,7 +1854,7 @@ button {
 
 .land-btn-outline {
   background: transparent;
-  border: 1px solid rgba(124, 106, 247, 0.45);
+  border: 1px solid rgba(232, 108, 47, 0.45);
   color: var(--accent);
   border-radius: var(--radius);
   padding: 8px 16px;
@@ -1850,7 +1865,7 @@ button {
 }
 
 .land-btn-outline:hover {
-  background: rgba(124, 106, 247, 0.08);
+  background: rgba(232, 108, 47, 0.08);
   border-color: var(--accent);
 }
 
@@ -1903,8 +1918,8 @@ button {
   font-size: 12px;
   font-weight: 500;
   color: var(--accent);
-  background: rgba(124, 106, 247, 0.1);
-  border: 1px solid rgba(124, 106, 247, 0.3);
+  background: rgba(232, 108, 47, 0.1);
+  border: 1px solid rgba(232, 108, 47, 0.3);
   border-radius: 99px;
   padding: 5px 14px;
   margin-bottom: 24px;
@@ -1931,7 +1946,7 @@ button {
 }
 
 .land-h1-accent {
-  background: linear-gradient(90deg, #7c6af7 0%, #a78bfa 40%, #60a5fa 100%);
+  background: linear-gradient(90deg, var(--accent) 0%, var(--secondary) 52%, #f0efe8 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -1982,7 +1997,7 @@ button {
   overflow: hidden;
   box-shadow:
     0 32px 80px rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(124, 106, 247, 0.12),
+    0 0 0 1px rgba(232, 108, 47, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
   transition: opacity 0.4s ease, transform 0.4s ease;
 }
@@ -2116,7 +2131,7 @@ button {
 .land-demo-spinner {
   width: 16px;
   height: 16px;
-  border: 2px solid rgba(124, 106, 247, 0.25);
+  border: 2px solid rgba(232, 108, 47, 0.24);
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.65s linear infinite;
@@ -2255,8 +2270,8 @@ button {
 }
 
 .land-feat-card:hover {
-  border-color: rgba(124, 106, 247, 0.35);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(124, 106, 247, 0.12);
+  border-color: rgba(232, 108, 47, 0.35);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(232, 108, 47, 0.12);
   transform: translateY(-3px);
 }
 
@@ -2325,7 +2340,7 @@ button {
 }
 
 .land-module-row:hover {
-  border-color: rgba(124, 106, 247, 0.3);
+  border-color: rgba(232, 108, 47, 0.3);
 }
 
 .land-mod-num {
@@ -2372,11 +2387,11 @@ button {
   max-width: 540px;
   padding: 56px 48px;
   background: var(--surface);
-  border: 1px solid rgba(124, 106, 247, 0.25);
+  border: 1px solid rgba(232, 108, 47, 0.25);
   border-radius: 20px;
   box-shadow:
     0 40px 100px rgba(0, 0, 0, 0.4),
-    0 0 0 1px rgba(124, 106, 247, 0.08),
+    0 0 0 1px rgba(232, 108, 47, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
@@ -2628,8 +2643,8 @@ button {
 /* ── Run output terminal ───────────────────────────── */
 .run-output {
   margin-top: 16px;
-  background: #0d1117;
-  border: 1px solid #30363d;
+  background: var(--bg);
+  border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
   font-family: 'Ubuntu Mono', 'Cascadia Code', Consolas, monospace;
@@ -2646,16 +2661,16 @@ button {
   align-items: center;
   justify-content: space-between;
   padding: 6px 14px;
-  background: #161b22;
-  border-bottom: 1px solid #30363d;
-  color: #8b949e;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
   font-size: 12px;
 }
 
 .run-output-close {
   background: none;
   border: none;
-  color: #8b949e;
+  color: var(--text-muted);
   cursor: pointer;
   font-size: 16px;
   line-height: 1;
@@ -2687,7 +2702,7 @@ button {
 }
 
 .run-stdin-echo {
-  color: #d29922;
+  color: var(--secondary);
   padding: 8px 16px 0;
   margin: 0;
   white-space: pre-wrap;
@@ -2697,14 +2712,14 @@ button {
 
 .run-divider {
   border: none;
-  border-top: 1px solid #21262d;
+  border-top: 1px solid var(--border);
   margin: 8px 0 0;
 }
 
 .run-exit-code {
   display: block;
   padding: 4px 16px 8px;
-  color: #6e7681;
+  color: var(--text-muted);
   font-size: 11px;
 }
 
@@ -2726,16 +2741,16 @@ button {
 
 .run-stdin-label {
   font-size: 12px;
-  color: #8b949e;
+  color: var(--text-muted);
   font-family: 'Ubuntu Mono', 'Cascadia Code', Consolas, monospace;
 }
 
 .run-stdin {
   width: 100%;
-  background: #0d1117;
-  border: 1px solid #30363d;
+  background: var(--bg);
+  border: 1px solid var(--border);
   border-radius: 8px;
-  color: #e6edf3;
+  color: var(--text);
   font-family: 'Ubuntu Mono', 'Cascadia Code', Consolas, monospace;
   font-size: 13px;
   padding: 10px 16px;
@@ -2750,12 +2765,12 @@ button {
 }
 
 .run-stdin:focus {
-  border-color: #388bfd;
+  border-color: var(--accent);
 }
 
 /* ── Diff view ──────────────────────────────────────── */
 .btn-diff {
-  background: #1c1c2e;
+  background: var(--surface);
   color: var(--text-muted);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -2775,7 +2790,7 @@ button {
 .diff-view {
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: #0d1117;
+  background: var(--bg);
   font-family: 'Ubuntu Mono', 'Cascadia Code', Consolas, monospace;
   font-size: 13px;
 }
@@ -3032,7 +3047,7 @@ button {
 
 .quiz-option:hover {
   border-color: var(--accent);
-  background: rgba(124, 106, 247, 0.08);
+  background: rgba(232, 108, 47, 0.08);
 }
 
 .quiz-option input[type="radio"] {
@@ -3041,7 +3056,7 @@ button {
 
 .quiz-option.quiz-selected {
   border-color: var(--accent);
-  background: rgba(124, 106, 247, 0.12);
+  background: rgba(232, 108, 47, 0.12);
 }
 
 .quiz-option.quiz-correct {
@@ -3145,7 +3160,7 @@ button {
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #7c6af7, #a78bfa);
+  background: linear-gradient(135deg, var(--accent), var(--secondary));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3504,8 +3519,8 @@ button {
   font-size: 11px;
   font-weight: 600;
   color: var(--accent);
-  background: var(--accent-muted, rgba(124, 106, 247, 0.13));
-  border: 1px solid var(--accent-border, rgba(124, 106, 247, 0.3));
+  background: var(--accent-muted, rgba(232, 108, 47, 0.13));
+  border: 1px solid var(--accent-border, rgba(232, 108, 47, 0.3));
   border-radius: 4px;
   padding: 2px 7px;
   margin-left: 4px;
@@ -3618,7 +3633,7 @@ button {
 
 /* ── Explain button & section ────────────────────────────── */
 .btn-explain {
-  background: #1c1c2e;
+  background: var(--surface);
   color: var(--text-muted);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -3630,7 +3645,7 @@ button {
 
 .btn-explain:hover,
 .btn-explain.active {
-  background: rgba(124, 106, 247, 0.15);
+  background: rgba(232, 108, 47, 0.14);
   color: var(--accent);
   border-color: var(--accent);
 }
@@ -3846,7 +3861,7 @@ button {
 
 .reference-search:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(124, 106, 247, 0.12);
+  box-shadow: 0 0 0 3px rgba(232, 108, 47, 0.12);
 }
 
 .reference-search::placeholder {
@@ -4043,25 +4058,25 @@ button {
 }
 
 .land-v2 {
-  --hero-purple: #8b7cff;
-  --hero-blue: #55b7ff;
+  --hero-purple: #e86c2f;
+  --hero-blue: #c9a84c;
   background:
-    radial-gradient(circle at 72% 10%, rgba(71, 98, 255, 0.16), transparent 32%),
-    radial-gradient(circle at 15% 25%, rgba(139, 124, 255, 0.13), transparent 30%),
+    radial-gradient(circle at 72% 10%, rgba(232, 108, 47, 0.14), transparent 32%),
+    radial-gradient(circle at 15% 25%, rgba(201, 168, 76, 0.08), transparent 30%),
     var(--bg);
 }
 
 .landing > .land-v2-nav {
   position: sticky;
   background: color-mix(in srgb, var(--bg) 78%, transparent);
-  border-color: rgba(152, 177, 200, 0.14);
+  border-color: rgba(232, 108, 47, 0.16);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
 }
 
 .land-v2 .land-bg-grid {
   background-image:
-    linear-gradient(rgba(139, 124, 255, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(139, 124, 255, 0.045) 1px, transparent 1px);
+    linear-gradient(rgba(232, 108, 47, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(232, 108, 47, 0.035) 1px, transparent 1px);
   background-size: 44px 44px;
   mask-image: linear-gradient(to bottom, #000 0%, transparent 78%);
 }
@@ -4088,7 +4103,7 @@ button {
 
 .land-v2-title span {
   color: transparent;
-  background: linear-gradient(100deg, #a99cff 5%, #73c7ff 55%, #77f2d0 105%);
+  background: linear-gradient(100deg, var(--accent) 5%, var(--secondary) 55%, #f0efe8 105%);
   background-size: 180% 100%;
   -webkit-background-clip: text;
   background-clip: text;
@@ -4102,9 +4117,9 @@ button {
 }
 
 .land-v2 .land-hero-badge {
-  color: #b9b1ff;
-  border-color: rgba(139, 124, 255, 0.35);
-  background: linear-gradient(90deg, rgba(139, 124, 255, 0.13), rgba(85, 183, 255, 0.07));
+  color: var(--secondary);
+  border-color: rgba(232, 108, 47, 0.35);
+  background: linear-gradient(90deg, rgba(232, 108, 47, 0.13), rgba(201, 168, 76, 0.07));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
@@ -4125,7 +4140,7 @@ button {
   position: absolute;
   inset: 6% -8% 0;
   border-radius: 50%;
-  background: radial-gradient(circle at var(--light-x) var(--light-y), rgba(139, 124, 255, 0.28), rgba(36, 105, 255, 0.08) 32%, transparent 68%);
+  background: radial-gradient(circle at var(--light-x) var(--light-y), rgba(232, 108, 47, 0.22), rgba(201, 168, 76, 0.08) 32%, transparent 68%);
   filter: blur(18px);
   z-index: -2;
 }
@@ -4142,21 +4157,21 @@ button {
 }
 
 .land-demo-perspective .land-demo {
-  border-color: rgba(139, 124, 255, 0.27);
+  border-color: rgba(232, 108, 47, 0.25);
   background: color-mix(in srgb, var(--surface) 91%, transparent);
   backdrop-filter: blur(18px);
   box-shadow:
     0 38px 90px rgba(0, 0, 0, 0.48),
-    0 0 50px rgba(102, 90, 255, 0.1),
+    0 0 50px rgba(232, 108, 47, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .land-demo-depth {
   position: absolute;
   inset: 16px -14px -16px 14px;
-  border: 1px solid rgba(139, 124, 255, 0.13);
+  border: 1px solid rgba(232, 108, 47, 0.13);
   border-radius: 16px;
-  background: rgba(65, 58, 130, 0.11);
+  background: rgba(232, 108, 47, 0.07);
   transform: translateZ(-35px);
   z-index: -1;
 }
@@ -4185,13 +4200,13 @@ button {
   inset: 0;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(167, 156, 255, 0.52);
-  background: linear-gradient(145deg, rgba(94, 79, 191, 0.7), rgba(27, 34, 63, 0.74));
-  color: #e9e6ff;
+  border: 1px solid rgba(232, 108, 47, 0.48);
+  background: linear-gradient(145deg, rgba(76, 45, 27, 0.74), rgba(22, 23, 24, 0.82));
+  color: #f0efe8;
   font: 700 14px/1 var(--mono);
   letter-spacing: 0.08em;
-  text-shadow: 0 0 14px rgba(164, 151, 255, 0.9);
-  box-shadow: inset 0 0 22px rgba(139, 124, 255, 0.12);
+  text-shadow: 0 0 14px rgba(232, 108, 47, 0.72);
+  box-shadow: inset 0 0 22px rgba(232, 108, 47, 0.10);
   backdrop-filter: blur(10px);
   backface-visibility: visible;
 }
@@ -4207,7 +4222,7 @@ button {
   position: absolute;
   inset: -28px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(126, 106, 255, 0.4), transparent 66%);
+  background: radial-gradient(circle, rgba(232, 108, 47, 0.34), transparent 66%);
   filter: blur(12px);
 }
 
@@ -4217,7 +4232,7 @@ button {
   right: 4px;
   width: 205px;
   height: 92px;
-  border: 1px solid rgba(125, 154, 255, 0.22);
+  border: 1px solid rgba(201, 168, 76, 0.22);
   border-radius: 50%;
   transform: rotate(-12deg);
   z-index: 1;
@@ -4249,7 +4264,7 @@ button {
   position: absolute;
   z-index: 6;
   padding: 7px 11px;
-  border: 1px solid rgba(139, 124, 255, 0.25);
+  border: 1px solid rgba(232, 108, 47, 0.22);
   border-radius: 9px;
   background: color-mix(in srgb, var(--surface) 82%, transparent);
   color: var(--text-muted);
@@ -4298,9 +4313,9 @@ button {
   position: relative;
   max-width: 1080px;
   margin: 0 auto 28px;
-  border: 1px solid rgba(139, 124, 255, 0.16);
+  border: 1px solid rgba(232, 108, 47, 0.16);
   border-radius: 18px;
-  background: linear-gradient(110deg, rgba(139, 124, 255, 0.08), rgba(85, 183, 255, 0.04));
+  background: linear-gradient(110deg, rgba(232, 108, 47, 0.08), rgba(201, 168, 76, 0.04));
   backdrop-filter: blur(16px);
 }
 
@@ -4344,10 +4359,10 @@ button {
   position: relative;
   overflow: hidden;
   padding: 64px 42px;
-  border: 1px solid rgba(139, 124, 255, 0.28);
+  border: 1px solid rgba(232, 108, 47, 0.28);
   border-radius: 28px;
   background:
-    radial-gradient(circle at 50% 0%, rgba(139, 124, 255, 0.2), transparent 52%),
+    radial-gradient(circle at 50% 0%, rgba(232, 108, 47, 0.18), transparent 52%),
     color-mix(in srgb, var(--surface) 92%, transparent);
   box-shadow: 0 40px 100px rgba(0, 0, 0, 0.28);
   opacity: 0;
@@ -4473,8 +4488,8 @@ button {
 
 .land-primary-cta,
 .land-nav-primary {
-  background: linear-gradient(135deg, #7c5cff, #6657e8);
-  box-shadow: 0 10px 28px rgba(105, 83, 235, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  background: linear-gradient(135deg, var(--accent), #b94d1e);
+  box-shadow: 0 10px 28px rgba(232, 108, 47, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
 .land-primary-cta {
@@ -4494,8 +4509,8 @@ button {
 
 .land-primary-cta:hover,
 .land-nav-primary:hover {
-  background: linear-gradient(135deg, #9075ff, #7565f1);
-  box-shadow: 0 14px 34px rgba(105, 83, 235, 0.46);
+  background: linear-gradient(135deg, var(--accent-hover), #c55a27);
+  box-shadow: 0 14px 34px rgba(232, 108, 47, 0.42);
   transform: translateY(-1px);
 }
 
@@ -4596,9 +4611,9 @@ button {
   width: min(1080px, calc(100% - 32px));
   margin: 8px auto 18px;
   overflow: hidden;
-  border: 1px solid rgba(139, 124, 255, 0.16);
+  border: 1px solid rgba(232, 108, 47, 0.16);
   border-radius: 18px;
-  background: rgba(139, 124, 255, 0.14);
+  background: rgba(232, 108, 47, 0.12);
 }
 
 .land-how-step {
@@ -4617,8 +4632,8 @@ button {
   height: 34px;
   flex: 0 0 34px;
   border-radius: 10px;
-  color: #aaa0ff;
-  background: rgba(139, 124, 255, 0.11);
+  color: var(--secondary);
+  background: rgba(232, 108, 47, 0.10);
   font: 700 11px/1 var(--mono);
 }
 

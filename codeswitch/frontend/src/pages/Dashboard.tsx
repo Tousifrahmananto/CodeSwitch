@@ -305,7 +305,7 @@ export default function Dashboard() {
           value={completedLessons}
           label="Lessons Done"
           icon="✓"
-          accent="#5ba8f5"
+          accent="var(--secondary)"
           helper={completedLessons ? `${Math.max(totalLessons - completedLessons, 0)} lessons left across your modules.` : 'Start a lesson to turn this into progress.'}
           action={!completedLessons ? { label: 'Browse modules', onClick: () => navigate('/learning') } : undefined}
         />

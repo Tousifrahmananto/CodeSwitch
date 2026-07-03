@@ -412,7 +412,7 @@ function ModulesTab({ modules, onRefresh }: { modules: LearningModule[] | null; 
                   </td>
                 </tr>
                 {expandedModuleId === mod.id && (
-                  <tr key={`lessons-${mod.id}`} style={{ background: '#0d1117' }}>
+                  <tr key={`lessons-${mod.id}`} style={{ background: 'var(--bg)' }}>
                     <td colSpan={6} style={{ padding: 0 }}>
                       <LessonsPanel moduleId={mod.id} onDone={() => onRefresh()} />
                     </td>

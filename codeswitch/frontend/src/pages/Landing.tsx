@@ -36,7 +36,7 @@ const FEATURES = [
     ),
     title: 'AI-Powered Conversion',
     desc: 'Convert code between Python, Java, and C with AI accuracy. A rule-based fallback engine ensures conversions always work, even offline.',
-    accent: '#7c6af7',
+    accent: '#e86c2f',
   },
   {
     icon: (
@@ -47,7 +47,7 @@ const FEATURES = [
     ),
     title: '13 Learning Modules',
     desc: 'Structured curriculum from Python basics to graph algorithms. Interactive examples, live sandbox, and per-lesson progress tracking.',
-    accent: '#3b82f6',
+    accent: '#c9a84c',
   },
   {
     icon: (
@@ -193,7 +193,7 @@ function LanguageCube() {
         <span className="land-cube-face land-cube-back" style={{ '--face-color': '#f7df1e' } as CSSProperties}>JS</span>
         <span className="land-cube-face land-cube-right" style={{ '--face-color': '#659ad2' } as CSSProperties}>C++</span>
         <span className="land-cube-face land-cube-left" style={{ '--face-color': '#a8b9cc' } as CSSProperties}>C</span>
-        <span className="land-cube-face land-cube-top" style={{ '--face-color': '#a78bfa' } as CSSProperties}>AI</span>
+        <span className="land-cube-face land-cube-top" style={{ '--face-color': '#c9a84c' } as CSSProperties}>AI</span>
         <span className="land-cube-face land-cube-bottom" style={{ '--face-color': '#f89820' } as CSSProperties}>JAVA</span>
       </div>
     </div>
@@ -483,18 +483,18 @@ export default function Landing({ onGetStarted }: LandingProps) {
             <div className="flex-1 p-4 overflow-hidden flex flex-col gap-3" style={{ background: 'var(--bg)' }}>
               <div className="flex items-center gap-3 flex-wrap">
                 <span className="text-xs text-muted">From</span>
-                <span className="land-mock-pill" style={{ color: '#3b82f6', background: '#3b82f614', borderColor: '#3b82f640' }}>● Python</span>
+                <span className="land-mock-pill" style={{ color: '#3572A5', background: '#3572A514', borderColor: '#3572A540' }}>● Python</span>
                 <span className="text-muted text-sm">→</span>
                 <span className="bg-accent text-white text-xs font-semibold rounded px-3 py-1">Convert</span>
                 <span className="text-muted text-sm">→</span>
                 <span className="text-xs text-muted">To</span>
                 <span className="land-mock-pill" style={{ color: '#f59e0b', background: '#f59e0b14', borderColor: '#f59e0b40' }}>● Java</span>
-                <span className="ml-auto text-xs font-semibold rounded px-2 py-0.5" style={{ background: 'rgba(124,106,247,0.15)', color: 'var(--accent)', border: '1px solid var(--accent)' }}>✦ AI-powered</span>
+                <span className="ml-auto text-xs font-semibold rounded px-2 py-0.5" style={{ background: 'rgba(232,108,47,0.15)', color: 'var(--accent)', border: '1px solid var(--accent)' }}>✦ AI-powered</span>
               </div>
 
               <div className="grid grid-cols-2 gap-3 flex-1 min-h-0">
                 <div className="land-mock-code-panel">
-                  <div className="land-mock-panel-hdr" style={{ color: '#3b82f6' }}>Python · Input</div>
+                  <div className="land-mock-panel-hdr" style={{ color: '#3572A5' }}>Python · Input</div>
                   <pre className="land-mock-code">
                     <span style={{ color: '#c678dd' }}>def</span><span style={{ color: '#61afef' }}> factorial</span><span>(n):</span>{'\n'}
                     <span style={{ color: '#c678dd' }}>    if</span><span> n </span><span style={{ color: '#56b6c2' }}>{'<='}</span><span style={{ color: '#d19a66' }}> 1</span><span>: </span><span style={{ color: '#c678dd' }}>return</span><span style={{ color: '#d19a66' }}> 1</span>{'\n'}
