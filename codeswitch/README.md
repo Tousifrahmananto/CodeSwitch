@@ -189,7 +189,12 @@ pre-deploy command. The `Procfile` starts only the web process:
 web: gunicorn codeswitch.wsgi --bind 0.0.0.0:$PORT --access-logfile - --error-logfile -
 ```
 
-Required Railway env vars: `DATABASE_URL`, `SECRET_KEY`, `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, `AI_PROVIDER`, `AI_API_KEY`, `AI_API_KEY_2`, `AI_API_KEY_3`, `AI_MODEL`, `DEBUG=False`.
+Required Railway env vars: `DATABASE_URL`, `SECRET_KEY`, `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, `GOOGLE_OAUTH_CLIENT_ID`, `AI_PROVIDER`, `AI_API_KEY`, `AI_API_KEY_2`, `AI_API_KEY_3`, `AI_MODEL`, `DEBUG=False`.
+
+For Google sign-in, set `VITE_GOOGLE_CLIENT_ID` in Vercel to the same Google
+OAuth Web Client ID. Authorized JavaScript origins should include
+`http://localhost:3000` and the production Vercel URL; redirect URIs are not
+needed for the ID-token button flow.
 
 ---
 

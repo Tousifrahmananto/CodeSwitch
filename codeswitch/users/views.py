@@ -6,8 +6,11 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from django.contrib.auth import get_user_model
 from django.conf import settings
+from django.utils.text import slugify
 from .serializers import RegisterSerializer, UserProfileSerializer
 from converter.throttles import RegisterThrottle, LoginThrottle, TokenRefreshThrottle, PublicProfileThrottle
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token
 
 User = get_user_model()
 
@@ -77,6 +80,88 @@ class LoginView(APIView):
             return response
 
         return Response({'error': 'Invalid credentials.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+
+def _unique_google_username(email):
+    """Generate a stable, human-ish username from a verified Google email."""
+    prefix = (email.split('@', 1)[0] or 'google-user').strip()
+    base = slugify(prefix).replace('-', '_')[:140] or 'google_user'
+    username = base
+    counter = 1
+    while User.objects.filter(username__iexact=username).exists():
+        suffix = f'_{counter}'
+        username = f'{base[:150 - len(suffix)]}{suffix}'
+        counter += 1
+    return username
+
+
+class GoogleAuthView(APIView):
+    permission_classes = [AllowAny]
+    throttle_classes = [LoginThrottle]
+
+    def post(self, request):
+        credential = (request.data.get('credential') or '').strip()
+        if not credential:
+            return Response({'error': 'Google credential is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        client_id = getattr(settings, 'GOOGLE_OAUTH_CLIENT_ID', '') or ''
+        if not client_id:
+            return Response({'error': 'Google sign-in is not configured.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        try:
+            payload = id_token.verify_oauth2_token(
+                credential,
+                google_requests.Request(),
+                client_id,
+            )
+        except ValueError:
+            return Response({'error': 'Invalid Google credential.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        google_sub = payload.get('sub')
+        email = (payload.get('email') or '').strip().lower()
+        email_verified = bool(payload.get('email_verified'))
+
+        if not google_sub or not email:
+            return Response({'error': 'Google credential is missing required account details.'}, status=status.HTTP_401_UNAUTHORIZED)
+        if not email_verified:
+            return Response({'error': 'Google email must be verified.'}, status=status.HTTP_403_FORBIDDEN)
+
+        user = User.objects.filter(google_sub=google_sub).first()
+        if user is None:
+            existing = User.objects.filter(email__iexact=email).first()
+            if existing:
+                if existing.google_sub and existing.google_sub != google_sub:
+                    return Response(
+                        {'error': 'This email is already linked to another Google account.'},
+                        status=status.HTTP_409_CONFLICT,
+                    )
+                existing.google_sub = google_sub
+                existing.google_email_verified = True
+                if not existing.first_name and payload.get('given_name'):
+                    existing.first_name = payload.get('given_name', '')[:150]
+                if not existing.last_name and payload.get('family_name'):
+                    existing.last_name = payload.get('family_name', '')[:150]
+                existing.save(update_fields=['google_sub', 'google_email_verified', 'first_name', 'last_name'])
+                user = existing
+            else:
+                user = User(
+                    username=_unique_google_username(email),
+                    email=email,
+                    first_name=(payload.get('given_name') or '')[:150],
+                    last_name=(payload.get('family_name') or '')[:150],
+                    google_sub=google_sub,
+                    google_email_verified=True,
+                )
+                user.set_unusable_password()
+                user.save()
+        elif not user.google_email_verified:
+            user.google_email_verified = True
+            user.save(update_fields=['google_email_verified'])
+
+        refresh = RefreshToken.for_user(user)
+        response = Response({'user': UserProfileSerializer(user).data})
+        _set_auth_cookies(response, refresh)
+        return response
 
 
 class LogoutView(APIView):

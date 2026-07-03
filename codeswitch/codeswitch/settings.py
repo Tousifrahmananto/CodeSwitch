@@ -199,6 +199,8 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
+GOOGLE_OAUTH_CLIENT_ID = config('GOOGLE_OAUTH_CLIENT_ID', default='')
+
 # ── CORS Security ────────────────────────────────────────────────────────────
 # CRITICAL: Wildcard origins are only safe when credentials are disabled.
 # When CORS_ALLOW_CREDENTIALS=True, MUST use explicit origin list only.

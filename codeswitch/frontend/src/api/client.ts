@@ -55,6 +55,9 @@ export const register = (data: Record<string, string>): Promise<AxiosResponse> =
 export const login = (data: { username: string; password: string }): Promise<AxiosResponse<{ user: User }>> =>
   client.post('/login', data);
 
+export const googleLogin = (data: { credential: string }): Promise<AxiosResponse<{ user: User }>> =>
+  client.post('/auth/google', data);
+
 export const logout = (): Promise<AxiosResponse> =>
   client.post('/logout', {});
 

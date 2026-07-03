@@ -24,6 +24,8 @@ class User(AbstractUser):
         validators=[_validate_avatar],
         help_text="Max 5 MB. Allowed: JPEG, PNG, WebP only."
     )
+    google_sub = models.CharField(max_length=255, unique=True, null=True, blank=True)
+    google_email_verified = models.BooleanField(default=False)
 
     def __str__(self):
         return self.username

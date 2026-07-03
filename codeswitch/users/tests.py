@@ -2,6 +2,7 @@ from django.test import TestCase, override_settings
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
+from unittest.mock import patch
 
 User = get_user_model()
 
@@ -75,6 +76,90 @@ class LoginTests(TestCase):
             {'username': 'nobody', 'password': 'Test1234!'},
             format='json')
         self.assertEqual(response.status_code, 401)
+
+
+@override_settings(AXES_ENABLED=False, GOOGLE_OAUTH_CLIENT_ID='google-client-id.apps.googleusercontent.com')
+class GoogleAuthTests(TestCase):
+
+    def setUp(self):
+        self.client = APIClient()
+
+    def _payload(self, **overrides):
+        payload = {
+            'sub': 'google-sub-123',
+            'email': 'google@example.com',
+            'email_verified': True,
+            'given_name': 'Googly',
+            'family_name': 'User',
+        }
+        payload.update(overrides)
+        return payload
+
+    @patch('users.views.id_token.verify_oauth2_token')
+    def test_google_auth_creates_user_and_sets_cookies(self, verify_mock):
+        verify_mock.return_value = self._payload()
+        response = self.client.post('/api/auth/google', {'credential': 'id-token'}, format='json')
+
+        self.assertEqual(response.status_code, 200)
+        user = User.objects.get(email='google@example.com')
+        self.assertEqual(user.google_sub, 'google-sub-123')
+        self.assertTrue(user.google_email_verified)
+        self.assertFalse(user.has_usable_password())
+        self.assertIn('access_token', response.cookies)
+        self.assertIn('refresh_token', response.cookies)
+        self.assertTrue(response.cookies['access_token']['httponly'])
+        self.assertEqual(response.data['user']['email'], 'google@example.com')
+
+    @patch('users.views.id_token.verify_oauth2_token')
+    def test_google_auth_links_existing_verified_email(self, verify_mock):
+        existing = User.objects.create_user(
+            username='existing',
+            email='google@example.com',
+            password='Test1234!',
+        )
+        verify_mock.return_value = self._payload(given_name='Linked')
+
+        response = self.client.post('/api/auth/google', {'credential': 'id-token'}, format='json')
+
+        self.assertEqual(response.status_code, 200)
+        existing.refresh_from_db()
+        self.assertEqual(existing.google_sub, 'google-sub-123')
+        self.assertEqual(existing.first_name, 'Linked')
+        self.assertEqual(User.objects.count(), 1)
+
+    @patch('users.views.id_token.verify_oauth2_token')
+    def test_google_auth_existing_google_sub_signs_in_same_user(self, verify_mock):
+        user = User.objects.create_user(
+            username='googleuser',
+            email='old@example.com',
+            password='Test1234!',
+            google_sub='google-sub-123',
+            google_email_verified=True,
+        )
+        verify_mock.return_value = self._payload(email='new@example.com')
+
+        response = self.client.post('/api/auth/google', {'credential': 'id-token'}, format='json')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['user']['id'], user.id)
+        self.assertEqual(User.objects.count(), 1)
+
+    @patch('users.views.id_token.verify_oauth2_token')
+    def test_google_auth_rejects_invalid_token(self, verify_mock):
+        verify_mock.side_effect = ValueError('bad token')
+        response = self.client.post('/api/auth/google', {'credential': 'bad-token'}, format='json')
+        self.assertEqual(response.status_code, 401)
+
+    @patch('users.views.id_token.verify_oauth2_token')
+    def test_google_auth_rejects_unverified_email(self, verify_mock):
+        verify_mock.return_value = self._payload(email_verified=False)
+        response = self.client.post('/api/auth/google', {'credential': 'id-token'}, format='json')
+        self.assertEqual(response.status_code, 403)
+
+    def test_google_auth_requires_config(self):
+        with override_settings(GOOGLE_OAUTH_CLIENT_ID=''):
+            response = self.client.post('/api/auth/google', {'credential': 'id-token'}, format='json')
+        self.assertEqual(response.status_code, 503)
 
 
 @override_settings(AXES_ENABLED=False)

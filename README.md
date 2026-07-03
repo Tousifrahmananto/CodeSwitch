@@ -390,7 +390,7 @@ Railway runs migrations, idempotent seeding, and static collection through
 web: gunicorn codeswitch.wsgi --bind 0.0.0.0:$PORT --access-logfile - --error-logfile -
 ```
 
-Set these Railway environment variables: `DATABASE_URL`, `SECRET_KEY`, `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, `AI_PROVIDER`, `AI_API_KEY`, `AI_API_KEY_2`, `AI_API_KEY_3`, `AI_MODEL`, `DEBUG=False`.
+Set these Railway environment variables: `DATABASE_URL`, `SECRET_KEY`, `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, `GOOGLE_OAUTH_CLIENT_ID`, `AI_PROVIDER`, `AI_API_KEY`, `AI_API_KEY_2`, `AI_API_KEY_3`, `AI_MODEL`, `DEBUG=False`.
 
 Mount a persistent Railway volume for profile photos and set `MEDIA_ROOT` to
 that mount path. Without a volume, Railway's ephemeral filesystem will lose
@@ -399,7 +399,11 @@ uploaded avatars during redeploys.
 ### Frontend — Vercel
 Build command: `npm run build`
 Output directory: `dist`
-Set `VITE_API_URL` to your Railway backend URL.
+Set `VITE_API_URL` to your Railway backend URL and `VITE_GOOGLE_CLIENT_ID` to the same Google OAuth Web Client ID used by Railway.
+
+Google Cloud OAuth Web Client authorized JavaScript origins should include
+`http://localhost:3000` and the production Vercel URL. This ID-token flow does
+not require redirect URIs.
 
 ---
 

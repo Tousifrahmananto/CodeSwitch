@@ -1,7 +1,37 @@
-import { useState } from 'react';
-import { login, register } from '../api/client';
+import { useEffect, useRef, useState } from 'react';
+import { googleLogin, login, register } from '../api/client';
 import Logo from '../components/Logo';
 import type { User } from '../types';
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+const GOOGLE_SCRIPT_SRC = 'https://accounts.google.com/gsi/client';
+
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (config: {
+            client_id: string;
+            callback: (response: { credential?: string }) => void;
+            use_fedcm_for_prompt?: boolean;
+          }) => void;
+          renderButton: (
+            parent: HTMLElement,
+            options: {
+              theme?: 'outline' | 'filled_blue' | 'filled_black';
+              size?: 'large' | 'medium' | 'small';
+              width?: number;
+              text?: 'signin_with' | 'signup_with' | 'continue_with' | 'signin';
+              shape?: 'rectangular' | 'pill' | 'circle' | 'square';
+            },
+          ) => void;
+          cancel: () => void;
+        };
+      };
+    };
+  }
+}
 
 // Password requirement definitions
 const PWD_REQS = [
@@ -56,6 +86,8 @@ export default function Login({ onLogin, onBack }: LoginProps) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const googleButtonRef = useRef<HTMLDivElement | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -94,6 +126,70 @@ export default function Login({ onLogin, onBack }: LoginProps) {
       setLoading(false);
     }
   };
+
+  const handleGoogleCredential = async (credential?: string) => {
+    setError('');
+    setSuccess('');
+    if (!credential) {
+      setError('Google did not return a sign-in credential. Please try again.');
+      return;
+    }
+    setGoogleLoading(true);
+    try {
+      const { data } = await googleLogin({ credential });
+      onLogin(data.user);
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string } } };
+      setError(axiosErr.response?.data?.error || 'Google sign-in failed. Please try again.');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID || !googleButtonRef.current) return;
+
+    let cancelled = false;
+
+    const renderGoogleButton = () => {
+      if (cancelled || !window.google || !googleButtonRef.current) return;
+      googleButtonRef.current.innerHTML = '';
+      window.google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: response => handleGoogleCredential(response.credential),
+        use_fedcm_for_prompt: true,
+      });
+      window.google.accounts.id.renderButton(googleButtonRef.current, {
+        theme: 'outline',
+        size: 'large',
+        width: 340,
+        text: 'continue_with',
+        shape: 'rectangular',
+      });
+    };
+
+    const existingScript = document.querySelector<HTMLScriptElement>(`script[src="${GOOGLE_SCRIPT_SRC}"]`);
+    if (window.google) {
+      renderGoogleButton();
+    } else if (existingScript) {
+      existingScript.addEventListener('load', renderGoogleButton, { once: true });
+    } else {
+      const script = document.createElement('script');
+      script.src = GOOGLE_SCRIPT_SRC;
+      script.async = true;
+      script.defer = true;
+      script.onload = renderGoogleButton;
+      script.onerror = () => {
+        if (!cancelled) setError('Could not load Google sign-in. Please try again later.');
+      };
+      document.head.appendChild(script);
+    }
+
+    return () => {
+      cancelled = true;
+      window.google?.accounts.id.cancel();
+    };
+  }, [onLogin]);
 
   const handleKey = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') handleSubmit();
@@ -142,6 +238,22 @@ export default function Login({ onLogin, onBack }: LoginProps) {
             </button>
           ))}
         </div>
+
+        {GOOGLE_CLIENT_ID && (
+          <div className="mb-6">
+            <div className="flex justify-center min-h-[44px]">
+              <div ref={googleButtonRef} aria-label="Continue with Google" />
+            </div>
+            {googleLoading && (
+              <p className="text-center text-xs text-muted mt-2 m-0">Signing in with Google...</p>
+            )}
+            <div className="flex items-center gap-3 mt-5">
+              <span className="h-px bg-border flex-1" />
+              <span className="text-[11px] uppercase tracking-wide text-muted">or use email</span>
+              <span className="h-px bg-border flex-1" />
+            </div>
+          </div>
+        )}
 
         {/* Fields */}
         <div className="flex flex-col gap-3.5 mb-4">
