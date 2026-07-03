@@ -174,6 +174,9 @@ function AppLayout({
           </button>
         ))}
 
+        <p className="mt-3 pt-3 border-t border-border/70 px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted/70">
+          Preferences
+        </p>
         <button
           className="mt-2 w-full text-left px-3 py-2 rounded text-xs transition-colors bg-transparent border-none text-muted hover:bg-border hover:text-primary"
           onClick={onThemeToggle}

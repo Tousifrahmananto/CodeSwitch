@@ -1,11 +1,12 @@
 import { useState } from 'react';
+import { getLanguageMeta } from '../constants/languages';
 
 const LANG_META = {
-    python: { label: 'Python', color: '#3572A5' },
-    c: { label: 'C', color: '#6c757d' },
-    java: { label: 'Java', color: '#b07219' },
-    javascript: { label: 'JavaScript', color: '#f1e05a' },
-    cpp: { label: 'C++', color: '#f34b7d' },
+    python: getLanguageMeta('python'),
+    c: getLanguageMeta('c'),
+    java: getLanguageMeta('java'),
+    javascript: getLanguageMeta('javascript'),
+    cpp: getLanguageMeta('cpp'),
 };
 
 const ALL_LANGS = ['python', 'c', 'java', 'javascript', 'cpp'] as const;

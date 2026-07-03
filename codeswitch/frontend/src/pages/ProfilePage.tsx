@@ -2,12 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { getPublicProfile, getProfile, updateProfile } from '../api/client';
 import { resolveMediaUrl } from '../api/media';
 import Logo from '../components/Logo';
+import { getLanguageMeta } from '../constants/languages';
 import type { ChangeEvent } from 'react';
 import type { PublicProfile, User } from '../types';
-
-const LANG_COLORS: Record<string, string> = {
-  python: '#3572A5', javascript: '#f1e05a', java: '#b07219', c: '#555555', cpp: '#f34b7d',
-};
 
 interface ProfilePageProps {
   username: string;
@@ -259,15 +256,18 @@ export default function ProfilePage({ username, onBack, isOwner = false }: Profi
             <div className="bg-surface border border-border rounded p-4">
               <h4>Languages Used</h4>
               <div className="flex flex-wrap gap-2 mt-2">
-                {profile.languages_used.map(lang => (
-                  <span
-                    key={lang}
-                    className="text-xs px-2.5 py-1 rounded-full border font-mono font-semibold"
-                    style={{ borderColor: LANG_COLORS[lang] || '#8b8b8b', color: LANG_COLORS[lang] || '#8b8b8b' }}
-                  >
-                    {lang}
-                  </span>
-                ))}
+                {Array.from(new Set(profile.languages_used)).map(lang => {
+                  const meta = getLanguageMeta(lang);
+                  return (
+                    <span
+                      key={lang}
+                      className="text-xs px-2.5 py-1 rounded-full border font-mono font-semibold"
+                      style={{ borderColor: meta.color, color: meta.color, background: meta.softBg }}
+                    >
+                      {meta.label}
+                    </span>
+                  );
+                })}
               </div>
             </div>
           )}

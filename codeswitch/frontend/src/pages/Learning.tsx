@@ -3,11 +3,16 @@ import { useEffect, useState, memo } from 'react';
 import { getModules, getModule, updateProgress, getProgress, convertCode, getLessonQuiz, submitQuiz } from '../api/client';
 import CodeEditor from '../components/CodeEditor';
 import { runCode, canRun } from '../api/executor';
+import { getLanguageMeta } from '../constants/languages';
 import type { CSSProperties, ReactNode } from 'react';
 import type { LearningModule, Lesson, Quiz, RunResult, UserProgress } from '../types';
 
 type LearningLanguage = 'c' | 'python' | 'java';
-const LANG_COLORS: Record<LearningLanguage, string> = { c: '#555555', python: '#3572A5', java: '#b07219' };
+const LANG_COLORS: Record<LearningLanguage, string> = {
+  c: getLanguageMeta('c').color,
+  python: getLanguageMeta('python').color,
+  java: getLanguageMeta('java').color,
+};
 const DIFFICULTY_LEVELS = ['all', 'beginner', 'intermediate', 'advanced'] as const;
 
 const formatCompletionDate = (iso: string | null | undefined): string =>
@@ -200,7 +205,11 @@ function TryItSandbox({ exampleCode }: { exampleCode: Record<string, string> }) 
     setRunOutput(null);
   };
 
-  const LANG_META: Record<string, { label: string; color: string }> = { c: { label: 'C', color: '#6c757d' }, python: { label: 'Python', color: '#3572A5' }, java: { label: 'Java', color: '#b07219' } };
+  const LANG_META: Record<string, { label: string; color: string }> = {
+    c: getLanguageMeta('c'),
+    python: getLanguageMeta('python'),
+    java: getLanguageMeta('java'),
+  };
 
   const getPillStyle = (color: string): CSSProperties & { '--pill-color': string } => ({
     '--pill-color': color,

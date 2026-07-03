@@ -3,6 +3,7 @@ import { convertCode, createSnippet, explainCode } from '../api/client';
 import CodeEditor from '../components/CodeEditor';
 import DiffView from '../components/DiffView';
 import { runCode, canRun } from '../api/executor';
+import { getLanguageMeta } from '../constants/languages';
 import type { CSSProperties } from 'react';
 import type { RunResult } from '../types';
 
@@ -10,11 +11,11 @@ const LANGUAGES = ['python', 'c', 'java', 'javascript', 'cpp'] as const;
 type ConverterLanguage = (typeof LANGUAGES)[number];
 
 const LANG_META: Record<ConverterLanguage, { label: string; color: string }> = {
-  python: { label: 'Python', color: '#3572A5' },
-  c: { label: 'C', color: '#6c757d' },
-  java: { label: 'Java', color: '#b07219' },
-  javascript: { label: 'JavaScript', color: '#f1e05a' },
-  cpp: { label: 'C++', color: '#f34b7d' },
+  python: getLanguageMeta('python'),
+  c: getLanguageMeta('c'),
+  java: getLanguageMeta('java'),
+  javascript: getLanguageMeta('javascript'),
+  cpp: getLanguageMeta('cpp'),
 };
 
 const THEMES = [

@@ -3,19 +3,12 @@ import { useEffect, useState } from 'react';
 import { getFiles, createFile, updateFile, deleteFile } from '../api/client';
 import CodeEditor from '../components/CodeEditor';
 import LanguageSelector from '../components/LanguageSelector';
+import { getLanguageMeta } from '../constants/languages';
 import type { CodeFile } from '../types';
 
 const LANGUAGES = ['python', 'c', 'java', 'javascript', 'other'];
 type FileForm = { filename: string; language: string; code_content: string };
 const EMPTY_FORM: FileForm = { filename: '', language: 'python', code_content: '' };
-
-const LANG_COLORS: Record<string, string> = {
-  python: '#3572A5',
-  javascript: '#f1e05a',
-  java: '#b07219',
-  c: '#555555',
-  other: '#8b8b8b',
-};
 
 const FILE_EXT: Record<string, string> = {
   python: '.py', c: '.c', java: '.java', javascript: '.js', other: '.txt',
@@ -112,7 +105,7 @@ export default function FileManager() {
             className={`flex items-center px-2 py-0.5 rounded cursor-pointer gap-1.5 transition-colors min-h-[24px] text-primary hover:bg-border${selected?.id === f.id ? ' bg-accent/15' : ''}`}
             onClick={() => handleSelect(f)}
           >
-            <span className="flex-shrink-0" style={{ color: LANG_COLORS[f.language] || '#8b8b8b' }}>◆</span>
+            <span className="flex-shrink-0" style={{ color: getLanguageMeta(f.language).color }}>◆</span>
             <span className="flex-1 truncate text-sm">{f.filename || '(unnamed)'}</span>
             <button
               className="ml-auto text-muted hover:text-danger text-sm flex-shrink-0 cursor-pointer border-none bg-transparent p-0 disabled:opacity-40"
