@@ -26,6 +26,7 @@ import type { User } from './types';
 const Converter = lazy(() => import('./pages/Converter'));
 const FileManager = lazy(() => import('./pages/FileManager'));
 const Learning = lazy(() => import('./pages/Learning'));
+const Visualizer = lazy(() => import('./pages/Visualizer'));
 
 // ── Error Boundary ──────────────────────────────────────────────────────────
 class ErrorBoundary extends Component<
@@ -108,6 +109,7 @@ function AppLayout({
   const PAGE_TITLES: Record<string, string> = {
     '/dashboard': 'Dashboard | CodeSwitch',
     '/converter': 'Code Converter | CodeSwitch',
+    '/visualizer': 'Code Visualizer | CodeSwitch',
     '/files': 'My Files | CodeSwitch',
     '/learning': 'Learning Modules | CodeSwitch',
     '/reference': 'Language Reference | CodeSwitch',
@@ -121,6 +123,7 @@ function AppLayout({
   const navItems = [
     { path: '/dashboard', label: '🏠 Dashboard' },
     { path: '/converter', label: '💻 Converter' },
+    { path: '/visualizer', label: '✨ Visualizer' },
     { path: '/files', label: '📁 Files' },
     { path: '/learning', label: '📚 Learn' },
     { path: '/reference', label: '📖 Reference' },
@@ -291,6 +294,14 @@ function AppRoutes({
           element={
             <Suspense fallback={<PageLoader label="files" />}>
               <FileManager />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/visualizer"
+          element={
+            <Suspense fallback={<PageLoader label="visualizer" />}>
+              <Visualizer />
             </Suspense>
           }
         />

@@ -12,8 +12,10 @@ from .models import ConversionHistory, SharedSnippet
 from .throttles import (
     AIBurstThrottle, AISustainedThrottle, RunCodeAnonThrottle,
     RunCodeUserThrottle, SnippetIPThrottle, SnippetCreateThrottle,
+    WriteThrottle,
 )
 from .serializers import SharedSnippetCreateSerializer
+from .visualizer import build_visualization
 from codeswitch.observability import dependency_timer, record_conversion
 from codeswitch.pagination import OptionalPageNumberPagination
 
@@ -301,3 +303,22 @@ class ExplainCodeView(APIView):
             return Response({'explanation': result['explanation']}, status=status.HTTP_200_OK)
         else:
             return Response({'error': result['error']}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class VisualizeCodeView(APIView):
+    """
+    POST /api/visualize
+    Body: { language, code }
+    Returns a deterministic educational animation timeline.
+    """
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [WriteThrottle]
+
+    def post(self, request):
+        language = request.data.get('language', '')
+        code = request.data.get('code', '')
+        try:
+            timeline = build_visualization(language, code)
+        except ValueError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(timeline, status=status.HTTP_200_OK)

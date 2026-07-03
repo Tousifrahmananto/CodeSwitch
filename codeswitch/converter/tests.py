@@ -102,6 +102,62 @@ class RunCodeTests(TestCase):
 
 
 @override_settings(AXES_ENABLED=False)
+class VisualizeCodeTests(TestCase):
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='visual_user', email='visual@example.com', password='Test1234!')
+        self.client = _make_authed_client(self.user)
+
+    def test_visualize_requires_auth(self):
+        response = APIClient().post('/api/visualize',
+            {'language': 'python', 'code': SAMPLE_PYTHON},
+            format='json')
+        self.assertEqual(response.status_code, 401)
+
+    def test_visualize_python_returns_timeline(self):
+        code = 'total = 0\nfor n in [1, 2, 3]:\n    total = total + n\nprint(total)\n'
+        response = self.client.post('/api/visualize',
+            {'language': 'python', 'code': code},
+            format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['language'], 'python')
+        self.assertIn('loops', response.data['concepts'])
+        self.assertIn('variables', response.data['concepts'])
+        self.assertGreaterEqual(len(response.data['steps']), 4)
+        self.assertEqual(response.data['steps'][0]['line'], 1)
+        self.assertIn('visual', response.data['steps'][0])
+
+    def test_visualize_c_family_detects_output_and_conditionals(self):
+        code = 'int x = 3;\nif (x > 2) {\n  printf("%d", x);\n}\n'
+        response = self.client.post('/api/visualize',
+            {'language': 'c', 'code': code},
+            format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('conditionals', response.data['concepts'])
+        self.assertIn('output', response.data['concepts'])
+
+    def test_visualize_validates_language_and_code(self):
+        bad_lang = self.client.post('/api/visualize',
+            {'language': 'ruby', 'code': 'puts 1'},
+            format='json')
+        self.assertEqual(bad_lang.status_code, 400)
+
+        empty = self.client.post('/api/visualize',
+            {'language': 'python', 'code': '   '},
+            format='json')
+        self.assertEqual(empty.status_code, 400)
+
+    def test_visualize_code_too_long(self):
+        huge = 'x = 1\n' * 4_000
+        response = self.client.post('/api/visualize',
+            {'language': 'python', 'code': huge},
+            format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('20,000', response.data['error'])
+
+
+@override_settings(AXES_ENABLED=False)
 class SnippetTests(TestCase):
 
     def setUp(self):

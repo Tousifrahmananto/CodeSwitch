@@ -107,6 +107,45 @@ export interface RunResult {
   code: number;
 }
 
+export type VisualizationStepKind =
+  | 'function'
+  | 'loop'
+  | 'condition'
+  | 'assignment'
+  | 'array'
+  | 'return'
+  | 'output'
+  | 'call'
+  | 'statement';
+
+export interface VisualizationVariable {
+  name: string;
+  value: string;
+}
+
+export interface VisualizationStep {
+  id: string;
+  line: number;
+  kind: VisualizationStepKind;
+  title: string;
+  description: string;
+  code: string;
+  visual: {
+    focus: VisualizationStepKind;
+    variables: VisualizationVariable[];
+    pulse?: 'loop' | 'branch' | 'output' | 'collection';
+    iteration_label?: string;
+  };
+}
+
+export interface VisualizationTimeline {
+  language: string;
+  summary: string;
+  concepts: string[];
+  recommendations: string[];
+  steps: VisualizationStep[];
+}
+
 export interface AdminStats {
   total_users: number;
   total_conversions: number;

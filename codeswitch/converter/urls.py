@@ -1,5 +1,8 @@
 from django.urls import path
-from .views import ConvertCodeView, ConversionHistoryView, CreateSnippetView, GetSnippetView, RunCodeView, ExplainCodeView
+from .views import (
+    ConvertCodeView, ConversionHistoryView, CreateSnippetView, GetSnippetView,
+    RunCodeView, ExplainCodeView, VisualizeCodeView,
+)
 
 urlpatterns = [
     path('convert', ConvertCodeView.as_view(), name='convert'),
@@ -8,4 +11,5 @@ urlpatterns = [
     path('snippets/<uuid:slug>/', GetSnippetView.as_view(), name='get-snippet'),
     path('run/', RunCodeView.as_view(), name='run-code'),
     path('explain/', ExplainCodeView.as_view(), name='explain-code'),
+    path('visualize', VisualizeCodeView.as_view(), name='visualize-code'),
 ]
