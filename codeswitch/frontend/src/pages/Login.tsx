@@ -145,7 +145,12 @@ export default function Login({ onLogin, onBack }: LoginProps) {
       onLogin(data.user);
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: string } } };
-      setError(axiosErr.response?.data?.error || 'Google sign-in failed. Please try again.');
+      const message = axiosErr.response?.data?.error;
+      if (message === 'Invalid Google credential.') {
+        setError('Google sign-in is configured incorrectly. Make sure Railway and Vercel use the same Google Web Client ID.');
+      } else {
+        setError(message || 'Google sign-in failed. Please try again.');
+      }
     } finally {
       setGoogleLoading(false);
     }
