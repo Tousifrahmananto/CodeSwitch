@@ -1,5 +1,6 @@
 // src/pages/Learning.jsx
 import { useEffect, useState, memo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getModules, getModule, updateProgress, getProgress, convertCode, getLessonQuiz, submitQuiz } from '../api/client';
 import CodeEditor from '../components/CodeEditor';
 import { runCode, canRun } from '../api/executor';
@@ -469,6 +470,7 @@ function QuizPanel({ lessonId, onPass }: { lessonId: number; onPass?: () => void
 }
 
 export default function Learning() {
+  const navigate = useNavigate();
   const [modules, setModules] = useState<LearningModule[]>([]);
   const [activeModule, setActiveModule] = useState<LearningModule | null>(null);
   const [activeLesson, setActiveLesson] = useState<Lesson | null>(null);
@@ -628,6 +630,14 @@ export default function Learning() {
                     {parsedCode && Object.keys(parsedCode).length >= 2 && (
                       <TryItSandbox key={`sandbox-${activeLesson.id}`} exampleCode={parsedCode} />
                     )}
+                    {parsedCode && (
+                      <button
+                        className="learn-visualizer-inline"
+                        onClick={() => navigate('/visualizer')}
+                      >
+                        ✨ Open this in Code Visualizer
+                      </button>
+                    )}
                     <div className="lesson-actions">
                       {!isCompleted && (
                         <button className="btn-complete" onClick={() => markComplete(activeLesson.id)}>
@@ -668,6 +678,18 @@ export default function Learning() {
 
   return (
     <div className="learning-page">
+      <div className="learn-visualizer-cta">
+        <div>
+          <span className="learn-visualizer-kicker">New interactive tool</span>
+          <h2>Animate how code works</h2>
+          <p>
+            Paste code into the Visualizer to watch variables, loops, branches, outputs, and function steps move in an interactive timeline.
+          </p>
+        </div>
+        <button onClick={() => navigate('/visualizer')}>
+          ✨ Open Code Visualizer
+        </button>
+      </div>
       <div className="module-list">
         <h2>Learning Modules</h2>
         <div className="learn-filter-bar">
