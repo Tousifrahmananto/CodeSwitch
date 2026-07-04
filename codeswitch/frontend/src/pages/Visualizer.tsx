@@ -77,84 +77,6 @@ function inferLanguageFromCode(code: string, fallback: VisualizerLanguage): Visu
   return fallback;
 }
 
-function VisualCanvas({ step, total, index }: { step?: VisualizationStep; total: number; index: number }) {
-  const meta = kindMeta(step?.kind || 'statement');
-  const variables = step?.visual.variables || [];
-  const nodes = variables.length ? variables : [{ name: 'code', value: step ? step.kind : 'ready' }];
-  const stack = step?.visual.stack || [];
-  const output = step?.visual.output || [];
-
-  return (
-    <div className="viz-canvas">
-      <div className="viz-canvas-glow" style={{ background: meta.color }} />
-      <div className={`viz-core viz-pulse-${step?.visual.pulse || step?.kind || 'idle'}`} style={{ borderColor: meta.color }}>
-        <span className="viz-core-icon" style={{ color: meta.color }}>{meta.icon}</span>
-        <strong>{meta.label}</strong>
-        <small>Step {Math.min(index + 1, total || 1)} / {total || 1}</small>
-      </div>
-
-      <div className="viz-orbit viz-orbit-a" />
-      <div className="viz-orbit viz-orbit-b" />
-
-      <div className="viz-node-cloud">
-        {nodes.slice(0, 6).map((variable, i) => (
-          <div
-            key={`${variable.name}-${i}`}
-            className="viz-node"
-            style={{
-              '--node-color': i === nodes.length - 1 ? meta.color : '#4f8ef7',
-              '--node-delay': `${i * 90}ms`,
-            } as CSSProperties & { '--node-color': string; '--node-delay': string }}
-          >
-            <span>{variable.name}</span>
-            <code>{variable.value}</code>
-          </div>
-        ))}
-      </div>
-
-      {step?.kind === 'condition' && (
-        <div className="viz-branch">
-          <span>TRUE</span>
-          <span>FALSE</span>
-        </div>
-      )}
-
-      {step?.kind === 'output' && (
-        <div className="viz-output-beam">output</div>
-      )}
-
-      {(stack.length > 0 || output.length > 0 || step?.visual.return_value !== undefined) && (
-        <div className="viz-python-tutor-panel">
-          <div className="viz-stack-panel">
-            <span className="viz-panel-title">Stack</span>
-            {stack.map(frame => (
-              <div key={frame.name} className="viz-frame">
-                <strong>{frame.name}</strong>
-                {frame.variables.length ? frame.variables.map(variable => (
-                  <p key={`${frame.name}-${variable.name}`}>
-                    <span>{variable.name}</span>
-                    <code>{variable.value}</code>
-                  </p>
-                )) : <p><span>empty</span><code>{'{}'}</code></p>}
-              </div>
-            ))}
-          </div>
-          <div className="viz-output-panel">
-            <span className="viz-panel-title">Output</span>
-            <pre>{output.length ? output.join('\n') : '(no output yet)'}</pre>
-            {step?.visual.return_value !== undefined && (
-              <div className="viz-return-value">
-                <span>return</span>
-                <code>{step.visual.return_value}</code>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 function TutorTraceBoard({
   step,
   total,
@@ -199,7 +121,7 @@ function TutorTraceBoard({
             <span>{kindMeta(step?.kind || 'statement').label}</span>
             <strong>{step?.title || 'Ready to trace'}</strong>
           </div>
-          <p>{step?.description || 'Generate the animation to walk through the code one executed step at a time.'}</p>
+          <p>{step?.description || 'Generate the trace to walk through the code one step at a time.'}</p>
           <small>Step {Math.min(index + 1, total || 1)} of {total || 1}</small>
         </div>
 
@@ -246,6 +168,23 @@ function TutorTraceBoard({
   );
 }
 
+function traceExplanation(step?: VisualizationTraceStep, companionStep?: VisualizationStep, codeLine?: string): string {
+  if (!step) return 'Generate a trace to see what this line does.';
+  if (step.error?.message) return `Python stopped here with: ${step.error.message}`;
+  if (companionStep?.description) return companionStep.description;
+  if (step.event === 'call') return 'Python is entering this function and creating a new stack frame.';
+  if (step.event === 'return') return `This function is returning ${formatTraceValue(step.return_value)} to its caller.`;
+
+  const text = codeLine?.trim() || '';
+  if (!text) return 'Python is moving through a blank or structural line.';
+  if (/^for\b|^while\b/.test(text)) return 'Python is checking the loop and preparing the next iteration.';
+  if (/^if\b|^elif\b|^else\b/.test(text)) return 'Python is deciding which branch should run.';
+  if (/\bprint\s*\(/.test(text)) return 'Python is sending a value to stdout, so the output panel may update.';
+  if (/^return\b/.test(text)) return 'Python is leaving the current function with this return value.';
+  if (/=/.test(text) && !/[=!<>]=/.test(text)) return 'Python is assigning or updating a variable in the current frame.';
+  return 'Python is executing this statement and updating the trace snapshot after it runs.';
+}
+
 function isRef(value: VisualizationValue | unknown): value is { $ref: string } {
   return !!value && typeof value === 'object' && '$ref' in value && typeof (value as { $ref?: unknown }).$ref === 'string';
 }
@@ -284,11 +223,13 @@ function renderHeapItems(object: VisualizationHeapObject) {
 
 function MemoryTraceBoard({
   step,
+  companionStep,
   total,
   index,
   codeLines,
 }: {
   step?: VisualizationTraceStep;
+  companionStep?: VisualizationStep;
   total: number;
   index: number;
   codeLines: string[];
@@ -331,6 +272,9 @@ function MemoryTraceBoard({
     };
   }, [step]);
 
+  const activeCodeLine = activeLine ? codeLines[activeLine - 1] : '';
+  const explanation = traceExplanation(step, companionStep, activeCodeLine);
+
   return (
     <div className="viz-memory-board">
       <div className="viz-memory-code">
@@ -358,7 +302,7 @@ function MemoryTraceBoard({
             {step?.event === 'exception' ? 'Exception' : 'Real trace'}
           </span>
           <strong>Step {Math.min(index + 1, total || 1)} / {total || 1}</strong>
-          <p>{step?.error?.message || 'Trace generated by executing Python once, then replaying snapshots.'}</p>
+          <p>{step?.error?.message || 'Real Python trace: the backend executed your code once, captured snapshots, then this page replays them.'}</p>
         </div>
 
         <div className="viz-memory-diagram" ref={memoryRef}>
@@ -406,6 +350,15 @@ function MemoryTraceBoard({
             <small>stdout so far</small>
           </div>
           <pre>{step?.stdout || '(nothing printed yet)'}</pre>
+        </div>
+
+        <div className="viz-line-explanation">
+          <div className="viz-tutor-section-title">
+            <span>Line explanation</span>
+            <small>{activeLine ? `line ${activeLine}` : 'waiting'}</small>
+          </div>
+          <p>{explanation}</p>
+          {activeCodeLine && <code>{activeCodeLine.trim()}</code>}
         </div>
       </div>
     </div>
@@ -501,18 +454,16 @@ export default function Visualizer() {
 
   const stepCount = isRealTrace ? traceSteps.length : timeline?.steps.length || 0;
   const progress = stepCount > 1 ? (activeIndex / (stepCount - 1)) * 100 : 0;
-  const isExecutionTrace = timeline?.mode === 'execution_trace';
-
   return (
     <div className="viz-page">
       <div className="viz-hero">
         <div>
           <p className="viz-eyebrow">Interactive Code Visualizer</p>
           <h2>Watch your code come alive.</h2>
-          <p>Generate a step-by-step animated story of variables, loops, branches, outputs, and beginner-friendly concepts.</p>
+          <p>Generate a step-by-step trace of variables, stack frames, heap objects, output, and beginner-friendly line explanations.</p>
         </div>
         <button className="viz-generate" onClick={handleGenerate} disabled={loading || !code.trim()}>
-          {loading ? 'Generating…' : 'Generate Animation'}
+          {loading ? 'Generating…' : 'Generate Trace'}
         </button>
       </div>
 
@@ -555,7 +506,7 @@ export default function Visualizer() {
 
         <section className="viz-card">
           <div className="viz-card-header">
-            <span>{isRealTrace ? 'Python Tutor Trace' : 'Animation Canvas'}</span>
+            <span>{isRealTrace ? 'Python Tutor Trace' : 'Code Trace'}</span>
             <small>
               {timeline
                 ? isRealTrace ? 'Real trace' : 'Concept trace: this explains structure, not runtime memory.'
@@ -565,12 +516,18 @@ export default function Visualizer() {
           {isRealTrace ? (
             <MemoryTraceBoard
               step={activeTraceStep}
+              companionStep={activeStep}
               total={stepCount}
               index={activeIndex}
               codeLines={codeLines}
             />
           ) : (
-            <VisualCanvas step={activeStep} total={stepCount} index={activeIndex} />
+            <TutorTraceBoard
+              step={activeStep}
+              total={stepCount}
+              index={activeIndex}
+              codeLines={codeLines}
+            />
           )}
 
           <div className="viz-controls">
