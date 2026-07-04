@@ -159,6 +159,39 @@ class VisualizeCodeTests(TestCase):
         self.assertTrue(response.data['trace'])
         self.assertTrue(any(step['event'] == 'exception' for step in response.data['trace']))
 
+    def test_visualize_python_supports_safe_imports_and_classes(self):
+        code = (
+            'import math\n\n'
+            'class Circle:\n'
+            '    def __init__(self, radius):\n'
+            '        self.radius = radius\n'
+            '    def area(self):\n'
+            '        return round(math.pi * self.radius ** 2, 2)\n\n'
+            'shape = Circle(3)\n'
+            'print(shape.area())\n'
+        )
+        response = self.client.post('/api/visualize',
+            {'language': 'python', 'code': code},
+            format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['mode'], 'execution_trace')
+        self.assertNotIn('error', response.data)
+        self.assertTrue(any('28.27' in step['stdout'] for step in response.data['trace']))
+        self.assertTrue(any(
+            frame['name'] == 'area()'
+            for step in response.data['trace']
+            for frame in step['frames']
+        ))
+
+    def test_visualize_python_blocks_dangerous_imports(self):
+        response = self.client.post('/api/visualize',
+            {'language': 'python', 'code': 'import os\nprint(os.listdir("."))\n'},
+            format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['mode'], 'execution_trace')
+        self.assertIn('error', response.data)
+        self.assertIn("blocked", response.data['error']['message'])
+
     def test_visualize_python_return_negative_one_is_normal_return(self):
         code = 'def find(x):\n    if x > 0:\n        return x\n    return -1\n\nresult = find(0)\nprint(result)\n'
         response = self.client.post('/api/visualize',

@@ -458,6 +458,7 @@ import builtins
 import json
 import sys
 import traceback
+import types
 
 payload = json.loads(sys.stdin.read() or "{}")
 user_code = payload.get("code") or ""
@@ -506,7 +507,9 @@ def object_id(value):
 
 def is_mutable_like(value):
     return isinstance(value, (list, tuple, dict, set)) or (
-        hasattr(value, "__dict__") and not isinstance(value, type)
+        hasattr(value, "__dict__")
+        and not callable(value)
+        and not isinstance(value, (type, types.ModuleType))
     )
 
 
@@ -604,30 +607,93 @@ def tracer(frame, event, arg):
     return tracer
 
 
+allowed_import_roots = {
+    "bisect",
+    "collections",
+    "copy",
+    "decimal",
+    "fractions",
+    "functools",
+    "heapq",
+    "itertools",
+    "math",
+    "operator",
+    "random",
+    "re",
+    "statistics",
+    "string",
+}
+
+
+def safe_import(name, globals=None, locals=None, fromlist=(), level=0):
+    if level != 0:
+        raise ImportError("Relative imports are not available in the visualizer.")
+    root = (name or "").split(".", 1)[0]
+    if root not in allowed_import_roots:
+        raise ImportError(f"Import '{name}' is blocked in the visualizer sandbox.")
+    return builtins.__import__(name, globals, locals, fromlist, level)
+
+
 safe_builtins = {
+    "__build_class__": builtins.__build_class__,
+    "__import__": safe_import,
     "abs": abs,
     "all": all,
     "any": any,
+    "ArithmeticError": ArithmeticError,
+    "AssertionError": AssertionError,
+    "BaseException": BaseException,
     "bool": bool,
+    "callable": callable,
+    "chr": chr,
+    "classmethod": classmethod,
+    "complex": complex,
     "dict": dict,
+    "divmod": divmod,
     "enumerate": enumerate,
+    "Exception": Exception,
+    "filter": filter,
     "float": float,
+    "format": format,
+    "frozenset": frozenset,
+    "getattr": getattr,
+    "hasattr": hasattr,
+    "hex": hex,
+    "IndexError": IndexError,
     "int": int,
+    "isinstance": isinstance,
+    "issubclass": issubclass,
+    "iter": iter,
+    "KeyError": KeyError,
     "len": len,
     "list": list,
+    "LookupError": LookupError,
+    "map": map,
     "max": max,
     "min": min,
+    "next": next,
+    "object": object,
+    "oct": oct,
+    "ord": ord,
     "pow": pow,
     "print": print,
+    "property": property,
     "range": range,
     "reversed": reversed,
     "round": round,
     "set": set,
+    "setattr": setattr,
+    "slice": slice,
     "sorted": sorted,
+    "staticmethod": staticmethod,
     "str": str,
     "sum": sum,
+    "super": super,
     "tuple": tuple,
+    "type": type,
+    "ValueError": ValueError,
     "zip": zip,
+    "ZeroDivisionError": ZeroDivisionError,
 }
 
 old_stdout = sys.stdout
@@ -635,7 +701,7 @@ sys.stdout = CaptureStdout()
 error = None
 
 try:
-    globals_dict = {"__builtins__": safe_builtins}
+    globals_dict = {"__builtins__": safe_builtins, "__name__": "__main__"}
     sys.settrace(tracer)
     exec(compile(user_code, "<user_code>", "exec"), globals_dict, globals_dict)
 except Exception as exc:
