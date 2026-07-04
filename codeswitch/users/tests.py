@@ -1,9 +1,13 @@
 from django.test import TestCase, override_settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
+from django.core.files.uploadedfile import SimpleUploadedFile
+import tempfile
+from io import BytesIO
+from unittest.mock import patch
+from PIL import Image
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
-from unittest.mock import patch
 
 User = get_user_model()
 
@@ -265,6 +269,29 @@ class ProfileTests(TestCase):
         self.user.refresh_from_db()
         self.assertEqual(self.user.first_name, 'Updated')
         self.assertEqual(self.user.bio, 'New bio')
+
+    def test_profile_avatar_upload_persists_after_reload(self):
+        image = BytesIO()
+        Image.new('RGB', (1, 1), color='blue').save(image, format='PNG')
+        image.seek(0)
+        avatar = SimpleUploadedFile(
+            'avatar.png',
+            image.read(),
+            content_type='image/png',
+        )
+
+        with tempfile.TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):
+            response = self.client.patch('/api/profile', {'avatar': avatar}, format='multipart')
+            self.assertEqual(response.status_code, 200)
+            self.assertIn('/media/avatars/', response.data['avatar'])
+
+            self.user.refresh_from_db()
+            self.assertTrue(self.user.avatar)
+            self.assertTrue(self.user.avatar.name.startswith('avatars/'))
+
+            reload_response = self.client.get('/api/profile')
+            self.assertEqual(reload_response.status_code, 200)
+            self.assertEqual(reload_response.data['avatar'], response.data['avatar'])
 
     def test_public_profile_includes_absolute_avatar_url(self):
         self.user.avatar.name = 'avatars/test.png'

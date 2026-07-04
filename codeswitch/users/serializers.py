@@ -54,23 +54,23 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
-    avatar = serializers.SerializerMethodField()
-
-    def get_avatar(self, obj):
-        if not obj.avatar:
-            return None
-
-        try:
-            url = obj.avatar.url
-        except ValueError:
-            return None
-
-        request = self.context.get('request')
-        if request:
-            return request.build_absolute_uri(url)
-        return url
-
     class Meta:
         model = User
         fields = ('id', 'username', 'email', 'first_name', 'last_name', 'bio', 'avatar', 'date_joined')
         read_only_fields = ('id', 'date_joined')
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if not instance.avatar:
+            data['avatar'] = None
+            return data
+
+        try:
+            url = instance.avatar.url
+        except ValueError:
+            data['avatar'] = None
+            return data
+
+        request = self.context.get('request')
+        data['avatar'] = request.build_absolute_uri(url) if request else url
+        return data

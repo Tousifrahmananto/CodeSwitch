@@ -125,3 +125,4 @@ scripts/validate-security-fixes.sh
 
 # Local planning docs
 SEO-PLAN.md
+codeswitch/users/tests.py
