@@ -120,6 +120,8 @@ class GoogleAuthView(APIView):
         google_sub = payload.get('sub')
         email = (payload.get('email') or '').strip().lower()
         email_verified = bool(payload.get('email_verified'))
+        # Intentionally ignore Google's "picture" claim.
+        # CodeSwitch avatars must only come from explicit user uploads to user.avatar.
 
         if not google_sub or not email:
             return Response({'error': 'Google credential is missing required account details.'}, status=status.HTTP_401_UNAUTHORIZED)

@@ -1,5 +1,6 @@
 from django.test import TestCase, override_settings
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 from unittest.mock import patch
@@ -41,6 +42,7 @@ class RegistrationTests(TestCase):
 class LoginTests(TestCase):
 
     def setUp(self):
+        cache.clear()
         self.client = APIClient()
         self.user = User.objects.create_user(**VALID_USER)
 
@@ -82,6 +84,7 @@ class LoginTests(TestCase):
 class GoogleAuthTests(TestCase):
 
     def setUp(self):
+        cache.clear()
         self.client = APIClient()
 
     def _payload(self, **overrides):
@@ -109,6 +112,19 @@ class GoogleAuthTests(TestCase):
         self.assertIn('refresh_token', response.cookies)
         self.assertTrue(response.cookies['access_token']['httponly'])
         self.assertEqual(response.data['user']['email'], 'google@example.com')
+
+    @patch('users.views.id_token.verify_oauth2_token')
+    def test_google_auth_does_not_import_google_profile_picture(self, verify_mock):
+        verify_mock.return_value = self._payload(
+            picture='https://lh3.googleusercontent.com/a/google-avatar'
+        )
+
+        response = self.client.post('/api/auth/google', {'credential': 'id-token'}, format='json')
+
+        self.assertEqual(response.status_code, 200)
+        user = User.objects.get(email='google@example.com')
+        self.assertFalse(user.avatar)
+        self.assertIsNone(response.data['user']['avatar'])
 
     @patch('users.views.id_token.verify_oauth2_token')
     def test_google_auth_links_existing_verified_email(self, verify_mock):
