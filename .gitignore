@@ -3,6 +3,19 @@ venv/
 env/
 .venv/
 
+# Python generated files and test/tool caches
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyre/
+.hypothesis/
+.tox/
+.nox/
+
 # Environment and local configuration files
 .env
 .env.*
@@ -45,6 +58,10 @@ uploads/
 
 # Logs, crash dumps, and local reports
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 logs/
 *.pid
 *.dump
@@ -52,6 +69,11 @@ coverage.xml
 .coverage
 .coverage.*
 htmlcov/
+coverage/
+.nyc_output/
+junit.xml
+test-results/
+playwright-report/
 
 # OS
 .DS_Store
@@ -62,6 +84,11 @@ desktop.ini
 .idea/
 .vscode/
 *.swp
+*.swo
+*.bak
+*.tmp
+*.temp
+*.orig
 *.tsbuildinfo
 .vercel
 .env*.local
@@ -70,6 +97,25 @@ desktop.ini
 node_modules/
 **/node_modules/
 gsap-public/
+dist/
+build/
+**/build/
+**/.vite/
+**/.turbo/
+**/.next/
+.cache/
+**/.cache/
+.eslintcache
+.stylelintcache
+
+# Local generated outputs / scratch space
+output/
+tmp/
+temp/
+
+# Django generated deployment artifacts
+staticfiles/
+**/staticfiles/
 
 # Security documentation (local reference only)
 SECURITY_PATCH.md

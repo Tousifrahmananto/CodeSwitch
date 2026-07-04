@@ -75,7 +75,7 @@ class LoginView(APIView):
 
         if user:
             refresh = RefreshToken.for_user(user)
-            response = Response({'user': UserProfileSerializer(user).data})
+            response = Response({'user': UserProfileSerializer(user, context={'request': request}).data})
             _set_auth_cookies(response, refresh)
             return response
 
@@ -159,7 +159,7 @@ class GoogleAuthView(APIView):
             user.save(update_fields=['google_email_verified'])
 
         refresh = RefreshToken.for_user(user)
-        response = Response({'user': UserProfileSerializer(user).data})
+        response = Response({'user': UserProfileSerializer(user, context={'request': request}).data})
         _set_auth_cookies(response, refresh)
         return response
 
@@ -217,7 +217,7 @@ class MeView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        return Response(UserProfileSerializer(request.user).data)
+        return Response(UserProfileSerializer(request.user, context={'request': request}).data)
 
 
 class ProfileView(generics.RetrieveUpdateAPIView):

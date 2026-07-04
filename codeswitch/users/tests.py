@@ -201,6 +201,17 @@ class MeViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['username'], 'testuser')
 
+    def test_me_includes_absolute_avatar_url(self):
+        self.user.avatar.name = 'avatars/test.png'
+        self.user.save(update_fields=['avatar'])
+        self._set_auth_cookie()
+        response = self.client.get('/api/me/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.data['avatar'],
+            'http://testserver/media/avatars/test.png',
+        )
+
     def test_me_unauthenticated(self):
         response = self.client.get('/api/me/')
         self.assertEqual(response.status_code, 401)
@@ -219,6 +230,16 @@ class ProfileTests(TestCase):
         response = self.client.get('/api/profile')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['username'], 'testuser')
+
+    def test_profile_get_includes_absolute_avatar_url(self):
+        self.user.avatar.name = 'avatars/test.png'
+        self.user.save(update_fields=['avatar'])
+        response = self.client.get('/api/profile')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.data['avatar'],
+            'http://testserver/media/avatars/test.png',
+        )
 
     def test_profile_update(self):
         response = self.client.patch('/api/profile',

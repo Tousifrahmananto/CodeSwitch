@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getProfile, getConversionHistory, getProgress, getFiles, getModules } from '../api/client';
 import { resolveMediaUrl } from '../api/media';
+import { SankeyChart, SankeyLink, SankeyNode, SankeyTooltip, type SankeyData } from '../components/charts/sankey';
 import { getLanguageMeta } from '../constants/languages';
 import type { CodeFile, ConversionRecord, LearningModule, User, UserProgress } from '../types';
 
@@ -102,6 +103,114 @@ function EmptyState({
       >
         {actionLabel}
       </button>
+    </div>
+  );
+}
+
+function buildLanguageFlow(history: ConversionRecord[]): { data: SankeyData; total: number } {
+  const pairCounts = new Map<string, { source: string; target: string; value: number }>();
+
+  history.forEach(item => {
+    const source = item.source_language?.toLowerCase();
+    const target = item.target_language?.toLowerCase();
+    if (!source || !target) return;
+    const key = `${source}->${target}`;
+    const current = pairCounts.get(key);
+    if (current) {
+      current.value += 1;
+    } else {
+      pairCounts.set(key, { source, target, value: 1 });
+    }
+  });
+
+  const pairs = Array.from(pairCounts.values())
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 8);
+
+  const nodes: SankeyData['nodes'] = [];
+  const nodeIndex = new Map<string, number>();
+
+  const addNode = (side: 'source' | 'outcome', lang: string) => {
+    const key = `${side}:${lang}`;
+    const existing = nodeIndex.get(key);
+    if (existing !== undefined) return existing;
+    const index = nodes.length;
+    nodeIndex.set(key, index);
+    nodes.push({
+      name: getLanguageMeta(lang).label,
+      category: side,
+      lang,
+    });
+    return index;
+  };
+
+  const links = pairs.map(pair => ({
+    source: addNode('source', pair.source),
+    target: addNode('outcome', pair.target),
+    value: pair.value,
+  }));
+
+  return {
+    data: { nodes, links },
+    total: pairs.reduce((sum, pair) => sum + pair.value, 0),
+  };
+}
+
+function LanguageFlowCard({
+  history,
+  onOpenConverter,
+}: {
+  history: ConversionRecord[];
+  onOpenConverter: () => void;
+}) {
+  const flow = useMemo(() => buildLanguageFlow(history), [history]);
+
+  return (
+    <div className="bg-surface border border-border rounded-xl p-4 overflow-hidden">
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted m-0">Language Flow</h3>
+          <p className="text-xs text-muted mt-1 mb-0">
+            {flow.total ? `${flow.total} recent conversions mapped by source and target.` : 'Your conversion map will appear here.'}
+          </p>
+        </div>
+        {flow.total > 0 && (
+          <span className="text-[11px] text-accent border border-accent/30 rounded-full px-2 py-0.5 bg-accent/5">
+            live activity
+          </span>
+        )}
+      </div>
+
+      {flow.data.links.length === 0 ? (
+        <EmptyState
+          icon="⇄"
+          title="No language flow yet"
+          body="Run a few conversions and this card will show which languages you move between most."
+          actionLabel="Open Converter →"
+          onAction={onOpenConverter}
+        />
+      ) : (
+        <div className="dashboard-sankey">
+          <SankeyChart
+            animationDuration={900}
+            aspectRatio="1.7 / 1"
+            className="min-h-[230px]"
+            data={flow.data}
+            margin={{ top: 24, right: 86, bottom: 24, left: 86 }}
+            nodePadding={18}
+            nodeWidth={13}
+            revealSignature={`${flow.total}-${flow.data.links.length}`}
+          >
+            <SankeyLink strokeOpacity={0.58} />
+            <SankeyNode
+              lineCap={5}
+              showValueLabels={false}
+              getNodeColor={(node) => getLanguageMeta(String(node.lang || '')).color}
+            />
+            <SankeyTooltip />
+          </SankeyChart>
+        </div>
+      )}
     </div>
   );
 }
@@ -380,6 +489,11 @@ export default function Dashboard() {
         </div>
 
         <div className="grid grid-cols-1 gap-5">
+          <LanguageFlowCard
+            history={history}
+            onOpenConverter={() => navigate('/converter')}
+          />
+
           <div className="bg-surface border border-border rounded-xl p-4">
             <div className="flex items-center justify-between gap-3 mb-4">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-muted m-0">Learning Progress</h3>

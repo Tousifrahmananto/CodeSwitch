@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { gsap } from 'gsap';
 import { ScrambleTextPlugin } from 'gsap/ScrambleTextPlugin';
+import { CodeBlock } from '../components/animate-ui/primitives/animate/code-block';
 import Logo from '../components/Logo';
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 
@@ -159,6 +160,14 @@ const CONVERSION_STEPS = [
   'Done. Output ready.',
 ] as const;
 
+const SHIKI_LANGUAGE: Record<string, string> = {
+  Python: 'python',
+  Java: 'java',
+  C: 'c',
+  'C++': 'cpp',
+  JavaScript: 'javascript',
+};
+
 interface LandingProps {
   onGetStarted?: () => void;
 }
@@ -258,7 +267,16 @@ function CodeDemo() {
             </span>
             <span className="land-demo-panel-label">Input</span>
           </div>
-          <pre className="land-demo-code">{demo.fromCode}</pre>
+          <CodeBlock
+            key={`input-${demoIdx}-${demo.from.lang}`}
+            className="land-demo-code land-animated-code"
+            code={demo.fromCode}
+            duration={1250}
+            inView
+            lang={SHIKI_LANGUAGE[demo.from.lang] || 'txt'}
+            theme="dark"
+            writing
+          />
         </div>
 
         {/* Finished conversion state: one clear input-to-output flow */}
@@ -278,7 +296,17 @@ function CodeDemo() {
             </span>
             <span className="land-demo-panel-label">Output</span>
           </div>
-          <pre className="land-demo-code land-demo-output-code">{demo.toCode}</pre>
+          <CodeBlock
+            key={`output-${demoIdx}-${demo.to.lang}`}
+            className="land-demo-code land-demo-output-code land-animated-code"
+            code={demo.toCode}
+            delay={760}
+            duration={1450}
+            inView
+            lang={SHIKI_LANGUAGE[demo.to.lang] || 'txt'}
+            theme="dark"
+            writing
+          />
         </div>
       </div>
 
