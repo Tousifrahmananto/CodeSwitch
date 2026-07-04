@@ -1,6 +1,9 @@
 import ast
+import json
 import operator
 import re
+import subprocess
+import sys
 
 
 SUPPORTED_LANGUAGES = {'python', 'c', 'java', 'javascript', 'cpp'}
@@ -18,6 +21,8 @@ CONCEPT_RECOMMENDATIONS = {
 
 MAX_TRACE_STEPS = 120
 MAX_LOOP_ITERATIONS = 40
+MAX_TRACE_OUTPUT_LENGTH = 12_000
+PYTHON_TRACE_TIMEOUT_SECONDS = 4
 
 
 class _ReturnSignal(Exception):
@@ -448,6 +453,324 @@ def _build_python_trace(code):
         return None
 
 
+PYTHON_SUBPROCESS_TRACER = r'''
+import builtins
+import json
+import sys
+import traceback
+
+payload = json.loads(sys.stdin.read() or "{}")
+user_code = payload.get("code") or ""
+max_steps = int(payload.get("max_steps") or 120)
+max_output = int(payload.get("max_output") or 12000)
+
+trace = []
+output_parts = []
+object_labels = {}
+object_counter = 0
+
+
+class StepLimitExceeded(Exception):
+    pass
+
+
+class OutputLimitExceeded(Exception):
+    pass
+
+
+class CaptureStdout:
+    def write(self, text):
+        if not isinstance(text, str):
+            text = str(text)
+        current = ''.join(output_parts)
+        remaining = max_output - len(current)
+        if remaining <= 0:
+            raise OutputLimitExceeded("Output limit exceeded.")
+        output_parts.append(text[:remaining])
+        if len(text) > remaining:
+            raise OutputLimitExceeded("Output limit exceeded.")
+        return len(text)
+
+    def flush(self):
+        return None
+
+
+def object_id(value):
+    global object_counter
+    real = id(value)
+    if real not in object_labels:
+        object_counter += 1
+        object_labels[real] = f"obj-{object_counter}"
+    return object_labels[real]
+
+
+def is_mutable_like(value):
+    return isinstance(value, (list, tuple, dict, set)) or (
+        hasattr(value, "__dict__") and not isinstance(value, type)
+    )
+
+
+def primitive_or_repr(value):
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    text = repr(value)
+    return text if len(text) <= 120 else text[:117] + "..."
+
+
+def snapshot_value(value, heap, seen):
+    if is_mutable_like(value):
+        ref = object_id(value)
+        if ref in seen:
+            return {"$ref": ref}
+        seen.add(ref)
+
+        if isinstance(value, dict):
+            items = {}
+            for key, item in list(value.items())[:80]:
+                items[primitive_or_repr(key)] = snapshot_value(item, heap, seen)
+            heap[ref] = {"type": "dict", "items": items}
+        elif isinstance(value, (list, tuple)):
+            heap[ref] = {
+                "type": "list" if isinstance(value, list) else "tuple",
+                "items": [snapshot_value(item, heap, seen) for item in list(value)[:80]],
+            }
+        elif isinstance(value, set):
+            heap[ref] = {
+                "type": "set",
+                "items": [snapshot_value(item, heap, seen) for item in list(value)[:80]],
+            }
+        else:
+            attrs = {}
+            for key, item in list(getattr(value, "__dict__", {}).items())[:80]:
+                if not str(key).startswith("_"):
+                    attrs[str(key)] = snapshot_value(item, heap, seen)
+            heap[ref] = {
+                "type": "object",
+                "items": attrs,
+                "repr": primitive_or_repr(value),
+            }
+        return {"$ref": ref}
+
+    return primitive_or_repr(value)
+
+
+def snapshot_frames(frame, event, arg=None):
+    if len(trace) >= max_steps:
+        raise StepLimitExceeded("Trace step limit exceeded.")
+
+    chain = []
+    current = frame
+    while current is not None:
+        if current.f_code.co_filename == "<user_code>":
+            chain.append(current)
+        current = current.f_back
+    chain.reverse()
+
+    heap = {}
+    frames = []
+    for current_frame in chain:
+        local_seen = set()
+        variables = {}
+        for key, value in current_frame.f_locals.items():
+            if key.startswith("__"):
+                continue
+            variables[key] = snapshot_value(value, heap, local_seen)
+
+        code_name = current_frame.f_code.co_name
+        frames.append({
+            "id": f"frame-{id(current_frame)}",
+            "name": "<module>" if code_name == "<module>" else f"{code_name}()",
+            "variables": variables,
+        })
+
+    step = {
+        "id": f"trace-{len(trace) + 1}",
+        "line": frame.f_lineno,
+        "event": event,
+        "frames": frames,
+        "heap": heap,
+        "stdout": ''.join(output_parts),
+    }
+    if event == "return":
+        step["return_value"] = primitive_or_repr(arg)
+    trace.append(step)
+
+
+def tracer(frame, event, arg):
+    if frame.f_code.co_filename != "<user_code>":
+        return tracer
+    if event in {"call", "line", "return", "exception"}:
+        snapshot_frames(frame, event, arg)
+    return tracer
+
+
+safe_builtins = {
+    "abs": abs,
+    "all": all,
+    "any": any,
+    "bool": bool,
+    "dict": dict,
+    "enumerate": enumerate,
+    "float": float,
+    "int": int,
+    "len": len,
+    "list": list,
+    "max": max,
+    "min": min,
+    "pow": pow,
+    "print": print,
+    "range": range,
+    "reversed": reversed,
+    "round": round,
+    "set": set,
+    "sorted": sorted,
+    "str": str,
+    "sum": sum,
+    "tuple": tuple,
+    "zip": zip,
+}
+
+old_stdout = sys.stdout
+sys.stdout = CaptureStdout()
+error = None
+
+try:
+    globals_dict = {"__builtins__": safe_builtins}
+    sys.settrace(tracer)
+    exec(compile(user_code, "<user_code>", "exec"), globals_dict, globals_dict)
+except Exception as exc:
+    line = None
+    tb = exc.__traceback__
+    while tb:
+        if tb.tb_frame.f_code.co_filename == "<user_code>":
+            line = tb.tb_lineno
+        tb = tb.tb_next
+    error = {"message": str(exc) or exc.__class__.__name__, "line": line}
+    if not trace or trace[-1].get("event") != "exception":
+        trace.append({
+            "id": f"trace-{len(trace) + 1}",
+            "line": line or (trace[-1]["line"] if trace else 1),
+            "event": "exception",
+            "frames": trace[-1]["frames"] if trace else [],
+            "heap": trace[-1]["heap"] if trace else {},
+            "stdout": ''.join(output_parts),
+            "error": error,
+        })
+finally:
+    sys.settrace(None)
+    sys.stdout = old_stdout
+
+print(json.dumps({"trace": trace[:max_steps], "error": error}))
+'''
+
+
+def _kind_from_trace_step(step):
+    event = step.get('event')
+    if event == 'call':
+        return 'call'
+    if event == 'return':
+        return 'return'
+    if event == 'exception':
+        return 'statement'
+    line = step.get('code', '')
+    return _statement_kind(line, 'python') or 'statement'
+
+
+def _trace_to_steps(trace, lines):
+    steps = []
+    previous_stdout = ''
+    for index, trace_step in enumerate(trace, start=1):
+        line_no = trace_step.get('line') or 1
+        code = lines[line_no - 1].strip() if 1 <= line_no <= len(lines) else ''
+        trace_step['code'] = code
+        kind = _kind_from_trace_step(trace_step)
+        if trace_step.get('stdout', '') != previous_stdout:
+            kind = 'output'
+        if trace_step.get('event') == 'exception':
+            title = 'Runtime error'
+            description = trace_step.get('error', {}).get('message') or 'Execution stopped with an error.'
+        elif trace_step.get('event') == 'return':
+            title = 'Return value'
+            description = 'The function returns to its caller.'
+        else:
+            title = _line_title(kind)
+            description = _description_for(kind, code, 'python')
+
+        stack = []
+        for frame in trace_step.get('frames', []):
+            stack.append({
+                'name': frame.get('name', '<frame>'),
+                'variables': [
+                    {'name': key, 'value': _safe_repr(value)}
+                    for key, value in frame.get('variables', {}).items()
+                ],
+            })
+
+        visual = {
+            'focus': kind,
+            'variables': stack[-1]['variables'] if stack else [],
+            'stack': stack,
+            'output': trace_step.get('stdout', '').splitlines(),
+        }
+        if trace_step.get('return_value') is not None:
+            visual['return_value'] = _safe_repr(trace_step.get('return_value'))
+        if kind == 'loop':
+            visual['pulse'] = 'loop'
+        elif kind == 'condition':
+            visual['pulse'] = 'branch'
+        elif kind == 'output':
+            visual['pulse'] = 'output'
+        elif kind == 'array':
+            visual['pulse'] = 'collection'
+
+        steps.append({
+            'id': f'step-{index}',
+            'line': line_no,
+            'kind': kind,
+            'title': title,
+            'description': description,
+            'code': code,
+            'visual': visual,
+        })
+        previous_stdout = trace_step.get('stdout', '')
+    return steps
+
+
+def _build_python_subprocess_trace(code):
+    try:
+        completed = subprocess.run(
+            [sys.executable, '-I', '-c', PYTHON_SUBPROCESS_TRACER],
+            input=json.dumps({
+                'code': code,
+                'max_steps': MAX_TRACE_STEPS,
+                'max_output': MAX_TRACE_OUTPUT_LENGTH,
+            }),
+            text=True,
+            capture_output=True,
+            timeout=PYTHON_TRACE_TIMEOUT_SECONDS,
+            env={'PYTHONIOENCODING': 'utf-8'},
+        )
+    except subprocess.TimeoutExpired:
+        return {
+            'trace': [{
+                'id': 'trace-1',
+                'line': 1,
+                'event': 'exception',
+                'frames': [],
+                'heap': {},
+                'stdout': '',
+                'error': {'message': 'Execution timed out.', 'line': 1},
+            }],
+            'error': {'message': 'Execution timed out.', 'line': 1},
+        }
+    if completed.returncode != 0 and not completed.stdout:
+        return None
+    try:
+        return json.loads(completed.stdout)
+    except json.JSONDecodeError:
+        return None
+
+
 def build_visualization(language, code):
     language = (language or '').lower().strip()
     code = code or ''
@@ -464,6 +787,29 @@ def build_visualization(language, code):
     variables = {}
 
     if language == 'python':
+        trace_result = _build_python_subprocess_trace(code.replace('\x00', ''))
+        if trace_result and trace_result.get('trace'):
+            trace = trace_result.get('trace', [])[:MAX_TRACE_STEPS]
+            traced_steps = _trace_to_steps(trace, lines)
+            concepts = _concepts_from_steps(traced_steps)
+            recommendations = []
+            for concept in concepts:
+                for title in CONCEPT_RECOMMENDATIONS.get(concept, []):
+                    if title not in recommendations:
+                        recommendations.append(title)
+            response = {
+                'language': language,
+                'mode': 'execution_trace',
+                'summary': f'Traced {len(trace)} Python execution steps with stack frames, heap objects, and output.',
+                'concepts': concepts,
+                'recommendations': recommendations[:6],
+                'trace': trace,
+                'steps': traced_steps[:80],
+            }
+            if trace_result.get('error'):
+                response['error'] = trace_result['error']
+            return response
+
         traced_steps = _build_python_trace(code.replace('\x00', ''))
         if traced_steps:
             concepts = _concepts_from_steps(traced_steps)
@@ -478,6 +824,7 @@ def build_visualization(language, code):
                 'summary': f'Traced {len(traced_steps)} Python execution steps with stack frames and output.',
                 'concepts': concepts,
                 'recommendations': recommendations[:6],
+                'trace': [],
                 'steps': traced_steps[:80],
             }
 

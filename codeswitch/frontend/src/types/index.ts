@@ -123,6 +123,42 @@ export interface VisualizationVariable {
   value: string;
 }
 
+export type VisualizationPrimitive = string | number | boolean | null;
+
+export interface VisualizationRef {
+  $ref: string;
+}
+
+export type VisualizationValue = VisualizationPrimitive | VisualizationRef;
+
+export interface VisualizationFrame {
+  id: string;
+  name: string;
+  variables: Record<string, VisualizationValue>;
+}
+
+export interface VisualizationHeapObject {
+  type: 'list' | 'tuple' | 'dict' | 'set' | 'object';
+  items: unknown;
+  repr?: string;
+}
+
+export interface VisualizationTraceError {
+  message: string;
+  line?: number;
+}
+
+export interface VisualizationTraceStep {
+  id: string;
+  line: number;
+  event: 'call' | 'line' | 'return' | 'exception';
+  frames: VisualizationFrame[];
+  heap: Record<string, VisualizationHeapObject>;
+  stdout: string;
+  return_value?: VisualizationValue;
+  error?: VisualizationTraceError;
+}
+
 export interface VisualizationStep {
   id: string;
   line: number;
@@ -150,6 +186,8 @@ export interface VisualizationTimeline {
   summary: string;
   concepts: string[];
   recommendations: string[];
+  trace?: VisualizationTraceStep[];
+  error?: VisualizationTraceError;
   steps: VisualizationStep[];
 }
 

@@ -126,9 +126,38 @@ class VisualizeCodeTests(TestCase):
         self.assertIn('loops', response.data['concepts'])
         self.assertIn('variables', response.data['concepts'])
         self.assertGreaterEqual(len(response.data['steps']), 4)
+        self.assertGreaterEqual(len(response.data['trace']), 4)
+        self.assertIn('frames', response.data['trace'][0])
+        self.assertIn('heap', response.data['trace'][0])
         self.assertEqual(response.data['steps'][0]['line'], 1)
         self.assertIn('visual', response.data['steps'][0])
         self.assertIn('stack', response.data['steps'][0]['visual'])
+
+    def test_visualize_python_lists_and_dicts_create_heap_refs(self):
+        code = 'items = [1, 2]\nstate = {"items": items}\nitems.append(3)\nprint(state)\n'
+        response = self.client.post('/api/visualize',
+            {'language': 'python', 'code': code},
+            format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['mode'], 'execution_trace')
+        self.assertTrue(any(step['heap'] for step in response.data['trace']))
+        self.assertTrue(any(
+            isinstance(frame['variables'].get('items'), dict) and '$ref' in frame['variables']['items']
+            for step in response.data['trace']
+            for frame in step['frames']
+        ))
+
+    def test_visualize_python_runtime_error_returns_trace_and_error(self):
+        code = 'x = 1\ny = 0\nprint(x / y)\n'
+        response = self.client.post('/api/visualize',
+            {'language': 'python', 'code': code},
+            format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['mode'], 'execution_trace')
+        self.assertIn('error', response.data)
+        self.assertIn('division by zero', response.data['error']['message'])
+        self.assertTrue(response.data['trace'])
+        self.assertTrue(any(step['event'] == 'exception' for step in response.data['trace']))
 
     def test_visualize_python_return_negative_one_is_normal_return(self):
         code = 'def find(x):\n    if x > 0:\n        return x\n    return -1\n\nresult = find(0)\nprint(result)\n'
@@ -147,6 +176,8 @@ class VisualizeCodeTests(TestCase):
             {'language': 'c', 'code': code},
             format='json')
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['mode'], 'concept_trace')
+        self.assertNotIn('trace', response.data)
         self.assertIn('conditionals', response.data['concepts'])
         self.assertIn('output', response.data['concepts'])
 

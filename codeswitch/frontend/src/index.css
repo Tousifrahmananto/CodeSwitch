@@ -5980,6 +5980,257 @@ h6,
   font-family: var(--mono);
 }
 
+.viz-memory-board {
+  min-height: 520px;
+  display: grid;
+  grid-template-columns: minmax(300px, 0.82fr) minmax(420px, 1.18fr);
+  background:
+    radial-gradient(circle at 82% 8%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 38%),
+    color-mix(in srgb, var(--bg) 76%, var(--surface));
+}
+
+.viz-memory-code {
+  min-width: 0;
+  border-right: 1px solid var(--border);
+}
+
+.viz-memory-code pre {
+  max-height: 476px;
+  overflow: auto;
+  margin: 0;
+  padding: 12px 10px 18px;
+  font: 13px/1.75 var(--mono);
+}
+
+.viz-memory-code pre span {
+  display: grid;
+  grid-template-columns: 22px 34px minmax(0, 1fr);
+  gap: 8px;
+  min-height: 25px;
+  padding: 1px 8px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: var(--text);
+  white-space: pre;
+}
+
+.viz-memory-code pre span.active {
+  border-color: color-mix(in srgb, var(--accent) 54%, transparent);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 24%, transparent), color-mix(in srgb, var(--accent) 7%, transparent));
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.viz-memory-code b {
+  color: var(--accent);
+  font-weight: 900;
+}
+
+.viz-memory-code em {
+  color: var(--text-muted);
+  font-style: normal;
+  user-select: none;
+}
+
+.viz-memory-side {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: auto minmax(280px, 1fr) auto;
+}
+
+.viz-memory-status {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 12px;
+  align-items: center;
+  margin: 14px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--border));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+}
+
+.viz-memory-status span {
+  padding: 5px 8px;
+  border-radius: 999px;
+  color: #86efac;
+  background: rgba(34, 197, 94, 0.12);
+  font: 900 10px/1 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.viz-memory-status span.error {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+.viz-memory-status strong {
+  color: var(--text);
+  font-size: 12px;
+  text-align: right;
+}
+
+.viz-memory-status p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.viz-memory-diagram {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(190px, 0.82fr) minmax(220px, 1fr);
+  min-height: 0;
+  overflow: auto;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.viz-memory-arrows {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.viz-memory-arrows path {
+  fill: none;
+  stroke: #a78bfa;
+  stroke-width: 1.6;
+  marker-end: url(#vizArrowHead);
+}
+
+.viz-memory-column {
+  position: relative;
+  z-index: 2;
+  padding: 12px;
+}
+
+.viz-frame-column {
+  border-right: 1px solid var(--border);
+}
+
+.viz-memory-label {
+  margin-bottom: 9px;
+  color: var(--text-muted);
+  font: 900 10px/1 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.viz-memory-frame,
+.viz-heap-box {
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--bg) 66%, transparent);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.16);
+}
+
+.viz-memory-frame.global {
+  border-color: color-mix(in srgb, #86efac 26%, var(--border));
+}
+
+.viz-memory-frame > strong,
+.viz-heap-box > strong {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--secondary);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  font: 900 12px/1 var(--mono);
+}
+
+.viz-memory-frame.global > strong {
+  color: #86efac;
+}
+
+.viz-memory-frame p,
+.viz-heap-item {
+  display: grid;
+  grid-template-columns: minmax(68px, 0.7fr) minmax(0, 1fr);
+  gap: 10px;
+  margin: 0;
+  padding: 8px 10px;
+  border-top: 1px dashed color-mix(in srgb, var(--border) 78%, transparent);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.viz-memory-frame p:first-of-type,
+.viz-heap-item:first-of-type {
+  border-top: none;
+}
+
+.viz-memory-frame span,
+.viz-heap-item span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--accent);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.viz-memory-frame code,
+.viz-heap-item code,
+.viz-heap-repr {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.viz-memory-frame code.ref,
+.viz-heap-item code.ref {
+  color: #c4b5fd;
+  font-weight: 900;
+}
+
+.viz-heap-box {
+  background: color-mix(in srgb, #1d1630 72%, var(--surface));
+  border-color: rgba(167, 139, 250, 0.34);
+}
+
+.viz-heap-box > strong {
+  color: #c4b5fd;
+}
+
+.viz-heap-box small {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.viz-heap-empty,
+.viz-heap-repr {
+  margin: 0;
+  padding: 8px 10px;
+  color: var(--text-muted);
+  font: 12px/1.45 var(--mono);
+  text-align: left;
+}
+
+.viz-memory-output pre {
+  min-height: 86px;
+  max-height: 160px;
+  overflow: auto;
+  margin: 0;
+  padding: 12px 14px;
+  color: #86efac;
+  background: color-mix(in srgb, var(--bg) 82%, black 8%);
+  font: 13px/1.55 var(--mono);
+  white-space: pre-wrap;
+}
+
 .viz-controls {
   display: flex;
   gap: 8px;
@@ -6164,6 +6415,17 @@ h6,
 
   .viz-tutor-board {
     grid-template-columns: 1fr;
+  }
+
+  .viz-memory-board,
+  .viz-memory-diagram {
+    grid-template-columns: 1fr;
+  }
+
+  .viz-memory-code,
+  .viz-frame-column {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
   }
 
   .viz-tutor-code {
