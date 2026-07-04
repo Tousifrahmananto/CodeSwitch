@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getProfile, getConversionHistory, getProgress, getFiles, getModules } from '../api/client';
+import { getProfile, getConversionHistory, getProgress, getFiles, getModules, getPublicProfile } from '../api/client';
 import { resolveMediaUrl } from '../api/media';
 import { SankeyChart, SankeyLink, SankeyNode, SankeyTooltip, type SankeyData } from '../components/charts/sankey';
 import { getLanguageMeta } from '../constants/languages';
@@ -215,6 +215,17 @@ function LanguageFlowCard({
   );
 }
 
+function cacheBustAvatarUrl(url: string | null, signature?: string | null): string | null {
+  if (!url || url.startsWith('blob:') || url.startsWith('data:')) return url;
+  try {
+    const next = new URL(url);
+    next.searchParams.set('v', signature || 'avatar');
+    return next.toString();
+  } catch {
+    return url;
+  }
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const fresh = _dashCache.data && Date.now() - _dashCache.ts < CACHE_TTL
@@ -228,6 +239,7 @@ export default function Dashboard() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(!fresh);
   const [avatarFailed, setAvatarFailed] = useState(false);
+  const [publicAvatar, setPublicAvatar] = useState<string | null>(null);
 
   useEffect(() => {
     if (fresh) {
@@ -295,7 +307,8 @@ export default function Dashboard() {
   const memberSince = profile?.date_joined
     ? new Date(profile.date_joined).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
     : '';
-  const avatarUrl = resolveMediaUrl(profile?.avatar);
+  const rawAvatar = profile?.avatar || publicAvatar;
+  const avatarUrl = cacheBustAvatarUrl(resolveMediaUrl(rawAvatar), rawAvatar);
 
   const activityLevel = history.length >= 25 || completedLessons >= 20
     ? 'Power Learner'
@@ -306,6 +319,29 @@ export default function Dashboard() {
   useEffect(() => {
     setAvatarFailed(false);
   }, [avatarUrl]);
+
+  useEffect(() => {
+    if (!profile?.username) return;
+
+    let cancelled = false;
+    getPublicProfile(profile.username)
+      .then(response => {
+        if (cancelled) return;
+        const nextAvatar = response.data.avatar || null;
+        setPublicAvatar(nextAvatar);
+        if (nextAvatar && !profile.avatar) {
+          setProfile(current => current ? { ...current, avatar: nextAvatar } : current);
+          if (_dashCache.data?.profile && _dashCache.data.profile.username === profile.username) {
+            _dashCache.data.profile = { ..._dashCache.data.profile, avatar: nextAvatar };
+          }
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [profile?.username, profile?.avatar]);
 
   return (
     <div className="w-full max-w-[1500px] mx-auto p-5 xl:p-6">
