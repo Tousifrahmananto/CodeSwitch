@@ -283,15 +283,30 @@ class ProfileTests(TestCase):
         with tempfile.TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):
             response = self.client.patch('/api/profile', {'avatar': avatar}, format='multipart')
             self.assertEqual(response.status_code, 200)
-            self.assertIn('/media/avatars/', response.data['avatar'])
+            self.assertTrue(response.data['avatar'].startswith('data:image/png;base64,'))
 
             self.user.refresh_from_db()
-            self.assertTrue(self.user.avatar)
-            self.assertTrue(self.user.avatar.name.startswith('avatars/'))
+            self.assertFalse(self.user.avatar)
+            self.assertTrue(self.user.avatar_blob)
+            self.assertEqual(self.user.avatar_content_type, 'image/png')
+            self.assertEqual(self.user.avatar_filename, 'avatar.png')
 
             reload_response = self.client.get('/api/profile')
             self.assertEqual(reload_response.status_code, 200)
             self.assertEqual(reload_response.data['avatar'], response.data['avatar'])
+
+    def test_public_profile_includes_db_backed_avatar(self):
+        self.user.avatar_blob = b'avatar-bytes'
+        self.user.avatar_content_type = 'image/png'
+        self.user.avatar_filename = 'avatar.png'
+        self.user.save(update_fields=['avatar_blob', 'avatar_content_type', 'avatar_filename'])
+
+        response = self.client.get('/api/profile/testuser/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.data['avatar'],
+            'data:image/png;base64,YXZhdGFyLWJ5dGVz',
+        )
 
     def test_public_profile_includes_absolute_avatar_url(self):
         self.user.avatar.name = 'avatars/test.png'

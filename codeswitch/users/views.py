@@ -273,7 +273,7 @@ class PublicProfileView(APIView):
 
         return Response({
             'username': user.username,
-            'avatar': request.build_absolute_uri(user.avatar.url) if user.avatar else None,
+            'avatar': UserProfileSerializer.avatar_representation(user, request),
             'date_joined': user.date_joined,
             'conversion_count': conversion_count,
             'lessons_completed': lessons_completed,

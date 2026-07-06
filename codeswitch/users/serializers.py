@@ -1,4 +1,5 @@
 import re
+import base64
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 
@@ -54,23 +55,57 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
+    avatar = serializers.ImageField(required=False, allow_null=True, write_only=True)
+
     class Meta:
         model = User
         fields = ('id', 'username', 'email', 'first_name', 'last_name', 'bio', 'avatar', 'date_joined')
         read_only_fields = ('id', 'date_joined')
 
-    def to_representation(self, instance):
-        data = super().to_representation(instance)
+    @staticmethod
+    def avatar_representation(instance, request=None):
+        if instance.avatar_blob:
+            content_type = instance.avatar_content_type or 'image/png'
+            encoded = base64.b64encode(bytes(instance.avatar_blob)).decode('ascii')
+            return f'data:{content_type};base64,{encoded}'
+
         if not instance.avatar:
-            data['avatar'] = None
-            return data
+            return None
 
         try:
             url = instance.avatar.url
         except ValueError:
-            data['avatar'] = None
-            return data
+            return None
 
+        return request.build_absolute_uri(url) if request else url
+
+    def update(self, instance, validated_data):
+        avatar = validated_data.pop('avatar', serializers.empty)
+        instance = super().update(instance, validated_data)
+
+        if avatar is not serializers.empty:
+            if avatar is None:
+                instance.avatar_blob = None
+                instance.avatar_content_type = ''
+                instance.avatar_filename = ''
+                if instance.avatar:
+                    instance.avatar.delete(save=False)
+                instance.avatar = None
+            else:
+                avatar.seek(0)
+                instance.avatar_blob = avatar.read()
+                instance.avatar_content_type = getattr(avatar, 'content_type', '') or 'application/octet-stream'
+                instance.avatar_filename = getattr(avatar, 'name', '')[:255]
+                if instance.avatar:
+                    instance.avatar.delete(save=False)
+                instance.avatar = None
+
+            instance.save(update_fields=['avatar_blob', 'avatar_content_type', 'avatar_filename', 'avatar'])
+
+        return instance
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
         request = self.context.get('request')
-        data['avatar'] = request.build_absolute_uri(url) if request else url
+        data['avatar'] = self.avatar_representation(instance, request)
         return data

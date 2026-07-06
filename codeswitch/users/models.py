@@ -24,6 +24,9 @@ class User(AbstractUser):
         validators=[_validate_avatar],
         help_text="Max 5 MB. Allowed: JPEG, PNG, WebP only."
     )
+    avatar_blob = models.BinaryField(blank=True, null=True)
+    avatar_content_type = models.CharField(max_length=50, blank=True)
+    avatar_filename = models.CharField(max_length=255, blank=True)
     google_sub = models.CharField(max_length=255, unique=True, null=True, blank=True)
     google_email_verified = models.BooleanField(default=False)
 
