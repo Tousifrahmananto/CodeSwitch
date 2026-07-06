@@ -74,9 +74,10 @@ export default function ProfilePage({ username, onBack, isOwner = false }: Profi
       const r = await updateProfile(fd);
       setProfile(prev => (prev ? { ...prev, ...r.data } : prev));
       setAvatarFailed(false);
+      setAvatarPreview(null);
       setEditing(false);
       setAvatarFile(null);
-      // keep preview so avatar shows immediately without full reload
+      if (fileInputRef.current) fileInputRef.current.value = '';
     } catch {
       setSaveError('Failed to save. Please try again.');
     } finally {
