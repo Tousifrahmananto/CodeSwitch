@@ -1,7 +1,11 @@
 from django.urls import path
-from .views import RegisterView, LoginView, LogoutView, ProfileView, PublicProfileView, MeView, GoogleAuthView
+from .views import (
+    CsrfTokenView, GoogleAuthView, LoginView, LogoutView, MeView,
+    ProfileView, PublicProfileView, RegisterView,
+)
 
 urlpatterns = [
+    path('csrf/', CsrfTokenView.as_view(), name='csrf-token'),
     path('register', RegisterView.as_view(), name='register'),
     path('login', LoginView.as_view(), name='login'),
     path('auth/google', GoogleAuthView.as_view(), name='google-auth'),

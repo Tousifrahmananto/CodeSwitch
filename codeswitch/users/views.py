@@ -6,9 +6,16 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from django.contrib.auth import get_user_model
 from django.conf import settings
+from django.middleware.csrf import get_token
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_protect
 from django.utils.text import slugify
 from .serializers import RegisterSerializer, UserProfileSerializer
-from converter.throttles import RegisterThrottle, LoginThrottle, TokenRefreshThrottle, PublicProfileThrottle
+from converter.throttles import (
+    CsrfTokenThrottle, LoginThrottle, ProfileWriteThrottle,
+    PublicProfileThrottle, RegisterThrottle, TokenRefreshThrottle,
+    TrackedUserThrottle,
+)
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
 
@@ -45,6 +52,7 @@ def _set_auth_cookies(response, refresh):
     )
 
 
+@method_decorator(csrf_protect, name='dispatch')
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
@@ -52,6 +60,7 @@ class RegisterView(generics.CreateAPIView):
     throttle_classes = [RegisterThrottle]
 
 
+@method_decorator(csrf_protect, name='dispatch')
 class LoginView(APIView):
     permission_classes = [AllowAny]
     throttle_classes = [LoginThrottle]
@@ -95,6 +104,7 @@ def _unique_google_username(email):
     return username
 
 
+@method_decorator(csrf_protect, name='dispatch')
 class GoogleAuthView(APIView):
     permission_classes = [AllowAny]
     throttle_classes = [LoginThrottle]
@@ -119,7 +129,9 @@ class GoogleAuthView(APIView):
 
         google_sub = payload.get('sub')
         email = (payload.get('email') or '').strip().lower()
-        email_verified = bool(payload.get('email_verified'))
+        # Do not treat arbitrary truthy values (for example the string "false")
+        # as proof that Google verified the address.
+        email_verified = payload.get('email_verified') is True
         # Intentionally ignore Google's "picture" claim.
         # CodeSwitch avatars must only come from explicit user uploads to user.avatar.
 
@@ -137,13 +149,30 @@ class GoogleAuthView(APIView):
                         {'error': 'This email is already linked to another Google account.'},
                         status=status.HTTP_409_CONFLICT,
                     )
+                explicitly_linking_current_user = (
+                    request.user.is_authenticated and request.user.pk == existing.pk
+                )
+                if not existing.email_verified and not explicitly_linking_current_user:
+                    return Response(
+                        {
+                            'error': (
+                                'An account already uses this email. Sign in with its password '
+                                'before linking Google.'
+                            )
+                        },
+                        status=status.HTTP_409_CONFLICT,
+                    )
                 existing.google_sub = google_sub
                 existing.google_email_verified = True
+                existing.email_verified = True
                 if not existing.first_name and payload.get('given_name'):
                     existing.first_name = payload.get('given_name', '')[:150]
                 if not existing.last_name and payload.get('family_name'):
                     existing.last_name = payload.get('family_name', '')[:150]
-                existing.save(update_fields=['google_sub', 'google_email_verified', 'first_name', 'last_name'])
+                existing.save(update_fields=[
+                    'google_sub', 'google_email_verified', 'email_verified',
+                    'first_name', 'last_name',
+                ])
                 user = existing
             else:
                 user = User(
@@ -153,12 +182,15 @@ class GoogleAuthView(APIView):
                     last_name=(payload.get('family_name') or '')[:150],
                     google_sub=google_sub,
                     google_email_verified=True,
+                    email_verified=True,
                 )
                 user.set_unusable_password()
                 user.save()
         elif not user.google_email_verified:
             user.google_email_verified = True
-            user.save(update_fields=['google_email_verified'])
+            if (user.email or '').casefold() == email.casefold():
+                user.email_verified = True
+            user.save(update_fields=['google_email_verified', 'email_verified'])
 
         refresh = RefreshToken.for_user(user)
         response = Response({'user': UserProfileSerializer(user, context={'request': request}).data})
@@ -166,6 +198,7 @@ class GoogleAuthView(APIView):
         return response
 
 
+@method_decorator(csrf_protect, name='dispatch')
 class LogoutView(APIView):
     permission_classes = [AllowAny]
 
@@ -184,6 +217,7 @@ class LogoutView(APIView):
         return response
 
 
+@method_decorator(csrf_protect, name='dispatch')
 class CookieTokenRefreshView(APIView):
     """
     POST /api/token/refresh/
@@ -222,9 +256,18 @@ class MeView(APIView):
         return Response(UserProfileSerializer(request.user, context={'request': request}).data)
 
 
+class CsrfTokenView(APIView):
+    permission_classes = [AllowAny]
+    throttle_classes = [CsrfTokenThrottle]
+
+    def get(self, request):
+        return Response({'csrf_token': get_token(request)})
+
+
 class ProfileView(generics.RetrieveUpdateAPIView):
     serializer_class = UserProfileSerializer
     permission_classes = [IsAuthenticated]
+    throttle_classes = [TrackedUserThrottle, ProfileWriteThrottle]
 
     def get_object(self):
         return self.request.user

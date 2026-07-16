@@ -163,7 +163,7 @@ class VerifyConversionTests(TestCase):
         self.assertEqual(response.status_code, 400)
 
 
-@override_settings(AXES_ENABLED=False)
+@override_settings(AXES_ENABLED=False, PYTHON_EXECUTION_TRACING_ENABLED=True)
 class VisualizeCodeTests(TestCase):
 
     def setUp(self):
@@ -194,6 +194,17 @@ class VisualizeCodeTests(TestCase):
         self.assertEqual(response.data['steps'][0]['line'], 1)
         self.assertIn('visual', response.data['steps'][0])
         self.assertIn('stack', response.data['steps'][0]['visual'])
+
+    def test_visualize_python_uses_non_executing_concept_trace_by_default(self):
+        with self.settings(PYTHON_EXECUTION_TRACING_ENABLED=False):
+            response = self.client.post(
+                '/api/visualize',
+                {'language': 'python', 'code': 'print("safe")'},
+                format='json',
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['mode'], 'concept_trace')
+        self.assertNotIn('trace', response.data)
 
     def test_visualize_python_lists_and_dicts_create_heap_refs(self):
         code = 'items = [1, 2]\nstate = {"items": items}\nitems.append(3)\nprint(state)\n'

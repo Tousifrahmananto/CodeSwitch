@@ -78,7 +78,8 @@ export default function Converter() {
   // User API key state
   const [quotaExhausted, setQuotaExhausted] = useState(false);
   const [userKeyInput, setUserKeyInput] = useState('');
-  const [hasUserKey, setHasUserKey] = useState(!!sessionStorage.getItem('userApiKey'));
+  const [userApiKey, setUserApiKey] = useState('');
+  const hasUserKey = Boolean(userApiKey);
 
   // Abort controllers for in-flight AI requests — cancelled on unmount or new request
   const convertControllerRef = useRef<AbortController | null>(null);
@@ -117,7 +118,7 @@ export default function Converter() {
   const isQuotaError = (msg: string) =>
     msg.includes('All API keys exhausted') || msg.includes('AI_API_KEY not set');
 
-  const handleConvert = async () => {
+  const handleConvert = async (apiKeyOverride?: string) => {
     if (!inputCode.trim()) return setError('Please enter some code.');
     if (sourceLang === targetLang) return setError('Source and target languages must differ.');
     convertControllerRef.current?.abort();
@@ -140,7 +141,12 @@ export default function Converter() {
         source_language: sourceLang,
         target_language: targetLang,
         code: inputCode,
-      }, { signal: controller.signal });
+      }, {
+        signal: controller.signal,
+        headers: (apiKeyOverride || userApiKey)
+          ? { 'X-User-Api-Key': apiKeyOverride || userApiKey }
+          : undefined,
+      });
       setOutputCode(data.output);
       setEngine(data.engine || 'rules');
     } catch (err: any) {
@@ -227,7 +233,10 @@ export default function Converter() {
         output_code: outputCode,
         source_language: sourceLang,
         target_language: targetLang,
-      }, { signal: controller.signal });
+      }, {
+        signal: controller.signal,
+        headers: userApiKey ? { 'X-User-Api-Key': userApiKey } : undefined,
+      });
       setExplanation(data.explanation);
     } catch (err: any) {
       if (err.name === 'CanceledError' || err.name === 'AbortError') return;
@@ -311,17 +320,15 @@ export default function Converter() {
   const handleSaveUserKey = () => {
     const key = userKeyInput.trim();
     if (!key) return;
-    sessionStorage.setItem('userApiKey', key);
-    setHasUserKey(true);
+    setUserApiKey(key);
     setUserKeyInput('');
     setQuotaExhausted(false);
     setError('');
-    handleConvert();
+    void handleConvert(key);
   };
 
   const handleRemoveUserKey = () => {
-    sessionStorage.removeItem('userApiKey');
-    setHasUserKey(false);
+    setUserApiKey('');
   };
 
   // Keep shortcut refs in sync with latest handlers
@@ -392,7 +399,7 @@ export default function Converter() {
           </svg>
           <button
             className="bg-accent hover:bg-accent-h text-white border-none rounded px-5 py-2 text-sm font-semibold transition-colors cursor-pointer disabled:opacity-50"
-            onClick={handleConvert}
+            onClick={() => void handleConvert()}
             disabled={loading}
             title="Convert (Ctrl+Enter)"
           >

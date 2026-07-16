@@ -2,6 +2,24 @@ import axios, { AxiosResponse, AxiosRequestConfig, InternalAxiosRequestConfig } 
 import type { User, ConversionRecord, CodeFile, LearningModule, Lesson, UserProgress, Quiz, SharedSnippet, PublicProfile, AdminStats, AdminUser, AdminConversion, AdminLesson, VisualizationTimeline, VerificationResult } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+let csrfToken: string | null = null;
+let csrfRequest: Promise<string> | null = null;
+
+export const ensureCsrfToken = (): Promise<string> => {
+  if (csrfToken) return Promise.resolve(csrfToken);
+  if (!csrfRequest) {
+    csrfRequest = axios
+      .get<{ csrf_token: string }>(`${API_BASE}/csrf/`, { withCredentials: true })
+      .then(({ data }) => {
+        csrfToken = data.csrf_token;
+        return csrfToken;
+      })
+      .finally(() => {
+        csrfRequest = null;
+      });
+  }
+  return csrfRequest;
+};
 
 const client = axios.create({
   baseURL: API_BASE,
@@ -23,7 +41,11 @@ client.interceptors.response.use(
       original._retry = true;
       try {
         // The refresh_token cookie is automatically included via withCredentials
-        await axios.post(`${API_BASE}/token/refresh/`, {}, { withCredentials: true });
+        const token = await ensureCsrfToken();
+        await axios.post(`${API_BASE}/token/refresh/`, {}, {
+          withCredentials: true,
+          headers: { 'X-CSRFToken': token },
+        });
         // Retry the original request — the new access_token cookie will be included
         return client(original);
       } catch {
@@ -39,11 +61,12 @@ client.interceptors.response.use(
   }
 );
 
-// Inject user-provided API key header if one has been saved in sessionStorage
-client.interceptors.request.use((config) => {
-  const userKey = sessionStorage.getItem('userApiKey');
-  if (userKey) {
-    config.headers['X-User-Api-Key'] = userKey;
+// Cross-origin cookie auth cannot read Railway's CSRF cookie from Vercel.
+// Fetch a masked token from Django and keep it in memory for unsafe requests.
+client.interceptors.request.use(async (config) => {
+  const method = (config.method || 'get').toLowerCase();
+  if (!['get', 'head', 'options'].includes(method)) {
+    config.headers['X-CSRFToken'] = await ensureCsrfToken();
   }
   return config;
 });

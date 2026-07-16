@@ -83,6 +83,16 @@ class LoginTests(TestCase):
             format='json')
         self.assertEqual(response.status_code, 401)
 
+    def test_login_requires_csrf_in_real_client_mode(self):
+        client = APIClient(enforce_csrf_checks=True)
+        payload = {'username': 'testuser', 'password': 'Test1234!'}
+        self.assertEqual(client.post('/api/login', payload, format='json').status_code, 403)
+
+        csrf_response = client.get('/api/csrf/')
+        token = csrf_response.data['csrf_token']
+        response = client.post('/api/login', payload, format='json', HTTP_X_CSRFTOKEN=token)
+        self.assertEqual(response.status_code, 200)
+
 
 @override_settings(AXES_ENABLED=False, GOOGLE_OAUTH_CLIENT_ID='google-client-id.apps.googleusercontent.com')
 class GoogleAuthTests(TestCase):
@@ -111,6 +121,7 @@ class GoogleAuthTests(TestCase):
         user = User.objects.get(email='google@example.com')
         self.assertEqual(user.google_sub, 'google-sub-123')
         self.assertTrue(user.google_email_verified)
+        self.assertTrue(user.email_verified)
         self.assertFalse(user.has_usable_password())
         self.assertIn('access_token', response.cookies)
         self.assertIn('refresh_token', response.cookies)
@@ -136,6 +147,7 @@ class GoogleAuthTests(TestCase):
             username='existing',
             email='google@example.com',
             password='Test1234!',
+            email_verified=True,
         )
         verify_mock.return_value = self._payload(given_name='Linked')
 
@@ -146,6 +158,21 @@ class GoogleAuthTests(TestCase):
         self.assertEqual(existing.google_sub, 'google-sub-123')
         self.assertEqual(existing.first_name, 'Linked')
         self.assertEqual(User.objects.count(), 1)
+
+    @patch('users.views.id_token.verify_oauth2_token')
+    def test_google_auth_does_not_link_unverified_local_email(self, verify_mock):
+        existing = User.objects.create_user(
+            username='unverified',
+            email='google@example.com',
+            password='Test1234!',
+        )
+        verify_mock.return_value = self._payload()
+
+        response = self.client.post('/api/auth/google', {'credential': 'id-token'}, format='json')
+
+        self.assertEqual(response.status_code, 409)
+        existing.refresh_from_db()
+        self.assertIsNone(existing.google_sub)
 
     @patch('users.views.id_token.verify_oauth2_token')
     def test_google_auth_existing_google_sub_signs_in_same_user(self, verify_mock):
@@ -269,6 +296,24 @@ class ProfileTests(TestCase):
         self.user.refresh_from_db()
         self.assertEqual(self.user.first_name, 'Updated')
         self.assertEqual(self.user.bio, 'New bio')
+
+    def test_cookie_authenticated_profile_write_requires_csrf(self):
+        client = APIClient(enforce_csrf_checks=True)
+        client.cookies['access_token'] = str(RefreshToken.for_user(self.user).access_token)
+
+        rejected = client.patch('/api/profile', {'first_name': 'Blocked'}, format='json')
+        self.assertEqual(rejected.status_code, 403)
+
+        csrf_response = client.get('/api/csrf/')
+        accepted = client.patch(
+            '/api/profile',
+            {'first_name': 'Allowed'},
+            format='json',
+            HTTP_X_CSRFTOKEN=csrf_response.data['csrf_token'],
+        )
+        self.assertEqual(accepted.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, 'Allowed')
 
     def test_profile_avatar_upload_persists_after_reload(self):
         image = BytesIO()

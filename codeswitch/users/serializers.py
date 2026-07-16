@@ -59,8 +59,16 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'bio', 'avatar', 'date_joined')
-        read_only_fields = ('id', 'date_joined')
+        fields = ('id', 'username', 'email', 'email_verified', 'first_name', 'last_name', 'bio', 'avatar', 'date_joined')
+        read_only_fields = ('id', 'email_verified', 'date_joined')
+
+    def validate_email(self, value):
+        queryset = User.objects.filter(email__iexact=value)
+        if self.instance is not None:
+            queryset = queryset.exclude(pk=self.instance.pk)
+        if queryset.exists():
+            raise serializers.ValidationError('An account with this email already exists.')
+        return value.lower()
 
     @staticmethod
     def avatar_representation(instance, request=None):
@@ -81,7 +89,12 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         avatar = validated_data.pop('avatar', serializers.empty)
+        previous_email = (instance.email or '').casefold()
         instance = super().update(instance, validated_data)
+
+        if 'email' in validated_data and (instance.email or '').casefold() != previous_email:
+            instance.email_verified = False
+            instance.save(update_fields=['email_verified'])
 
         if avatar is not serializers.empty:
             if avatar is None:

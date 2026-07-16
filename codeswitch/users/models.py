@@ -1,6 +1,8 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.core.exceptions import ValidationError
+from django.db.models import Q
+from django.db.models.functions import Lower
 
 
 def _validate_avatar(file):
@@ -29,6 +31,16 @@ class User(AbstractUser):
     avatar_filename = models.CharField(max_length=255, blank=True)
     google_sub = models.CharField(max_length=255, unique=True, null=True, blank=True)
     google_email_verified = models.BooleanField(default=False)
+    email_verified = models.BooleanField(default=False)
+
+    class Meta(AbstractUser.Meta):
+        constraints = [
+            models.UniqueConstraint(
+                Lower('email'),
+                condition=~Q(email=''),
+                name='users_user_email_ci_unique',
+            ),
+        ]
 
     def __str__(self):
         return self.username

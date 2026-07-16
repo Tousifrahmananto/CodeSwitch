@@ -1,4 +1,5 @@
 from pathlib import Path
+from django.core.exceptions import ImproperlyConfigured
 from decouple import config
 from datetime import timedelta
 import dj_database_url
@@ -158,17 +159,32 @@ REST_FRAMEWORK = {
         'register': '5/hour',
         'login': '10/minute',
         'token_refresh': '30/minute',
+        'csrf': '60/minute',
         'public_profile': '60/minute',
         'run_user': '30/minute',
+        'run_anon_sustained': '30/hour',
+        'run_user_sustained': '100/hour',
+        'verify_burst': '10/minute',
+        'verify_sustained': '50/hour',
+        'visualizer_burst': '5/minute',
+        'visualizer_sustained': '30/hour',
         'snippet_ip': '60/minute',
         'snippet_create': '20/hour',
         'write': '60/minute',
+        'profile_write': '10/minute',
+        'file_write': '20/minute',
+        'quiz_submit': '20/minute',
+        'history_read': '60/minute',
         'admin': '120/minute',
         'snippet_anon': '60/minute',  # PUBLIC snippet retrieval — prevent UUID enumeration
     },
 }
 
 REDIS_URL = config('REDIS_URL', default='').strip()
+if not DEBUG and not REDIS_URL:
+    raise ImproperlyConfigured(
+        'REDIS_URL is required when DEBUG=False so throttles are shared across workers.'
+    )
 if REDIS_URL:
     CACHES = {
         'default': {
@@ -187,12 +203,23 @@ else:
     }
 
 TRUSTED_PROXY_COUNT = config('TRUSTED_PROXY_COUNT', default=0, cast=int)
+if not DEBUG and TRUSTED_PROXY_COUNT <= 0:
+    raise ImproperlyConfigured(
+        'TRUSTED_PROXY_COUNT must match Railway proxy hops when DEBUG=False.'
+    )
 REST_FRAMEWORK['NUM_PROXIES'] = TRUSTED_PROXY_COUNT
 METRICS_ENABLED = config('METRICS_ENABLED', default=True, cast=bool)
 METRICS_BEARER_TOKEN = config('METRICS_BEARER_TOKEN', default='')
 CONVERSION_HISTORY_RETENTION_DAYS = config('CONVERSION_HISTORY_RETENTION_DAYS', default=180, cast=int)
 DB_REQUEST_RETRY_ATTEMPTS = config('DB_REQUEST_RETRY_ATTEMPTS', default=3, cast=int)
 DB_REQUEST_RETRY_DELAY_SECONDS = config('DB_REQUEST_RETRY_DELAY_SECONDS', default=0.25, cast=float)
+PYTHON_EXECUTION_TRACING_ENABLED = config(
+    'PYTHON_EXECUTION_TRACING_ENABLED', default=False, cast=bool
+)
+if not DEBUG and PYTHON_EXECUTION_TRACING_ENABLED:
+    raise ImproperlyConfigured(
+        'In-process Python execution tracing is disabled in production. Use an isolated worker.'
+    )
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=config('JWT_ACCESS_TOKEN_LIFETIME_MINUTES', default=60, cast=int)),
@@ -232,7 +259,7 @@ CORS_ALLOWED_ORIGINS = _parse_and_validate_origins(
 from corsheaders.defaults import default_headers as _default_cors_headers
 CORS_ALLOW_HEADERS = list(_default_cors_headers) + ['X-User-Api-Key']
 CSRF_TRUSTED_ORIGINS = _parse_and_validate_origins(
-    config('CSRF_TRUSTED_ORIGINS', default='http://localhost:8000')
+    config('CSRF_TRUSTED_ORIGINS', default='http://localhost:3000')
 )
 
 # ── Cookie security ───────────────────────────────────────────────────────────
@@ -240,9 +267,10 @@ SESSION_COOKIE_HTTPONLY = True
 # Cross-origin production (Vercel → Railway): SameSite=None so cookies are sent cross-site.
 # Local development: SameSite=Lax is sufficient (both services run on localhost).
 SESSION_COOKIE_SAMESITE = 'None' if not DEBUG else 'Lax'
-# In production these are forced True by SECURE_SSL_REDIRECT
 SESSION_COOKIE_SECURE = not DEBUG
-CSRF_COOKIE_HTTPONLY = False   # Must be JS-readable so Axios can send X-CSRFToken header
+# The frontend receives a masked token from /api/csrf/ and keeps it in memory;
+# JavaScript never needs direct access to the CSRF cookie.
+CSRF_COOKIE_HTTPONLY = True
 CSRF_COOKIE_SAMESITE = 'None' if not DEBUG else 'Lax'
 CSRF_COOKIE_SECURE = not DEBUG
 

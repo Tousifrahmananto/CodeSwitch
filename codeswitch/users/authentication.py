@@ -1,5 +1,14 @@
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+from rest_framework.authentication import CSRFCheck
+from rest_framework.exceptions import PermissionDenied
+
+
+def _csrf_failure_reason(request):
+    """Run Django's CSRF validation for a DRF request."""
+    check = CSRFCheck(lambda _request: None)
+    check.process_request(request)
+    return check.process_view(request, None, (), {})
 
 
 class JWTCookieAuthentication(JWTAuthentication):
@@ -17,4 +26,8 @@ class JWTCookieAuthentication(JWTAuthentication):
             validated_token = self.get_validated_token(raw_token)
         except (InvalidToken, TokenError):
             return None
-        return self.get_user(validated_token), validated_token
+        user = self.get_user(validated_token)
+        reason = _csrf_failure_reason(request)
+        if reason:
+            raise PermissionDenied(f'CSRF Failed: {reason}')
+        return user, validated_token

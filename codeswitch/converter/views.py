@@ -12,7 +12,10 @@ from .models import ConversionHistory, SharedSnippet
 from .throttles import (
     AIBurstThrottle, AISustainedThrottle, RunCodeAnonThrottle,
     RunCodeUserThrottle, SnippetIPThrottle, SnippetCreateThrottle,
-    WriteThrottle,
+    HistoryReadThrottle, RunCodeAnonSustainedThrottle,
+    RunCodeUserSustainedThrottle, VerifyBurstThrottle,
+    VerifySustainedThrottle, VisualizerBurstThrottle,
+    VisualizerSustainedThrottle,
 )
 from .serializers import SharedSnippetCreateSerializer
 from .visualizer import build_visualization
@@ -197,6 +200,7 @@ class ConvertCodeView(APIView):
 class ConversionHistoryView(APIView):
     """GET /api/convert/history — List the user's past conversions."""
     permission_classes = [IsAuthenticated]
+    throttle_classes = [HistoryReadThrottle]
 
     def get(self, request):
         queryset = ConversionHistory.objects.filter(user=request.user).order_by('-timestamp')
@@ -259,7 +263,10 @@ class RunCodeView(APIView):
     Proxies code execution to Wandbox, picking the best available compiler.
     """
     permission_classes = [AllowAny]
-    throttle_classes = [RunCodeAnonThrottle, RunCodeUserThrottle]
+    throttle_classes = [
+        RunCodeAnonThrottle, RunCodeAnonSustainedThrottle,
+        RunCodeUserThrottle, RunCodeUserSustainedThrottle,
+    ]
     SUPPORTED = EXECUTION_LANGUAGES
     MAX_CODE_LENGTH = MAX_EXECUTION_CODE_LENGTH
     MAX_STDIN_LENGTH = MAX_EXECUTION_STDIN_LENGTH
@@ -302,7 +309,7 @@ class VerifyConversionView(APIView):
     Execute source and converted code with identical stdin and compare behavior.
     """
     permission_classes = [IsAuthenticated]
-    throttle_classes = [RunCodeUserThrottle]
+    throttle_classes = [VerifyBurstThrottle, VerifySustainedThrottle]
 
     def post(self, request):
         source_language = request.data.get('source_language', '').lower().strip()
@@ -430,7 +437,7 @@ class VisualizeCodeView(APIView):
     Returns a deterministic educational animation timeline.
     """
     permission_classes = [IsAuthenticated]
-    throttle_classes = [WriteThrottle]
+    throttle_classes = [VisualizerBurstThrottle, VisualizerSustainedThrottle]
 
     def post(self, request):
         language = request.data.get('language', '')

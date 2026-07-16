@@ -4,6 +4,7 @@ import operator
 import re
 import subprocess
 import sys
+from django.conf import settings
 
 
 SUPPORTED_LANGUAGES = {'python', 'c', 'java', 'javascript', 'cpp'}
@@ -853,7 +854,7 @@ def build_visualization(language, code):
     variables = {}
     output = []
 
-    if language == 'python':
+    if language == 'python' and settings.PYTHON_EXECUTION_TRACING_ENABLED:
         trace_result = _build_python_subprocess_trace(code.replace('\x00', ''))
         if trace_result and trace_result.get('trace'):
             trace = trace_result.get('trace', [])[:MAX_TRACE_STEPS]

@@ -43,6 +43,10 @@ class TokenRefreshThrottle(IPThrottle):
     scope = 'token_refresh'
 
 
+class CsrfTokenThrottle(IPThrottle):
+    scope = 'csrf'
+
+
 class PublicProfileThrottle(IPThrottle):
     scope = 'public_profile'
 
@@ -53,6 +57,30 @@ class RunCodeAnonThrottle(TrackedAnonThrottle):
 
 class RunCodeUserThrottle(TrackedUserThrottle):
     scope = 'run_user'
+
+
+class RunCodeAnonSustainedThrottle(TrackedAnonThrottle):
+    scope = 'run_anon_sustained'
+
+
+class RunCodeUserSustainedThrottle(TrackedUserThrottle):
+    scope = 'run_user_sustained'
+
+
+class VerifyBurstThrottle(TrackedUserThrottle):
+    scope = 'verify_burst'
+
+
+class VerifySustainedThrottle(TrackedUserThrottle):
+    scope = 'verify_sustained'
+
+
+class VisualizerBurstThrottle(TrackedUserThrottle):
+    scope = 'visualizer_burst'
+
+
+class VisualizerSustainedThrottle(TrackedUserThrottle):
+    scope = 'visualizer_sustained'
 
 
 class SnippetIPThrottle(IPThrottle):
@@ -70,6 +98,22 @@ class WriteThrottle(TrackedUserThrottle):
         if request.method in ('GET', 'HEAD', 'OPTIONS'):
             return True
         return super().allow_request(request, view)
+
+
+class ProfileWriteThrottle(WriteThrottle):
+    scope = 'profile_write'
+
+
+class FileWriteThrottle(WriteThrottle):
+    scope = 'file_write'
+
+
+class QuizSubmitThrottle(TrackedUserThrottle):
+    scope = 'quiz_submit'
+
+
+class HistoryReadThrottle(TrackedUserThrottle):
+    scope = 'history_read'
 
 
 class AdminThrottle(TrackedUserThrottle):

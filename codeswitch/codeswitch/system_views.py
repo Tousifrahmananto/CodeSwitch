@@ -4,13 +4,16 @@ from django.conf import settings
 from django.db import connection
 from django.core.cache import cache
 from django.http import HttpResponse, JsonResponse
+from django.views.decorators.http import require_safe
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 
+@require_safe
 def live(request):
     return JsonResponse({'status': 'ok'})
 
 
+@require_safe
 def ready(request):
     try:
         with connection.cursor() as cursor:
@@ -25,6 +28,7 @@ def ready(request):
         return JsonResponse({'status': 'not_ready'}, status=503)
 
 
+@require_safe
 def metrics(request):
     if not settings.METRICS_ENABLED:
         return HttpResponse(status=404)

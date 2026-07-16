@@ -67,3 +67,25 @@ class EndpointThrottleTests(TestCase):
         )
         self.assertEqual(response.status_code, 429)
         self.assertEqual(response.data['scope'], 'register')
+
+    def test_visualizer_has_cost_aware_burst_limit(self):
+        client = authed_client(self.user)
+        payload = {'language': 'python', 'code': 'value = 1\nprint(value)'}
+        for _ in range(5):
+            self.assertEqual(client.post('/api/visualize', payload, format='json').status_code, 200)
+        response = client.post('/api/visualize', payload, format='json')
+        self.assertEqual(response.status_code, 429)
+        self.assertEqual(response.data['scope'], 'visualizer_burst')
+        self.assertIn('Retry-After', response)
+
+    def test_profile_writes_have_dedicated_limit(self):
+        client = authed_client(self.user)
+        for index in range(10):
+            self.assertEqual(
+                client.patch('/api/profile', {'bio': f'update {index}'}, format='json').status_code,
+                200,
+            )
+        response = client.patch('/api/profile', {'bio': 'blocked'}, format='json')
+        self.assertEqual(response.status_code, 429)
+        self.assertEqual(response.data['scope'], 'profile_write')
+        self.assertIn('Retry-After', response)

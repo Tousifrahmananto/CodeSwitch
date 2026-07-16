@@ -6,7 +6,7 @@ from rest_framework import serializers
 from django.db.models import Count
 from django.utils import timezone
 from .models import LearningModule, Lesson, UserProgress, Quiz, QuizAttempt
-from converter.throttles import WriteThrottle
+from converter.throttles import QuizSubmitThrottle, WriteThrottle
 
 
 # ── Serializers ──────────────────────────────
@@ -145,7 +145,7 @@ class GetLessonQuizView(APIView):
 class SubmitQuizAttemptView(APIView):
     """POST /api/quizzes/<quiz_id>/submit/ — Submit answers and get score with explanations."""
     permission_classes = [IsAuthenticated]
-    throttle_classes = [WriteThrottle]
+    throttle_classes = [QuizSubmitThrottle]
 
     def post(self, request, quiz_id):
         try:
@@ -154,6 +154,8 @@ class SubmitQuizAttemptView(APIView):
             return Response({'error': 'Quiz not found.'}, status=status.HTTP_404_NOT_FOUND)
 
         answers = request.data.get('answers', {})  # {str(question_id): str(option_id)}
+        if not isinstance(answers, dict) or len(answers) > 100:
+            return Response({'error': 'Answers must be an object with at most 100 entries.'}, status=status.HTTP_400_BAD_REQUEST)
         questions = list(quiz.questions.all())
         if not questions:
             return Response({'error': 'Quiz has no questions.'}, status=status.HTTP_400_BAD_REQUEST)

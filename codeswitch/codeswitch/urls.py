@@ -33,7 +33,9 @@ urlpatterns = [
     path('api/admin/lessons/<int:pk>',                  AdminLessonDetailView.as_view()),
 ]
 
-# Public profile avatars. Mount a persistent Railway volume at MEDIA_ROOT.
-urlpatterns += [
-    re_path(r'^media/(?P<path>.*)$', serve_media, {'document_root': settings.MEDIA_ROOT}),
-]
+# Legacy file-backed avatars are available only in local development. Production
+# avatars are served from the database representation, not Django's static helper.
+if settings.DEBUG:
+    urlpatterns += [
+        re_path(r'^media/(?P<path>.*)$', serve_media, {'document_root': settings.MEDIA_ROOT}),
+    ]
