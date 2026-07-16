@@ -384,8 +384,9 @@ Each module contains structured lessons with a built-in Monaco sandbox for live 
 ## Deployment
 
 ### Backend — Railway
-Railway runs migrations, idempotent seeding, and static collection through
-`codeswitch/railway.json` before switching traffic. The `Procfile` starts only Gunicorn:
+Railway collects static files into the deploy image during the build, then runs
+migrations and idempotent seeding in the pre-deploy container through
+`codeswitch/railway.json`. The `Procfile` starts only Gunicorn:
 ```
 web: gunicorn codeswitch.wsgi --bind 0.0.0.0:$PORT --access-logfile - --error-logfile -
 ```

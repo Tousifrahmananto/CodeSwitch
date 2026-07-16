@@ -182,8 +182,9 @@ python manage.py runserver
 
 ## Deployment (Railway)
 
-`railway.json` runs migration, seeding, and static collection as a
-pre-deploy command. The `Procfile` starts only the web process:
+`railway.json` collects static files into the deploy image during the build.
+Database migration and idempotent seeding run in the separate pre-deploy
+container. The `Procfile` starts only the web process:
 
 ```
 web: gunicorn codeswitch.wsgi --bind 0.0.0.0:$PORT --access-logfile - --error-logfile -
