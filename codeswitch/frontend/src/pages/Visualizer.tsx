@@ -82,14 +82,18 @@ function TutorTraceBoard({
   total,
   index,
   codeLines,
+  language,
 }: {
   step?: VisualizationStep;
   total: number;
   index: number;
   codeLines: string[];
+  language: VisualizerLanguage;
 }) {
   const meta = kindMeta(step?.kind || 'statement');
-  const stack = step?.visual.stack || [];
+  const stack = step?.visual.stack || (step?.visual.variables.length
+    ? [{ name: 'Program state', variables: step.visual.variables }]
+    : []);
   const output = step?.visual.output || [];
   const activeLine = step?.line;
 
@@ -127,8 +131,8 @@ function TutorTraceBoard({
 
         <div className="viz-tutor-memory">
           <div className="viz-tutor-section-title">
-            <span>Frames / Variables</span>
-            <small>call stack</small>
+            <span>Variables</span>
+            <small>{getLanguageMeta(language).label} concept state</small>
           </div>
           {stack.length ? stack.map((frame, frameIndex) => (
             <div key={`${frame.name}-${frameIndex}`} className="viz-tutor-frame">
@@ -483,6 +487,15 @@ export default function Visualizer() {
 
       {error && <p className="viz-error">{error}</p>}
 
+      <div className={`viz-mode-notice ${language === 'python' ? 'real' : 'concept'}`}>
+        <strong>{language === 'python' ? 'Real execution trace' : 'Concept trace'}</strong>
+        <span>
+          {language === 'python'
+            ? 'Python runs in a restricted backend tracer to capture stack frames, heap objects, and output.'
+            : `${getLanguageMeta(language).label} is explained line by line using structural analysis; it is not executed or presented as runtime memory.`}
+        </span>
+      </div>
+
       <div className="viz-grid">
         <section className="viz-card viz-editor-card">
           <div className="viz-card-header">
@@ -527,6 +540,7 @@ export default function Visualizer() {
               total={stepCount}
               index={activeIndex}
               codeLines={codeLines}
+              language={language}
             />
           )}
 

@@ -851,6 +851,7 @@ def build_visualization(language, code):
     steps = []
     concepts = []
     variables = {}
+    output = []
 
     if language == 'python':
         trace_result = _build_python_subprocess_trace(code.replace('\x00', ''))
@@ -907,9 +908,21 @@ def build_visualization(language, code):
         if name and value:
             variables[name] = value
 
+        if kind == 'output':
+            output.append(f'Output expression: {_clean_line(line)}')
+
+        variable_snapshot = [
+            {'name': key, 'value': val}
+            for key, val in variables.items()
+        ]
         visual = {
             'focus': kind,
-            'variables': [{'name': key, 'value': val} for key, val in variables.items()],
+            'variables': variable_snapshot,
+            'stack': [{
+                'name': 'Program state',
+                'variables': variable_snapshot,
+            }],
+            'output': list(output),
         }
         if kind == 'loop':
             visual['pulse'] = 'loop'

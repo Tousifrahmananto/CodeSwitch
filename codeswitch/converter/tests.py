@@ -213,6 +213,30 @@ class VisualizeCodeTests(TestCase):
         self.assertNotIn('trace', response.data)
         self.assertIn('conditionals', response.data['concepts'])
         self.assertIn('output', response.data['concepts'])
+        self.assertTrue(response.data['steps'][-1]['visual']['stack'])
+        self.assertTrue(response.data['steps'][-1]['visual']['output'])
+
+    def test_visualize_all_non_python_languages_return_concept_traces(self):
+        examples = {
+            'javascript': 'let total = 1;\ntotal = total + 2;\nconsole.log(total);',
+            'java': 'class Main {\n  public static void main(String[] args) {\n    int total = 3;\n    System.out.println(total);\n  }\n}',
+            'cpp': '#include <iostream>\nint main() {\n  int total = 3;\n  std::cout << total;\n}',
+            'c': '#include <stdio.h>\nint main() {\n  int total = 3;\n  printf("%d", total);\n}',
+        }
+
+        for language, code in examples.items():
+            with self.subTest(language=language):
+                response = self.client.post('/api/visualize',
+                    {'language': language, 'code': code},
+                    format='json')
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.data['language'], language)
+                self.assertEqual(response.data['mode'], 'concept_trace')
+                self.assertGreaterEqual(len(response.data['steps']), 2)
+                self.assertIn('variables', response.data['concepts'])
+                self.assertIn('output', response.data['concepts'])
+                self.assertTrue(response.data['steps'][-1]['visual']['stack'])
+                self.assertTrue(response.data['steps'][-1]['visual']['output'])
 
     def test_visualize_validates_language_and_code(self):
         bad_lang = self.client.post('/api/visualize',
