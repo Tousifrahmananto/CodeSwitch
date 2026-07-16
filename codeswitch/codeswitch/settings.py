@@ -180,18 +180,17 @@ REST_FRAMEWORK = {
     },
 }
 
-REDIS_URL = config('REDIS_URL', default='').strip()
-if not DEBUG and not REDIS_URL:
-    raise ImproperlyConfigured(
-        'REDIS_URL is required when DEBUG=False so throttles are shared across workers.'
-    )
-if REDIS_URL:
+_cache_key_prefix = config('CACHE_KEY_PREFIX', default='codeswitch')
+if not DEBUG:
+    # Railway plans may permit only one persistent database/volume. Reuse the
+    # existing PostgreSQL database for shared cross-worker throttle counters.
+    # `createcachetable` runs idempotently in the pre-deploy command.
     CACHES = {
         'default': {
-            'BACKEND': 'django_redis.cache.RedisCache',
-            'LOCATION': REDIS_URL,
-            'OPTIONS': {'CLIENT_CLASS': 'django_redis.client.DefaultClient'},
-            'KEY_PREFIX': config('CACHE_KEY_PREFIX', default='codeswitch'),
+            'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+            'LOCATION': config('CACHE_TABLE_NAME', default='codeswitch_cache'),
+            'KEY_PREFIX': _cache_key_prefix,
+            'OPTIONS': {'MAX_ENTRIES': 10_000, 'CULL_FREQUENCY': 3},
         }
     }
 else:
@@ -201,6 +200,7 @@ else:
             'LOCATION': 'codeswitch-local',
         }
     }
+CACHE_IS_SHARED = not DEBUG
 
 TRUSTED_PROXY_COUNT = config('TRUSTED_PROXY_COUNT', default=0, cast=int)
 if not DEBUG and TRUSTED_PROXY_COUNT <= 0:

@@ -19,7 +19,7 @@ def ready(request):
         with connection.cursor() as cursor:
             cursor.execute('SELECT 1')
             cursor.fetchone()
-        if settings.REDIS_URL:
+        if settings.CACHE_IS_SHARED:
             cache.set('readiness-check', 'ok', timeout=10)
             if cache.get('readiness-check') != 'ok':
                 raise RuntimeError('cache unavailable')

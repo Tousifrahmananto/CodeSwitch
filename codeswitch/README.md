@@ -182,9 +182,13 @@ python manage.py runserver
 
 ## Deployment (Railway)
 
-`railway.json` collects static files into the deploy image during the build.
+`railway.json` collects static files into the deploy image during an isolated
+`DEBUG=True` build step (no production traffic is served by that process).
 Database migration and idempotent seeding run in the separate pre-deploy
 container. The `Procfile` starts only the web process:
+
+Production rate limits use the existing PostgreSQL database cache, so no
+additional cache service or volume is required.
 
 ```
 web: gunicorn codeswitch.wsgi --bind 0.0.0.0:$PORT --access-logfile - --error-logfile -

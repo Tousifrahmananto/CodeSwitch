@@ -6,8 +6,9 @@ submitted code, prompts, cookies, JWTs, passwords, or API keys.
 
 ## Railway configuration
 
-Provision Railway Redis and set `REDIS_URL`. Set `TRUSTED_PROXY_COUNT=1` only
-after confirming Railway is the sole trusted reverse proxy. Configure:
+The existing PostgreSQL service provides the shared rate-limit cache. Set
+`TRUSTED_PROXY_COUNT=1` only after confirming Railway is the sole trusted
+reverse proxy. Configure:
 
 ```env
 SERVICE_NAME=codeswitch-backend

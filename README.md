@@ -384,9 +384,13 @@ Each module contains structured lessons with a built-in Monaco sandbox for live 
 ## Deployment
 
 ### Backend — Railway
-Railway collects static files into the deploy image during the build, then runs
+Railway collects static files into the deploy image during an isolated
+`DEBUG=True` build step, then runs
 migrations and idempotent seeding in the pre-deploy container through
 `codeswitch/railway.json`. The `Procfile` starts only Gunicorn:
+
+The existing PostgreSQL database also stores shared rate-limit cache entries,
+so this deployment does not require another cache service or volume.
 ```
 web: gunicorn codeswitch.wsgi --bind 0.0.0.0:$PORT --access-logfile - --error-logfile -
 ```
