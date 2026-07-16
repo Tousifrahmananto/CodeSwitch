@@ -3799,6 +3799,169 @@ h6,
   margin-top: 0;
 }
 
+.conversion-workflow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  border-radius: 12px;
+  background:
+    linear-gradient(100deg, color-mix(in srgb, var(--accent) 10%, transparent), transparent 42%),
+    var(--surface);
+}
+
+.conversion-workflow-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 190px;
+}
+
+.conversion-workflow-copy strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.conversion-workflow-copy span {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.conversion-workflow-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.conversion-action {
+  padding: 7px 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  font-size: 11px;
+  font-weight: 700;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.conversion-action:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+}
+
+.conversion-action.primary {
+  border-color: var(--accent);
+  color: #fff;
+  background: var(--accent);
+}
+
+.conversion-action:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.conversion-workflow-toast {
+  position: absolute;
+  right: 16px;
+  bottom: -25px;
+  z-index: 2;
+  color: var(--success);
+  font-size: 11px;
+}
+
+.verification-error,
+.verification-result {
+  margin: 14px 0 0;
+  border-radius: 12px;
+}
+
+.verification-error {
+  padding: 11px 14px;
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 9%, transparent);
+  font-size: 12px;
+}
+
+.verification-result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--warning);
+  background: color-mix(in srgb, var(--warning) 8%, var(--surface));
+}
+
+.verification-result.match {
+  border-color: var(--success);
+  background: color-mix(in srgb, var(--success) 8%, var(--surface));
+}
+
+.verification-result > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.verification-result > div:first-child span {
+  color: var(--text-muted);
+  font: 800 10px/1 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.verification-result strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.verification-checks {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.verification-checks span {
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font: 700 10px/1 var(--mono);
+}
+
+.verification-checks .pass {
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 42%, var(--border));
+}
+
+.verification-checks .fail {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 42%, var(--border));
+}
+
+@media (max-width: 900px) {
+  .conversion-workflow,
+  .verification-result {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .conversion-workflow-actions,
+  .verification-checks {
+    justify-content: flex-start;
+  }
+
+  .conversion-workflow-toast {
+    position: static;
+  }
+}
+
 /* ── Explain button & section ────────────────────────────── */
 .btn-explain {
   background: var(--surface);

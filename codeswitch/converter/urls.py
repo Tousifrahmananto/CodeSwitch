@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import (
     ConvertCodeView, ConversionHistoryView, CreateSnippetView, GetSnippetView,
-    RunCodeView, ExplainCodeView, VisualizeCodeView,
+    RunCodeView, VerifyConversionView, ExplainCodeView, VisualizeCodeView,
 )
 
 urlpatterns = [
@@ -10,6 +10,7 @@ urlpatterns = [
     path('snippets/', CreateSnippetView.as_view(), name='create-snippet'),
     path('snippets/<uuid:slug>/', GetSnippetView.as_view(), name='get-snippet'),
     path('run/', RunCodeView.as_view(), name='run-code'),
+    path('verify', VerifyConversionView.as_view(), name='verify-conversion'),
     path('explain/', ExplainCodeView.as_view(), name='explain-code'),
     path('visualize', VisualizeCodeView.as_view(), name='visualize-code'),
 ]

@@ -102,6 +102,68 @@ class RunCodeTests(TestCase):
 
 
 @override_settings(AXES_ENABLED=False)
+class VerifyConversionTests(TestCase):
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='verify_user', email='verify@example.com', password='Test1234!')
+        self.client = _make_authed_client(self.user)
+        self.payload = {
+            'source_language': 'python',
+            'target_language': 'javascript',
+            'source_code': 'print(3)',
+            'target_code': 'console.log(3);',
+            'stdin': '',
+        }
+
+    def test_verify_requires_authentication(self):
+        response = APIClient().post('/api/verify', self.payload, format='json')
+        self.assertEqual(response.status_code, 401)
+
+    @patch('converter.views._execute_code')
+    def test_verify_matching_programs(self, mock_execute):
+        mock_execute.side_effect = [
+            {'stdout': '3\n', 'stderr': '', 'code': 0},
+            {'stdout': '3\r\n', 'stderr': '', 'code': 0},
+        ]
+        response = self.client.post('/api/verify', self.payload, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data['verified'])
+        self.assertEqual(response.data['status'], 'match')
+        self.assertTrue(response.data['comparison']['stdout_match'])
+        self.assertEqual(mock_execute.call_count, 2)
+
+    @patch('converter.views._execute_code')
+    def test_verify_output_mismatch(self, mock_execute):
+        mock_execute.side_effect = [
+            {'stdout': '3\n', 'stderr': '', 'code': 0},
+            {'stdout': '4\n', 'stderr': '', 'code': 0},
+        ]
+        response = self.client.post('/api/verify', self.payload, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data['verified'])
+        self.assertEqual(response.data['status'], 'mismatch')
+        self.assertFalse(response.data['comparison']['stdout_match'])
+
+    @patch('converter.views._execute_code')
+    def test_verify_converted_program_failure(self, mock_execute):
+        mock_execute.side_effect = [
+            {'stdout': '3\n', 'stderr': '', 'code': 0},
+            {'stdout': '', 'stderr': 'compile error', 'code': 1},
+        ]
+        response = self.client.post('/api/verify', self.payload, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data['verified'])
+        self.assertEqual(response.data['status'], 'target_error')
+        self.assertEqual(response.data['target']['stderr'], 'compile error')
+
+    def test_verify_validates_payload(self):
+        payload = {**self.payload, 'target_code': ''}
+        response = self.client.post('/api/verify', payload, format='json')
+        self.assertEqual(response.status_code, 400)
+
+
+@override_settings(AXES_ENABLED=False)
 class VisualizeCodeTests(TestCase):
 
     def setUp(self):

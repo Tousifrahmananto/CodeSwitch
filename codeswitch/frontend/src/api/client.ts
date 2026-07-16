@@ -1,5 +1,5 @@
 import axios, { AxiosResponse, AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
-import type { User, ConversionRecord, CodeFile, LearningModule, Lesson, UserProgress, Quiz, SharedSnippet, PublicProfile, AdminStats, AdminUser, AdminConversion, AdminLesson, VisualizationTimeline } from '../types';
+import type { User, ConversionRecord, CodeFile, LearningModule, Lesson, UserProgress, Quiz, SharedSnippet, PublicProfile, AdminStats, AdminUser, AdminConversion, AdminLesson, VisualizationTimeline, VerificationResult } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
@@ -91,6 +91,15 @@ export const visualizeCode = (
   config?: AxiosRequestConfig,
 ): Promise<AxiosResponse<VisualizationTimeline>> =>
   client.post('/visualize', data, config);
+
+export const verifyConversion = (data: {
+  source_language: string;
+  target_language: string;
+  source_code: string;
+  target_code: string;
+  stdin?: string;
+}): Promise<AxiosResponse<VerificationResult>> =>
+  client.post('/verify', data);
 
 // ── Snippets ──────────────────────────────────
 export const createSnippet = (data: {

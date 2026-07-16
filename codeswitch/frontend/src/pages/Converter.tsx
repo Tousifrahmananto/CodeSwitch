@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
-import { convertCode, createSnippet, explainCode } from '../api/client';
+import { useNavigate } from 'react-router-dom';
+import { convertCode, createFile, createSnippet, explainCode, verifyConversion } from '../api/client';
 import CodeEditor from '../components/CodeEditor';
 import DiffView from '../components/DiffView';
 import { runCode, canRun } from '../api/executor';
 import { getLanguageMeta } from '../constants/languages';
 import type { CSSProperties } from 'react';
-import type { RunResult } from '../types';
+import type { RunResult, VerificationResult } from '../types';
 
 const LANGUAGES = ['python', 'c', 'java', 'javascript', 'cpp'] as const;
 type ConverterLanguage = (typeof LANGUAGES)[number];
@@ -26,7 +27,16 @@ const THEMES = [
   { id: 'dracula', label: 'Dracula' },
 ];
 
+const FILE_EXTENSIONS: Record<ConverterLanguage, string> = {
+  python: 'py',
+  c: 'c',
+  java: 'java',
+  javascript: 'js',
+  cpp: 'cpp',
+};
+
 export default function Converter() {
+  const navigate = useNavigate();
   const [sourceLang, setSourceLang] = useState<ConverterLanguage>('python');
   const [targetLang, setTargetLang] = useState<ConverterLanguage>('c');
   const [inputCode, setInputCode] = useState('');
@@ -53,6 +63,12 @@ export default function Converter() {
   // Share state
   const [shareLoading, setShareLoading] = useState(false);
   const [shareToast, setShareToast] = useState('');
+
+  // Connected conversion workflow state
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [verifyLoading, setVerifyLoading] = useState(false);
+  const [verification, setVerification] = useState<VerificationResult | null>(null);
+  const [verifyError, setVerifyError] = useState('');
 
   // Explain state
   const [explanation, setExplanation] = useState('');
@@ -115,6 +131,8 @@ export default function Converter() {
     setShowDiff(false);
     setExplanation('');
     setShowExplanation(false);
+    setVerification(null);
+    setVerifyError('');
     setConvertElapsed(0);
     elapsedIntervalRef.current = setInterval(() => setConvertElapsed(e => e + 1), 1000);
     try {
@@ -225,6 +243,62 @@ export default function Converter() {
     }
   };
 
+  const handleVisualize = () => {
+    if (!outputCode.trim()) return;
+    navigate('/visualizer', {
+      state: {
+        language: targetLang,
+        code: outputCode,
+        source: 'converter',
+      },
+    });
+  };
+
+  const handleSaveOutput = async () => {
+    if (!outputCode.trim()) return;
+    setSaveLoading(true);
+    try {
+      const filename = `conversion-${Date.now()}.${FILE_EXTENSIONS[targetLang]}`;
+      await createFile({
+        filename,
+        language: targetLang,
+        code_content: outputCode,
+      });
+      setShareToast(`Saved as ${filename}`);
+    } catch {
+      setShareToast('Could not save converted code.');
+    } finally {
+      setSaveLoading(false);
+      setTimeout(() => setShareToast(''), 2500);
+    }
+  };
+
+  const handleVerify = async () => {
+    if (!inputCode.trim() || !outputCode.trim()) return;
+    setVerifyLoading(true);
+    setVerifyError('');
+    setVerification(null);
+    try {
+      const { data } = await verifyConversion({
+        source_language: sourceLang,
+        target_language: targetLang,
+        source_code: inputCode,
+        target_code: outputCode,
+        stdin: runStdin,
+      });
+      setVerification(data);
+      setRunOutput(data.source);
+      setRunOutputTarget(data.target);
+      setRunError('');
+      setRunErrorTarget('');
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string } } };
+      setVerifyError(axiosErr.response?.data?.error || 'Could not verify this conversion.');
+    } finally {
+      setVerifyLoading(false);
+    }
+  };
+
   const handleThemeChange = (t: string) => {
     setTheme(t);
     localStorage.setItem('editor_theme', t);
@@ -275,6 +349,8 @@ export default function Converter() {
   // Compute output match badge when both sides are run
   const bothRan = runOutput !== null && runOutputTarget !== null;
   const outputsMatch = bothRan &&
+    runOutput.code === 0 &&
+    runOutputTarget.code === 0 &&
     runOutput.stdout?.trim() === runOutputTarget.stdout?.trim() &&
     runOutput.code === runOutputTarget.code;
 
@@ -291,7 +367,17 @@ export default function Converter() {
                 key={lang}
                 className={`sandbox-lang-pill${sourceLang === lang ? ' active' : ''}`}
                 style={getPillStyle(lang)}
-                onClick={() => setSourceLang(lang)}
+                onClick={() => {
+                  const previousSource = sourceLang;
+                  setSourceLang(lang);
+                  if (lang === targetLang) setTargetLang(previousSource);
+                  setOutputCode('');
+                  setEngine('');
+                  setVerification(null);
+                  setVerifyError('');
+                  setRunOutput(null);
+                  setRunOutputTarget(null);
+                }}
               >
                 <span className="sandbox-lang-dot" />
                 {LANG_META[lang].label}
@@ -324,7 +410,16 @@ export default function Converter() {
                 key={lang}
                 className={`sandbox-lang-pill${targetLang === lang ? ' active' : ''}${sourceLang === lang ? ' disabled' : ''}`}
                 style={getPillStyle(lang)}
-                onClick={() => sourceLang !== lang && setTargetLang(lang)}
+                onClick={() => {
+                  if (sourceLang === lang) return;
+                  setTargetLang(lang);
+                  setOutputCode('');
+                  setEngine('');
+                  setVerification(null);
+                  setVerifyError('');
+                  setRunOutput(null);
+                  setRunOutputTarget(null);
+                }}
                 disabled={sourceLang === lang}
               >
                 <span className="sandbox-lang-dot" />
@@ -438,7 +533,15 @@ export default function Converter() {
           </div>
           <CodeEditor
             value={inputCode}
-            onChange={(value) => setInputCode(value ?? '')}
+            onChange={(value) => {
+              setInputCode(value ?? '');
+              setOutputCode('');
+              setEngine('');
+              setVerification(null);
+              setVerifyError('');
+              setRunOutput(null);
+              setRunOutputTarget(null);
+            }}
             language={sourceLang}
             height="420px"
             theme={theme}
@@ -451,38 +554,12 @@ export default function Converter() {
             <div className="panel-header-actions">
               {outputCode && (
                 <button
-                  className="btn-run"
-                  onClick={handleRunTarget}
-                  disabled={runLoadingTarget || !canRun(targetLang)}
-                  title={!canRun(targetLang) ? 'Execution not supported for this language' : 'Run converted code'}
-                >
-                  {runLoadingTarget ? '⏳ Running...' : '▶ Run'}
-                </button>
-              )}
-              {outputCode && (
-                <button
                   className={`btn-diff${showDiff ? ' active' : ''}`}
                   onClick={() => setShowDiff(d => !d)}
                 >
                   ⊕ Diff
                 </button>
               )}
-              {outputCode && (
-                <button
-                  className={`btn-explain${showExplanation ? ' active' : ''}`}
-                  onClick={handleExplain}
-                  disabled={explainLoading}
-                  title="Explain this conversion"
-                >
-                  {explainLoading ? '...' : '💡 Explain'}
-                </button>
-              )}
-              {outputCode && (
-                <button className="btn-share" onClick={handleShare} disabled={shareLoading}>
-                  {shareLoading ? '...' : '⬆ Share'}
-                </button>
-              )}
-              {shareToast && <span className="share-toast">{shareToast}</span>}
             </div>
           </div>
           {showDiff ? (
@@ -490,8 +567,13 @@ export default function Converter() {
           ) : (
             <CodeEditor
               value={outputCode}
+              onChange={(value) => {
+                setOutputCode(value ?? '');
+                setVerification(null);
+                setVerifyError('');
+                setRunOutputTarget(null);
+              }}
               language={targetLang}
-              readOnly
               height="420px"
               theme={theme}
             />
@@ -506,11 +588,68 @@ export default function Converter() {
           className="run-stdin"
           placeholder="Enter input for your program here (one value per line)..."
           value={runStdin}
-          onChange={e => setRunStdin(e.target.value)}
+          onChange={e => {
+            setRunStdin(e.target.value);
+            setVerification(null);
+            setVerifyError('');
+            setRunOutput(null);
+            setRunOutputTarget(null);
+          }}
           rows={3}
           spellCheck={false}
         />
       </div>
+
+      {outputCode && (
+        <section className="conversion-workflow">
+          <div className="conversion-workflow-copy">
+            <strong>Conversion workflow</strong>
+            <span>Run, verify, understand, save, or continue with the converted result.</span>
+          </div>
+          <div className="conversion-workflow-actions">
+            <button className="conversion-action primary" onClick={handleVerify} disabled={verifyLoading}>
+              {verifyLoading ? 'Verifying...' : 'Verify behavior'}
+            </button>
+            <button className="conversion-action" onClick={handleRunTarget} disabled={runLoadingTarget || !canRun(targetLang)}>
+              {runLoadingTarget ? 'Running...' : 'Run output'}
+            </button>
+            <button className="conversion-action" onClick={handleVisualize}>
+              Visualize
+            </button>
+            <button className="conversion-action" onClick={handleExplain} disabled={explainLoading}>
+              {explainLoading ? 'Explaining...' : showExplanation ? 'Hide explanation' : 'Explain'}
+            </button>
+            <button className="conversion-action" onClick={handleSaveOutput} disabled={saveLoading}>
+              {saveLoading ? 'Saving...' : 'Save to Files'}
+            </button>
+            <button className="conversion-action" onClick={handleShare} disabled={shareLoading}>
+              {shareLoading ? 'Sharing...' : 'Share'}
+            </button>
+          </div>
+          {shareToast && <span className="conversion-workflow-toast">{shareToast}</span>}
+        </section>
+      )}
+
+      {verifyError && <p className="verification-error">{verifyError}</p>}
+      {verification && (
+        <section className={`verification-result ${verification.status}`}>
+          <div>
+            <span>{verification.verified ? 'Verified' : 'Needs attention'}</span>
+            <strong>{verification.summary}</strong>
+          </div>
+          <div className="verification-checks">
+            <span className={verification.comparison.stdout_match ? 'pass' : 'fail'}>
+              Output {verification.comparison.stdout_match ? 'matches' : 'differs'}
+            </span>
+            <span className={verification.source.code === 0 ? 'pass' : 'fail'}>
+              Source exit {verification.source.code}
+            </span>
+            <span className={verification.target.code === 0 ? 'pass' : 'fail'}>
+              Target exit {verification.target.code}
+            </span>
+          </div>
+        </section>
+      )}
 
       {/* Output comparison panel */}
       {(runOutput !== null || runError || runOutputTarget !== null || runErrorTarget) && (

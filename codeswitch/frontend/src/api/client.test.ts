@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import client, { login, logout, getMe, convertCode, visualizeCode } from './client';
+import client, { login, logout, getMe, convertCode, visualizeCode, verifyConversion } from './client';
 
 describe('API client configuration', () => {
   it('has withCredentials enabled for cookie auth', () => {
@@ -28,4 +28,5 @@ describe('API client exports named functions', () => {
   it('exports getMe function', () => expect(typeof getMe).toBe('function'));
   it('exports convertCode function', () => expect(typeof convertCode).toBe('function'));
   it('exports visualizeCode function', () => expect(typeof visualizeCode).toBe('function'));
+  it('exports verifyConversion function', () => expect(typeof verifyConversion).toBe('function'));
 });

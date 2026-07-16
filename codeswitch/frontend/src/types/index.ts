@@ -107,6 +107,18 @@ export interface RunResult {
   code: number;
 }
 
+export interface VerificationResult {
+  verified: boolean;
+  status: 'match' | 'mismatch' | 'source_error' | 'target_error';
+  summary: string;
+  source: RunResult;
+  target: RunResult;
+  comparison: {
+    stdout_match: boolean;
+    exit_code_match: boolean;
+  };
+}
+
 export type VisualizationStepKind =
   | 'function'
   | 'loop'

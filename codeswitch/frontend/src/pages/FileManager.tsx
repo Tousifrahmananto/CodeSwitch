@@ -6,12 +6,12 @@ import LanguageSelector from '../components/LanguageSelector';
 import { getLanguageMeta } from '../constants/languages';
 import type { CodeFile } from '../types';
 
-const LANGUAGES = ['python', 'c', 'java', 'javascript', 'other'];
+const LANGUAGES = ['python', 'c', 'cpp', 'java', 'javascript', 'other'];
 type FileForm = { filename: string; language: string; code_content: string };
 const EMPTY_FORM: FileForm = { filename: '', language: 'python', code_content: '' };
 
 const FILE_EXT: Record<string, string> = {
-  python: '.py', c: '.c', java: '.java', javascript: '.js', other: '.txt',
+  python: '.py', c: '.c', cpp: '.cpp', java: '.java', javascript: '.js', other: '.txt',
 };
 
 export default function FileManager() {
