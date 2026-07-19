@@ -479,7 +479,7 @@ export default function Landing({ onGetStarted }: LandingProps) {
   }, []);
 
   return (
-    <div className="landing land-v2">
+    <div className="landing land-v2 land-editorial">
 
       {/* ── Decorative background ── */}
       <div className="land-bg-grid" aria-hidden="true" />
@@ -517,6 +517,12 @@ export default function Landing({ onGetStarted }: LandingProps) {
 
       {/* ── Hero ── */}
       <section className="land-hero">
+        <div className="land-liquid-stage" aria-hidden="true">
+          <span className="land-liquid-blob land-liquid-blob-a" />
+          <span className="land-liquid-blob land-liquid-blob-b" />
+          <span className="land-liquid-blob land-liquid-blob-c" />
+          <span className="land-liquid-grain" />
+        </div>
         <div className="land-hero-text land-fade-up">
           <div className="land-hero-badge">
             <span className="land-badge-pulse" />
@@ -597,9 +603,16 @@ export default function Landing({ onGetStarted }: LandingProps) {
           </div>
         </div>
 
-        <div className="land-hero-demo land-fade-up land-delay-1">
-          <HeroVisual />
-          <ConversionStepReveal />
+        <div className="land-editorial-scroll" aria-hidden="true">
+          <svg viewBox="0 0 100 100" role="presentation">
+            <defs>
+              <path id="land-scroll-path" d="M 50,50 m -34,0 a 34,34 0 1,1 68,0 a 34,34 0 1,1 -68,0" />
+            </defs>
+            <text>
+              <textPath href="#land-scroll-path">SCROLL TO EXPLORE · SCROLL TO EXPLORE · </textPath>
+            </text>
+          </svg>
+          <span>↓</span>
         </div>
       </section>
 
