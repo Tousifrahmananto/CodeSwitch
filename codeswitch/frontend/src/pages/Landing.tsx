@@ -443,6 +443,7 @@ function HeroVisual() {
 // ─── Main Landing page ────────────────────────────────────────────────────────
 export default function Landing({ onGetStarted }: LandingProps) {
   const navigate = useNavigate();
+  const landingRef = useRef<HTMLDivElement>(null);
   const featuresRef = useRef(null);
   const modulesRef = useRef(null);
   const [featuresIn, setFeaturesIn] = useState(false);
@@ -454,6 +455,31 @@ export default function Landing({ onGetStarted }: LandingProps) {
 
   useEffect(() => {
     document.title = 'CodeSwitch | Convert Code Between Python, Java & C';
+  }, []);
+
+  useEffect(() => {
+    const root = landingRef.current;
+    if (!root) return;
+
+    const sections = Array.from(root.querySelectorAll<HTMLElement>('.land-scroll-reveal'));
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    root.classList.add('land-scroll-ready');
+    if (prefersReducedMotion) {
+      sections.forEach(section => section.classList.add('is-visible'));
+      return;
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add('is-visible');
+        observer.unobserve(entry.target);
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -10% 0px' });
+
+    sections.forEach(section => observer.observe(section));
+    return () => observer.disconnect();
   }, []);
 
   const goToPlayground = () => navigate('/playground');
@@ -479,7 +505,8 @@ export default function Landing({ onGetStarted }: LandingProps) {
   }, []);
 
   return (
-    <div className="landing land-v2 land-editorial">
+    <div ref={landingRef} className="landing land-v2 land-editorial">
+      <div className="land-scroll-progress" aria-hidden="true" />
 
       {/* ── Decorative background ── */}
       <div className="land-bg-grid" aria-hidden="true" />
@@ -619,7 +646,7 @@ export default function Landing({ onGetStarted }: LandingProps) {
       <LanguageMarquee />
 
       {/* ── Stats strip ── */}
-      <div className="land-v2-stats flex flex-wrap items-center justify-center gap-6 sm:gap-12 py-6 border-y border-border bg-surface/50 land-fade-up land-delay-2">
+      <div className="land-v2-stats land-scroll-reveal flex flex-wrap items-center justify-center gap-6 sm:gap-12 py-6 border-y border-border bg-surface/50 land-fade-up land-delay-2">
         {[
           { value: '5', label: 'Languages Supported' },
           { value: '13', label: 'Learning Modules' },
@@ -633,7 +660,7 @@ export default function Landing({ onGetStarted }: LandingProps) {
         ))}
       </div>
 
-      <section className="land-section-block land-how-block" aria-label="How CodeSwitch works">
+      <section className="land-section-block land-how-block land-scroll-reveal" aria-label="How CodeSwitch works">
         <div className="land-section-kicker">How it works</div>
         <h2>Three steps. Real code in, real code out.</h2>
         <div className="land-how-strip">
@@ -652,7 +679,7 @@ export default function Landing({ onGetStarted }: LandingProps) {
       {/* ── Features ── */}
       <section
         id="features"
-        className={`land-features-section${featuresIn ? ' animate-in' : ''}`}
+        className={`land-features-section land-scroll-reveal${featuresIn ? ' animate-in' : ''}`}
         ref={featuresRef}
       >
         <div className="text-center mb-8">
@@ -684,7 +711,7 @@ export default function Landing({ onGetStarted }: LandingProps) {
       {/* ── Product Preview ── */}
       <section
         ref={previewRef}
-        className={`land-preview-section py-16 px-4 sm:px-8${previewIn ? ' animate-in' : ''}`}
+        className={`land-preview-section land-scroll-reveal py-16 px-4 sm:px-8${previewIn ? ' animate-in' : ''}`}
       >
         <div className="text-center mb-10">
           <div className="land-section-kicker">Product preview</div>
@@ -759,7 +786,7 @@ export default function Landing({ onGetStarted }: LandingProps) {
       </section>
 
       {/* ── Modules ── */}
-      <section id="visualizer" className="land-visualizer-section">
+      <section id="visualizer" className="land-visualizer-section land-scroll-reveal">
         <div className="land-visualizer-copy">
           <div className="land-section-kicker">Visualizer</div>
           <h2>Watch your code think.</h2>
@@ -794,7 +821,7 @@ export default function Landing({ onGetStarted }: LandingProps) {
 
       <section
         id="modules"
-        className={`land-modules-section${modulesIn ? ' animate-in' : ''}`}
+        className={`land-modules-section land-scroll-reveal${modulesIn ? ' animate-in' : ''}`}
         ref={modulesRef}
       >
         <div className="text-center mb-8 land-module-brief-heading">
@@ -831,7 +858,7 @@ export default function Landing({ onGetStarted }: LandingProps) {
       </section>
 
       {/* ── CTA ── */}
-      <section ref={ctaRef} className={`land-v2-cta py-20 px-8 text-center${ctaIn ? ' animate-in' : ''}`}>
+      <section ref={ctaRef} className={`land-v2-cta land-scroll-reveal py-20 px-8 text-center${ctaIn ? ' animate-in' : ''}`}>
         <div className="land-v2-cta-card max-w-2xl mx-auto flex flex-col items-center gap-4">
           <Logo size={52} id="cta" />
           <h2 className="text-2xl font-bold m-0">Start converting. It is free.</h2>

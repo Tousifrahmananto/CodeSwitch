@@ -6128,6 +6128,98 @@ h6,
 .land-editorial .land-module-row > span:nth-child(2) { color: #e2e8f0; font-size: 18px; font-weight: 400; }
 .land-editorial .land-module-row .land-mod-num { color: #475569; }
 
+/* Scroll choreography: one calm reveal per section, then stagger its contents. */
+.land-scroll-progress {
+  display: none;
+}
+
+@supports (animation-timeline: scroll()) {
+  .land-scroll-progress {
+    position: fixed;
+    inset: 0 0 auto;
+    z-index: 100;
+    display: block;
+    height: 2px;
+    background: linear-gradient(90deg, #4f8ef7, #818cf8 62%, #8fd3ff);
+    box-shadow: 0 0 14px rgba(79, 142, 247, 0.55);
+    transform: scaleX(0);
+    transform-origin: left;
+    animation: landScrollProgress linear both;
+    animation-timeline: scroll(root block);
+  }
+}
+
+@keyframes landScrollProgress {
+  to { transform: scaleX(1); }
+}
+
+.land-scroll-ready .land-scroll-reveal {
+  opacity: 0.01;
+  filter: blur(7px);
+  transform: translateY(64px);
+  transition:
+    opacity 0.9s var(--editorial-ease),
+    filter 1.1s var(--editorial-ease),
+    transform 1.2s var(--editorial-ease);
+  will-change: opacity, filter, transform;
+}
+
+.land-scroll-ready .land-scroll-reveal.is-visible {
+  opacity: 1;
+  filter: blur(0);
+  transform: translateY(0);
+}
+
+.land-scroll-ready .land-scroll-reveal .land-section-kicker,
+.land-scroll-ready .land-scroll-reveal h2 {
+  opacity: 0;
+  transform: translateY(28px);
+  transition:
+    opacity 0.8s var(--editorial-ease) 0.12s,
+    transform 1s var(--editorial-ease) 0.12s;
+}
+
+.land-scroll-ready .land-scroll-reveal.is-visible .land-section-kicker,
+.land-scroll-ready .land-scroll-reveal.is-visible h2 {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.land-scroll-ready .land-how-step {
+  opacity: 0;
+  transform: translateY(34px);
+  transition:
+    opacity 0.75s var(--editorial-ease),
+    transform 0.95s var(--editorial-ease);
+}
+
+.land-scroll-ready .land-how-block.is-visible .land-how-step {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.land-scroll-ready .land-how-block.is-visible .land-how-step:nth-child(1) { transition-delay: 0.2s; }
+.land-scroll-ready .land-how-block.is-visible .land-how-step:nth-child(2) { transition-delay: 0.32s; }
+.land-scroll-ready .land-how-block.is-visible .land-how-step:nth-child(3) { transition-delay: 0.44s; }
+
+.land-scroll-ready .land-visualizer-copy {
+  opacity: 0;
+  transform: translateX(-44px);
+  transition: opacity 0.9s var(--editorial-ease) 0.14s, transform 1.1s var(--editorial-ease) 0.14s;
+}
+
+.land-scroll-ready .land-tutor-preview {
+  opacity: 0;
+  transform: translateX(52px) rotate(1.2deg);
+  transition: opacity 1s var(--editorial-ease) 0.25s, transform 1.25s var(--editorial-ease) 0.25s;
+}
+
+.land-scroll-ready .land-visualizer-section.is-visible .land-visualizer-copy,
+.land-scroll-ready .land-visualizer-section.is-visible .land-tutor-preview {
+  opacity: 1;
+  transform: translateX(0) rotate(0);
+}
+
 .land-editorial .land-v2-cta {
   padding: clamp(110px, 15vw, 180px) 24px;
 }
@@ -6173,6 +6265,31 @@ h6,
   .land-editorial .land-feat-card p { grid-column: 2; }
 }
 
+@media (max-width: 768px) {
+  .land-editorial .land-how-block {
+    padding-block: 82px;
+  }
+
+  .land-editorial .land-how-strip {
+    margin-top: 42px;
+  }
+
+  .land-editorial .land-how-step {
+    min-height: auto;
+    padding: 26px 0;
+    border-right: 0;
+    border-bottom: 1px solid rgba(129, 140, 248, 0.14);
+  }
+
+  .land-editorial .land-how-step:last-child {
+    border-bottom: 0;
+  }
+
+  .land-editorial .land-how-step strong {
+    margin: 0 0 9px;
+  }
+}
+
 @media (max-width: 640px) {
   .landing.land-editorial > .land-v2-nav { min-height: 64px; padding: 14px 18px; }
   .land-editorial .land-nav-brand-v2 span { display: none; }
@@ -6198,8 +6315,7 @@ h6,
   .land-editorial .land-visualizer-copy h2,
   .land-editorial .land-v2-cta-card h2 { font-size: clamp(42px, 13vw, 62px); }
   .land-editorial .land-how-strip { grid-template-columns: 1fr; }
-  .land-editorial .land-how-step { min-height: auto; padding: 24px 0 34px; border-right: 0; border-bottom: 1px solid rgba(226, 232, 240, 0.16); }
-  .land-editorial .land-how-step strong { margin-top: 32px; }
+  .land-editorial .land-how-step { padding-block: 22px; }
   .land-editorial .land-feat-card { grid-template-columns: 48px 1fr; gap: 18px; }
   .land-editorial .land-feat-card p { grid-column: 1 / -1; }
   .land-editorial .land-visualizer-section { padding-inline: 18px; }
@@ -6209,7 +6325,18 @@ h6,
 
 @media (prefers-reduced-motion: reduce) {
   .land-editorial .land-liquid-blob,
-  .land-editorial-scroll svg { animation: none !important; }
+  .land-editorial-scroll svg,
+  .land-scroll-progress { animation: none !important; }
+
+  .land-scroll-ready .land-scroll-reveal,
+  .land-scroll-ready .land-scroll-reveal *,
+  .land-scroll-ready .land-visualizer-copy,
+  .land-scroll-ready .land-tutor-preview {
+    opacity: 1 !important;
+    filter: none !important;
+    transform: none !important;
+    transition: none !important;
+  }
 }
 
 .viz-hero p:last-child {
