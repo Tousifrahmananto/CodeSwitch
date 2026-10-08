@@ -48,8 +48,16 @@ def _get(key: str, default: str = '') -> str:
 _DEFAULT_MODELS = {
     'gemini': 'gemini-2.0-flash-lite',
     'openai': 'gpt-3.5-turbo',
-    'groq':   'llama-3.1-8b-instant',
+    'groq':   'openai/gpt-oss-20b',
 }
+
+
+def _get_model(provider: str) -> str:
+    model = _get('AI_MODEL', _DEFAULT_MODELS.get(provider, 'gemini-2.0-flash-lite')).strip()
+    # Groq retired this model on 2026-08-16; migrate existing deployment settings.
+    if provider == 'groq' and model == 'llama-3.1-8b-instant':
+        return _DEFAULT_MODELS['groq']
+    return model
 
 # ── OpenAI-compatible base URLs ────────────────────────────────────────────────
 _BASE_URLS = {
@@ -150,7 +158,7 @@ def ai_convert_code(source_lang: str, target_lang: str, code: str, user_key: str
         return {'success': False, 'error': 'AI service unavailable'}
 
     provider = _get('AI_PROVIDER', 'gemini').lower().strip()
-    model    = _get('AI_MODEL', _DEFAULT_MODELS.get(provider, 'gemini-2.0-flash-lite')).strip()
+    model    = _get_model(provider)
     base_url = _get('AI_BASE_URL', _BASE_URLS.get(provider, _BASE_URLS['openai']))
 
     user_prompt = f'Convert the following {source_lang} code to {target_lang}.\n\n{code}'
@@ -222,7 +230,7 @@ def ai_explain_code(source_lang: str, target_lang: str, input_code: str, output_
         return {'success': False, 'error': 'AI service unavailable'}
 
     provider = _get('AI_PROVIDER', 'gemini').lower().strip()
-    model    = _get('AI_MODEL', _DEFAULT_MODELS.get(provider, 'gemini-2.0-flash-lite')).strip()
+    model    = _get_model(provider)
     base_url = _get('AI_BASE_URL', _BASE_URLS.get(provider, _BASE_URLS['openai']))
 
     user_prompt = (
