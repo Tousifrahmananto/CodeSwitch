@@ -23,6 +23,7 @@ the service automatically retries with the next available key.
 import os
 import re
 import logging
+import time
 
 import requests
 from codeswitch.observability import dependency_timer
@@ -46,17 +47,23 @@ def _get(key: str, default: str = '') -> str:
 
 # ── Default models per provider ────────────────────────────────────────────────
 _DEFAULT_MODELS = {
-    'gemini': 'gemini-2.0-flash-lite',
+    'gemini': 'gemini-3.1-flash-lite',
     'openai': 'gpt-3.5-turbo',
     'groq':   'openai/gpt-oss-20b',
 }
 
 
 def _get_model(provider: str) -> str:
-    model = _get('AI_MODEL', _DEFAULT_MODELS.get(provider, 'gemini-2.0-flash-lite')).strip()
+    default = _DEFAULT_MODELS.get(provider, _DEFAULT_MODELS['gemini'])
+    model = _get('AI_MODEL', default).strip() or default
     # Groq retired this model on 2026-08-16; migrate existing deployment settings.
     if provider == 'groq' and model == 'llama-3.1-8b-instant':
         return _DEFAULT_MODELS['groq']
+    if provider == 'gemini' and model in {
+        'gemini-2.0-flash', 'gemini-2.0-flash-lite',
+        'gemini-2.0-flash-001', 'gemini-2.0-flash-lite-001',
+    }:
+        return _DEFAULT_MODELS['gemini']
     return model
 
 # ── OpenAI-compatible base URLs ────────────────────────────────────────────────
@@ -115,29 +122,29 @@ def _response_text(data, provider):
         if not isinstance(text, str) or not _strip_markdown(text):
             raise AIResponseError('ai_invalid_response')
         return text
-    except (KeyError, IndexError, TypeError) as exc:
+    except (KeyError, IndexError, TypeError, AttributeError) as exc:
         raise AIResponseError('ai_invalid_response') from exc
 
 
-def _call_gemini(api_key: str, model: str, user_prompt: str) -> str:
+def _call_gemini(api_key, model, user_prompt, timeout, system_prompt, temperature, max_tokens):
     """Call the Google Gemini generateContent REST API."""
     url = (
         f'https://generativelanguage.googleapis.com/v1beta/models/'
         f'{model}:generateContent?key={api_key}'
     )
     payload = {
-        'system_instruction': {'parts': [{'text': _SYSTEM_PROMPT}]},
+        'system_instruction': {'parts': [{'text': system_prompt}]},
         'contents': [{'parts': [{'text': user_prompt}]}],
-        'generationConfig': {'temperature': 0.1, 'maxOutputTokens': 4096},
+        'generationConfig': {'temperature': temperature, 'maxOutputTokens': max_tokens},
     }
     with dependency_timer('ai_gemini'):
-        resp = requests.post(url, json=payload, timeout=25)
+        resp = requests.post(url, json=payload, timeout=timeout)
         resp.raise_for_status()
     data = resp.json()
     return _response_text(data, 'gemini')
 
 
-def _call_openai_compatible(api_key: str, base_url: str, model: str, user_prompt: str) -> str:
+def _call_openai_compatible(api_key, base_url, model, user_prompt, timeout, system_prompt, temperature, max_tokens):
     """Call any OpenAI-compatible /chat/completions endpoint."""
     url = f'{base_url.rstrip("/")}/chat/completions'
     headers = {
@@ -147,14 +154,14 @@ def _call_openai_compatible(api_key: str, base_url: str, model: str, user_prompt
     payload = {
         'model': model,
         'messages': [
-            {'role': 'system', 'content': _SYSTEM_PROMPT},
+            {'role': 'system', 'content': system_prompt},
             {'role': 'user', 'content': user_prompt},
         ],
-        'temperature': 0.1,
-        'max_tokens': 4096,
+        'temperature': temperature,
+        'max_tokens': max_tokens,
     }
     with dependency_timer('ai_openai_compatible'):
-        resp = requests.post(url, json=payload, headers=headers, timeout=25)
+        resp = requests.post(url, json=payload, headers=headers, timeout=timeout)
         resp.raise_for_status()
     return _response_text(resp.json(), 'openai')
 
@@ -163,75 +170,59 @@ def _call_openai_compatible(api_key: str, base_url: str, model: str, user_prompt
 _ROTATE_STATUSES = {401, 403, 429}
 
 
-def ai_convert_code(source_lang: str, target_lang: str, code: str, user_key: str = None) -> dict:
-    """
-    Convert code using an AI model.
+AI_ATTEMPT_BUDGET = 20
+AI_CONNECT_TIMEOUT = 3
+AI_READ_TIMEOUT = 10
 
-    Tries each configured API key in order (user_key if provided, then
-    AI_API_KEY, AI_API_KEY_2, AI_API_KEY_3). On a rate-limit (429) or
-    auth error (401/403) it moves to the next key. On the last key it
-    retries once after a 3-second wait before giving up.
 
-    Returns:
-        {'success': True,  'output': str, 'engine': 'ai'}
-        {'success': False, 'error': str}
-
-    NOTE: Detailed errors are logged server-side for debugging.
-    Clients receive generic error messages for security.
-    """
+def _generate_text(user_prompt, system_prompt, temperature, max_tokens, user_key):
+    provider = _get('AI_PROVIDER', 'gemini').lower().strip()
     api_keys = ([user_key.strip()] if user_key and user_key.strip() else []) + _get_api_keys()
     if not api_keys:
-        logger.warning("AI_API_KEY not configured in .env")
-        return {'success': False, 'error': 'AI service unavailable'}
-
-    provider = _get('AI_PROVIDER', 'gemini').lower().strip()
-    model    = _get_model(provider)
+        return {'success': False, 'error': 'AI service is not configured.', 'ai_error_code': 'ai_not_configured'}
+    model = _get_model(provider)
     base_url = _get('AI_BASE_URL', _BASE_URLS.get(provider, _BASE_URLS['openai']))
-
-    user_prompt = f'Convert the following {source_lang} code to {target_lang}.\n\n{code}'
-
-    last_error_detail = 'All API keys exhausted.'
-
+    deadline = time.monotonic() + AI_ATTEMPT_BUDGET
     for key_index, api_key in enumerate(api_keys):
-        is_last_key = (key_index == len(api_keys) - 1)
-        attempts = 2 if is_last_key else 1  # retry once only on the last key
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return {'success': False, 'error': 'AI request timed out.', 'ai_error_code': 'ai_timeout'}
+        connect = min(AI_CONNECT_TIMEOUT, remaining / 2)
+        timeout = (connect, min(AI_READ_TIMEOUT, remaining - connect))
+        try:
+            if provider == 'gemini':
+                text = _call_gemini(api_key, model, user_prompt, timeout, system_prompt, temperature, max_tokens)
+            else:
+                text = _call_openai_compatible(api_key, base_url, model, user_prompt, timeout, system_prompt, temperature, max_tokens)
+            if time.monotonic() >= deadline:
+                return {'success': False, 'error': 'AI request timed out.', 'ai_error_code': 'ai_timeout'}
+            return {'success': True, 'text': text}
+        except AIResponseError as exc:
+            return {'success': False, 'error': str(exc), 'ai_error_code': exc.code}
+        except requests.Timeout:
+            return {'success': False, 'error': 'AI request timed out.', 'ai_error_code': 'ai_timeout'}
+        except requests.HTTPError as exc:
+            status = exc.response.status_code if exc.response is not None else None
+            logger.warning('AI HTTP %s from %s (key slot %s)', status, provider, key_index + 1)
+            if status in _ROTATE_STATUSES:
+                continue
+            return {'success': False, 'error': 'AI service temporarily unavailable.', 'ai_error_code': 'ai_unavailable'}
+        except (ValueError, KeyError, TypeError):
+            return {'success': False, 'error': 'AI returned an invalid response.', 'ai_error_code': 'ai_invalid_response'}
+        except requests.RequestException:
+            return {'success': False, 'error': 'AI service temporarily unavailable.', 'ai_error_code': 'ai_unavailable'}
+        except Exception as exc:
+            logger.error('AI request failed: %s', type(exc).__name__)
+            return {'success': False, 'error': 'AI service temporarily unavailable.', 'ai_error_code': 'ai_unavailable'}
+    return {'success': False, 'error': 'AI keys are invalid or their quota is exhausted.', 'ai_error_code': 'ai_quota_exhausted'}
 
-        for attempt in range(attempts):
-            try:
-                if provider == 'gemini':
-                    raw = _call_gemini(api_key, model, user_prompt)
-                else:
-                    raw = _call_openai_compatible(api_key, base_url, model, user_prompt)
 
-                output = _strip_markdown(raw)
-                return {'success': True, 'output': output, 'engine': 'ai'}
-
-            except AIResponseError as exc:
-                return {'success': False, 'error': str(exc), 'ai_error_code': exc.code}
-            except requests.HTTPError as exc:
-                status = exc.response.status_code if exc.response is not None else None
-                last_error_detail = f'HTTP {status} from {provider} (key slot #{key_index + 1})'
-                logger.error(last_error_detail)
-
-                if status in _ROTATE_STATUSES:
-                    if is_last_key and attempt == 0:
-                        # Last key, first attempt — retry immediately
-                        continue
-                    # Move on to the next key
-                    break
-                else:
-                    # Non-quota error (e.g. 500) — no point trying other keys
-                    logger.error(f"Non-retryable AI service error: {last_error_detail}")
-                    return {'success': False, 'error': 'AI service temporarily unavailable'}
-
-            except Exception as exc:
-                last_error_detail = f'Conversion service error (key slot #{key_index + 1}): {type(exc).__name__}'
-                logger.error(last_error_detail)
-                break  # unexpected error — try next key
-
-    # All keys exhausted — return generic error to client, detailed error logged
-    logger.error(f"All AI conversion keys exhausted: {last_error_detail}")
-    return {'success': False, 'error': 'AI service unavailable. Please try again later.'}
+def ai_convert_code(source_lang: str, target_lang: str, code: str, user_key: str = None) -> dict:
+    prompt = f'Convert the following {source_lang} code to {target_lang}.\n\n{code}'
+    result = _generate_text(prompt, _SYSTEM_PROMPT, 0.1, 4096, user_key)
+    if not result['success']:
+        return result
+    return {'success': True, 'output': _strip_markdown(result['text']), 'engine': 'ai'}
 
 
 _EXPLAIN_SYSTEM_PROMPT = (
@@ -244,92 +235,13 @@ _EXPLAIN_SYSTEM_PROMPT = (
 
 
 def ai_explain_code(source_lang: str, target_lang: str, input_code: str, output_code: str, user_key: str = None) -> dict:
-    """
-    Explain the key differences between source code and its translation.
-
-    Returns:
-        {'success': True,  'explanation': str}
-        {'success': False, 'error': str}
-
-    NOTE: Detailed errors logged server-side, generic messages sent to clients.
-    """
-    api_keys = ([user_key.strip()] if user_key and user_key.strip() else []) + _get_api_keys()
-    if not api_keys:
-        logger.warning("AI_API_KEY not configured in .env, cannot explain code")
-        return {'success': False, 'error': 'AI service unavailable'}
-
-    provider = _get('AI_PROVIDER', 'gemini').lower().strip()
-    model    = _get_model(provider)
-    base_url = _get('AI_BASE_URL', _BASE_URLS.get(provider, _BASE_URLS['openai']))
-
-    user_prompt = (
+    prompt = (
         f'Here is a {source_lang} program and its {target_lang} translation. '
         f'Explain the key differences to a student learning {target_lang}.\n\n'
         f'--- {source_lang} (original) ---\n{input_code}\n\n'
         f'--- {target_lang} (translated) ---\n{output_code}'
     )
-
-    last_error_detail = 'All API keys exhausted.'
-
-    for key_index, api_key in enumerate(api_keys):
-        is_last_key = (key_index == len(api_keys) - 1)
-        attempts = 2 if is_last_key else 1
-
-        for attempt in range(attempts):
-            try:
-                if provider == 'gemini':
-                    url = (
-                        f'https://generativelanguage.googleapis.com/v1beta/models/'
-                        f'{model}:generateContent?key={api_key}'
-                    )
-                    payload = {
-                        'system_instruction': {'parts': [{'text': _EXPLAIN_SYSTEM_PROMPT}]},
-                        'contents': [{'parts': [{'text': user_prompt}]}],
-                        'generationConfig': {'temperature': 0.3, 'maxOutputTokens': 512},
-                    }
-                    resp = requests.post(url, json=payload, timeout=25)
-                    resp.raise_for_status()
-                    raw = _response_text(resp.json(), 'gemini')
-                else:
-                    url = f'{base_url.rstrip("/")}/chat/completions'
-                    headers = {
-                        'Authorization': f'Bearer {api_key}',
-                        'Content-Type': 'application/json',
-                    }
-                    payload = {
-                        'model': model,
-                        'messages': [
-                            {'role': 'system', 'content': _EXPLAIN_SYSTEM_PROMPT},
-                            {'role': 'user', 'content': user_prompt},
-                        ],
-                        'temperature': 0.3,
-                        'max_tokens': 512,
-                    }
-                    resp = requests.post(url, json=payload, headers=headers, timeout=25)
-                    resp.raise_for_status()
-                    raw = _response_text(resp.json(), 'openai')
-
-                return {'success': True, 'explanation': raw.strip()}
-
-            except AIResponseError as exc:
-                return {'success': False, 'error': str(exc), 'ai_error_code': exc.code}
-            except requests.HTTPError as exc:
-                status_code = exc.response.status_code if exc.response is not None else None
-                last_error_detail = f'HTTP {status_code} from {provider} (key slot #{key_index + 1})'
-                logger.error(last_error_detail)
-
-                if status_code in _ROTATE_STATUSES:
-                    if is_last_key and attempt == 0:
-                        continue
-                    break
-                else:
-                    logger.error(f"Non-retryable explanation service error: {last_error_detail}")
-                    return {'success': False, 'error': 'AI service temporarily unavailable'}
-
-            except Exception as exc:
-                last_error_detail = f'Code explanation error (key slot #{key_index + 1}): {type(exc).__name__}'
-                logger.error(last_error_detail)
-                break
-
-    logger.error(f"All explanation service keys exhausted: {last_error_detail}")
-    return {'success': False, 'error': 'AI service unavailable. Please try again later.'}
+    result = _generate_text(prompt, _EXPLAIN_SYSTEM_PROMPT, 0.3, 512, user_key)
+    if not result['success']:
+        return result
+    return {'success': True, 'explanation': result['text'].strip()}

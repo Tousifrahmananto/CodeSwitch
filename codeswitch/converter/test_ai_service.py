@@ -33,6 +33,59 @@ class AIResponseValidationTests(TestCase):
                 self.assertEqual(ai_service.ai_explain_code('python', 'c', 'print(1)', 'puts("1");')['explanation'], 'result')
 
 
+class AIBudgetTests(TestCase):
+    def test_only_authentication_and_quota_responses_rotate_keys(self):
+        import requests
+        for status in (401, 403, 429, 500):
+            response = Mock(**{'json.return_value': {'choices': [{'finish_reason': 'stop', 'message': {'content': 'result'}}]}})
+            with patch.object(ai_service, '_get_api_keys', return_value=['one', 'two']), \
+                 patch.object(ai_service, '_get', side_effect=lambda key, default='': 'groq' if key == 'AI_PROVIDER' else default), \
+                 patch.object(ai_service.requests, 'post', side_effect=[requests.HTTPError(response=Mock(status_code=status)), response]) as post:
+                result = ai_service.ai_convert_code('python', 'c', 'print(1)')
+                self.assertEqual(result['success'], status != 500)
+                self.assertEqual(post.call_count, 1 if status == 500 else 2)
+
+    def test_timeouts_stop_without_rotating_keys(self):
+        for helper, args in [(ai_service.ai_convert_code, ('python', 'c', 'print(1)')),
+                             (ai_service.ai_explain_code, ('python', 'c', 'print(1)', 'result'))]:
+            with patch.object(ai_service, '_get_api_keys', return_value=['one', 'two', 'three']), \
+                 patch.object(ai_service.requests, 'post', side_effect=ai_service.requests.Timeout), \
+                 patch.object(ai_service, '_get', side_effect=lambda key, default='': default) as config:
+                result = helper(*args)
+                self.assertFalse(result['success'])
+                self.assertEqual(ai_service.requests.post.call_count, 1)
+                connect, read = ai_service.requests.post.call_args.kwargs['timeout']
+                self.assertLessEqual(connect, 3)
+                self.assertLessEqual(read, 10)
+
+    def test_rotation_fits_the_overall_budget(self):
+        import requests
+        for helper, args in [(ai_service.ai_convert_code, ('python', 'c', 'print(1)')),
+                             (ai_service.ai_explain_code, ('python', 'c', 'print(1)', 'result'))]:
+            elapsed = [0.0]
+            timeouts = []
+            def quota_response(*args, **kwargs):
+                timeouts.append(kwargs['timeout'])
+                elapsed[0] += sum(kwargs['timeout'])
+                raise requests.HTTPError(response=Mock(status_code=429))
+            with patch.object(ai_service, '_get_api_keys', return_value=['one', 'two', 'three']), \
+                 patch.object(ai_service.requests, 'post', side_effect=quota_response), \
+                 patch.object(ai_service, '_get', side_effect=lambda key, default='': default), \
+                 patch('time.monotonic', side_effect=lambda: elapsed[0]):
+                self.assertFalse(helper(*args)['success'])
+                self.assertLessEqual(elapsed[0], 20)
+                self.assertEqual(len(timeouts), 2)
+
+    def test_gemini_retired_aliases_and_default_use_current_model(self):
+        for model in ('gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-2.0-flash-001', 'gemini-2.0-flash-lite-001'):
+            with patch.object(ai_service, '_get', return_value=model):
+                self.assertEqual(ai_service._get_model('gemini'), 'gemini-3.1-flash-lite')
+        with patch.object(ai_service, '_get', side_effect=lambda key, default='': default):
+            self.assertEqual(ai_service._get_model('gemini'), 'gemini-3.1-flash-lite')
+        with patch.object(ai_service, '_get', return_value='custom-gemini'):
+            self.assertEqual(ai_service._get_model('gemini'), 'custom-gemini')
+
+
 class GroqModelMigrationTests(TestCase):
     def config(self, key, default=''):
         return {

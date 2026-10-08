@@ -160,7 +160,7 @@ AI_PROVIDER=groq       # groq | openai | gemini
 AI_API_KEY=your-api-key
 AI_API_KEY_2=          # optional failover key
 AI_API_KEY_3=          # optional failover key
-AI_MODEL=llama3-70b-8192
+AI_MODEL=openai/gpt-oss-20b
 ```
 
 ### 5. Run migrations and seed learning content
@@ -226,7 +226,7 @@ The Django admin is at **http://localhost:8000/admin**
 | `AI_API_KEY` | Primary AI API key | — |
 | `AI_API_KEY_2` | First failover AI key | — |
 | `AI_API_KEY_3` | Second failover AI key | — |
-| `AI_MODEL` | Model name | `llama3-70b-8192` |
+| `AI_MODEL` | Model name | `openai/gpt-oss-20b` |
 | `JWT_ACCESS_TOKEN_LIFETIME_MINUTES` | Access token TTL | `60` |
 | `JWT_REFRESH_TOKEN_LIFETIME_DAYS` | Refresh token TTL | `7` |
 
