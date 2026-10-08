@@ -143,3 +143,18 @@ class PrintAndReturnTypeTests(TestCase):
         source = 'public class Main {\npublic static void main(String[] args) {\ndouble x = 1.5;\nString s = "猫";\nSystem.out.println(x + 1);\nSystem.out.println(s);\n}\n}'
         generated = java_to_c(source)
         self.assertEqual(c_safety.CStringSafetyTests.compile_and_run(generated).decode('utf-8').replace('\r\n', '\n').strip(), '2.5\n猫')
+
+
+class BlockScopeSafetyTests(TestCase):
+    def test_escaping_block_locals_fail_explicitly(self):
+        for converter in (python_to_c, python_to_java, python_to_javascript):
+            for source in ('if 1 > 0:\n    x = 1\nprint(x)',
+                           'for n in range(3):\n    print(n)\nprint(n)',
+                           'if 1 > 0:\n    x = 1\nelse:\n    x = 2'):
+                with self.subTest(converter=converter.__name__,source=source), self.assertRaisesRegex(ValueError, 'scope'):
+                    converter(source)
+
+    def test_outer_variables_remain_assignable_inside_blocks(self):
+        source = 'x = 0\nif 1 > 0:\n    x = 2\nprint(x)'
+        self.assertEqual(c_safety.CStringSafetyTests.compile_and_run(python_to_c(source)).decode().strip(), '2')
+        self.assertEqual(subprocess.check_output(['node', '-e', python_to_javascript(source)], text=True).strip(), '2')

@@ -73,34 +73,36 @@ def _py_range_to_c_for(var, range_str):
 
 
 def _printf_to_print(s):
-    """Convert C printf(...) to Python print(...). Returns None if no match."""
     literal = _literal_printf_text(s)
     if literal is not None:
         return f'print({literal!r})'
-    # printf("text\n");  — no args
-    m = re.match(r'printf\("(.*)\\n"\);$', s)
-    if m:
-        return f'print("{m.group(1)}")'
+    match = re.fullmatch(r'printf\(("(?:\\.|[^"\\])*")(?:,\s*(.+))?\);', s)
+    if not match:
+        return None
+    fmt = _decode_c_string(match.group(1))
+    if not fmt.endswith('\n'):
+        raise ValueError('Unsupported printf: a terminating newline is required.')
+    fmt = fmt[:-1]
+    if match.group(2):
+        arguments = match.group(2)
+        return f'print({fmt!r} % ({arguments},))'
+    if re.search(r'%(?!%)', fmt.replace('%%', '')):
+        raise ValueError('Unsupported printf format without arguments.')
+    return f'print({fmt.replace("%%", "%")!r})'
 
-    # printf("fmt\n", arg1, arg2, ...);
-    m = re.match(r'printf\("(.*)\\n",\s*(.+)\);$', s)
-    if m:
-        fmt = m.group(1)
-        args = [a.strip() for a in m.group(2).split(',')]
-        result_fmt = fmt
-        for arg in args:
-            result_fmt = re.sub(r'%(?:\.\d+)?[dsficg]', '{' + arg + '}', result_fmt, count=1)
-        if '{' in result_fmt:
-            return f'print(f"{result_fmt}")'
-        return f'print("{result_fmt}")'
 
-    return None
+def _decode_c_string(literal):
+    value = ast.literal_eval(literal)
+    try:
+        return value.encode('latin1').decode('utf-8')
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return value
 
 
 def _literal_printf_text(s):
     m = re.fullmatch(r'printf\("%s",\s*("(?:\\.|[^"\\])*")\);', s)
     if m:
-        text = ast.literal_eval(m.group(1)).encode('latin1').decode('utf-8')
+        text = _decode_c_string(m.group(1))
         if text.endswith('\n'):
             return text[:-1]
     return None
@@ -159,6 +161,57 @@ def _function_return_types(func_blocks):
             raise ValueError('Unsupported function return type.')
         types[match.group(1) + '()'] = 'double' if 'double' in kinds else 'int' if kinds else 'void'
     return types
+
+
+def _validate_rule_scopes(code, allow_loop_reuse=False):
+    tree = ast.parse(code)
+
+    def check(statements, parameters=()):
+        seen = set(parameters)
+        def visit(items, visible):
+            def read(node):
+                if node is None:
+                    return
+                for value in ast.walk(node):
+                    if isinstance(value, ast.Name) and isinstance(value.ctx, ast.Load):
+                        if value.id in seen and value.id not in visible:
+                            raise ValueError(f'Unsupported scope: {value.id} escapes its declaring block.')
+            def assign(target):
+                if not isinstance(target, ast.Name):
+                    return
+                if target.id in seen and target.id not in visible:
+                    raise ValueError(f'Unsupported scope: {target.id} escapes its declaring block.')
+                seen.add(target.id)
+                visible.add(target.id)
+            for node in items:
+                if isinstance(node, ast.FunctionDef):
+                    check(node.body, [arg.arg for arg in node.args.args])
+                elif isinstance(node, ast.Assign):
+                    read(node.value)
+                    for target in node.targets:
+                        assign(target)
+                elif isinstance(node, ast.AugAssign):
+                    read(node.value)
+                    if isinstance(node.target, ast.Name) and node.target.id not in visible:
+                        raise ValueError(f'Unsupported scope: {node.target.id} is not declared here.')
+                elif isinstance(node, ast.For):
+                    read(node.iter)
+                    inner = set(visible)
+                    if isinstance(node.target, ast.Name):
+                        if node.target.id in visible and not allow_loop_reuse:
+                            raise ValueError('Unsupported scope: reused loop variables in C/Java rules.')
+                        seen.add(node.target.id)
+                        inner.add(node.target.id)
+                    visit(node.body, inner)
+                    visit(node.orelse, set(visible))
+                elif isinstance(node, (ast.If, ast.While)):
+                    read(node.test)
+                    visit(node.body, set(visible))
+                    visit(node.orelse, set(visible))
+                else:
+                    read(node)
+        visit(statements, set(parameters))
+    check(tree.body)
 
 
 def _py_print_to_printf(s, type_map=None):
@@ -591,6 +644,7 @@ def python_to_c(code: str) -> str:
     Top-level def blocks are emitted as standalone C functions (outside main).
     Variable re-declarations are tracked to avoid duplicate type prefixes.
     """
+    _validate_rule_scopes(code)
     lines = code.split('\n')
     func_blocks, main_lines = _extract_toplevel_funcs(lines)
     function_types = _function_return_types(func_blocks)
@@ -624,6 +678,7 @@ def python_to_java(code: str) -> str:
     Top-level def blocks are emitted as static methods in the class (outside main).
     Variable re-declarations are tracked to avoid duplicate type prefixes.
     """
+    _validate_rule_scopes(code)
     lines = code.split('\n')
     func_blocks, main_lines = _extract_toplevel_funcs(lines)
     function_types = _function_return_types(func_blocks)
@@ -689,6 +744,11 @@ def c_to_python(code: str) -> str:
         # Line comment
         if stripped.startswith('//'):
             result.append(ind + '# ' + stripped[2:].strip())
+            continue
+
+        m = re.fullmatch(r'strcpy\((\w+),\s*("(?:\\.|[^"\\])*")\);', stripped)
+        if m:
+            result.append(ind + f'{m.group(1)} = {_decode_c_string(m.group(2))!r}')
             continue
 
         # printf → print
@@ -769,9 +829,9 @@ def c_to_python(code: str) -> str:
             result.append(ind + f'{m.group(1)} = {m.group(2)}')
             continue
 
-        m = re.match(r'char\s+(\w+)\[\s*\]\s*=\s*"(.*)";$', stripped)
+        m = re.match(r'char\s+(\w+)\[\s*(?:\d+)?\s*\]\s*=\s*("(?:\\.|[^"\\])*");$', stripped)
         if m:
-            result.append(ind + f'{m.group(1)} = "{m.group(2)}"')
+            result.append(ind + f'{m.group(1)} = {_decode_c_string(m.group(2))!r}')
             continue
 
         # Variable declaration without init: int i; — skip
@@ -969,35 +1029,29 @@ def c_to_java(code: str) -> str:
             result.append(ind + stripped)
             continue
 
+        m = re.fullmatch(r'strcpy\((\w+),\s*("(?:\\.|[^"\\])*")\);', stripped)
+        if m:
+            result.append(ind + f'{m.group(1)} = {json.dumps(_decode_c_string(m.group(2)), ensure_ascii=False)};')
+            continue
+
         # printf → System.out.println
         literal = _literal_printf_text(stripped)
         if literal is not None:
             result.append(ind + f'System.out.println({json.dumps(literal, ensure_ascii=False)});')
             continue
-        m = re.match(r'printf\("(.*)\\n"\);$', stripped)
+        m = re.fullmatch(r'printf\(("(?:\\.|[^"\\])*")(?:,\s*(.+))?\);', stripped)
         if m:
-            result.append(ind + f'System.out.println("{m.group(1)}");')
-            continue
-
-        m = re.match(r'printf\("(.*)\\n",\s*(.+)\);$', stripped)
-        if m:
-            fmt = m.group(1)
-            args = [a.strip() for a in m.group(2).split(',')]
-            # Single format specifier with one arg → direct println
-            if re.match(r'^%(?:\.\d+)?[dsficg]$', fmt) and len(args) == 1:
+            fmt = _decode_c_string(m.group(1))
+            if not fmt.endswith('\n'):
+                raise ValueError('Unsupported printf: a terminating newline is required.')
+            fmt = fmt[:-1]
+            args = [value.strip() for value in m.group(2).split(',')] if m.group(2) else []
+            if re.fullmatch(r'%(?:\.\d+)?[dsficg]', fmt) and len(args) == 1:
                 result.append(ind + f'System.out.println({args[0]});')
             else:
-                parts = re.split(r'(%(?:\.\d+)?[dsficg])', fmt)
-                arg_idx = 0
-                java_parts = []
-                for part in parts:
-                    if re.match(r'%(?:\.\d+)?[dsficg]', part) and arg_idx < len(args):
-                        java_parts.append(args[arg_idx])
-                        arg_idx += 1
-                    elif part:
-                        java_parts.append(f'"{part}"')
-                java_str = ' + '.join(java_parts) if java_parts else '""'
-                result.append(ind + f'System.out.println({java_str});')
+                fmt = fmt.replace('%i', '%d')
+                arguments = ', ' + ', '.join(args) if args else ''
+                result.append(ind + f'System.out.println(String.format(java.util.Locale.ROOT, {json.dumps(fmt, ensure_ascii=False)}{arguments}));')
             continue
 
         # for loop
@@ -1035,9 +1089,9 @@ def c_to_java(code: str) -> str:
                 continue
 
             # char x[] = "..."; → String x = "...";
-            m = re.match(r'char\s+(\w+)\[\s*\]\s*=\s*"(.*)";$', stripped)
+            m = re.match(r'char\s+(\w+)\[\s*(?:\d+)?\s*\]\s*=\s*("(?:\\.|[^"\\])*");$', stripped)
             if m:
-                result.append(ind + f'String {m.group(1)} = "{m.group(2)}";')
+                result.append(ind + f'String {m.group(1)} = {json.dumps(_decode_c_string(m.group(2)), ensure_ascii=False)};')
                 continue
 
             # Declaration without init
@@ -1192,6 +1246,7 @@ def java_to_c(code: str) -> str:
 # ─────────────────────────────────────────────
 
 def python_to_javascript(code: str) -> str:
+    _validate_rule_scopes(code, allow_loop_reuse=True)
     lines = code.split('\n')
     result = []
     block_stack = []

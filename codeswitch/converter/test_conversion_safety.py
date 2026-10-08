@@ -48,3 +48,37 @@ class CStringSafetyTests(TestCase):
             subprocess.run(['gcc', '-Werror=format', str(source), '-o', str(executable)],
                            check=True, capture_output=True)
             return subprocess.check_output([str(executable)])
+
+
+class CStringRoundtripTests(TestCase):
+    def test_sized_arrays_and_reassignments_roundtrip_to_python(self):
+        import contextlib
+        import io
+        for source in ('s = "hi"\nprint(s)', 's = "猫"\ns = "ab"\nprint(s)',
+                       's = "猫"\nprint(s)'):
+            with self.subTest(source=source):
+                expected = io.StringIO()
+                with contextlib.redirect_stdout(expected):
+                    exec(source, {})
+                actual = io.StringIO()
+                with contextlib.redirect_stdout(actual):
+                    exec(c_to_python(python_to_c(source)), {})
+                self.assertEqual(actual.getvalue(), expected.getvalue())
+                java = c_to_java(python_to_c(source))
+                self.assertNotIn('char s[', java)
+                self.assertNotIn('strcpy', java)
+                self.assertIn('String s =', java)
+
+    def test_formatted_percentage_and_unicode_roundtrip(self):
+        import contextlib
+        import io
+        source = 'x = 3\nprint(f"猫 100% = {x}%")'
+        expected, actual = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(expected): exec(source,{})
+        with contextlib.redirect_stdout(actual): exec(c_to_python(python_to_c(source)),{})
+        self.assertEqual(actual.getvalue(), expected.getvalue())
+
+    def test_formatted_strings_translate_to_java_with_decoded_text(self):
+        generated = c_to_java(python_to_c('x = 3\nprint(f"猫 100% = {x}%")'))
+        self.assertIn('String.format(java.util.Locale.ROOT, "猫 100%% = %d%%", x)', generated)
+        self.assertNotIn('printf(', generated)
