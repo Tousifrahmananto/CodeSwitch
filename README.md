@@ -395,16 +395,25 @@ so this deployment does not require another cache service or volume.
 web: gunicorn codeswitch.wsgi --bind 0.0.0.0:$PORT --access-logfile - --error-logfile -
 ```
 
-Set these Railway environment variables: `DATABASE_URL`, `SECRET_KEY`, `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, `GOOGLE_OAUTH_CLIENT_ID`, `AI_PROVIDER`, `AI_API_KEY`, `AI_API_KEY_2`, `AI_API_KEY_3`, `AI_MODEL`, `DEBUG=False`.
+Set these Railway environment variables: `DATABASE_URL`, `SECRET_KEY`, `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, `GOOGLE_OAUTH_CLIENT_ID`, `AI_PROVIDER`, `AI_API_KEY`, `AI_API_KEY_2`, `AI_API_KEY_3`, `AI_MODEL`, `TRUSTED_PROXY_COUNT`, `DEBUG=False`.
 
-Mount a persistent Railway volume for profile photos and set `MEDIA_ROOT` to
-that mount path. Without a volume, Railway's ephemeral filesystem will lose
-uploaded avatars during redeploys.
+`TRUSTED_PROXY_COUNT` is required when `DEBUG=False`. Before deploying, verify
+how many trusted proxies forward traffic into Django and how they sanitize
+client-supplied `X-Forwarded-For` headers. Set that verified hop count; use `1`
+only when the actual path has one trusted proxy. Do not guess a value from the
+hosting provider's name. Local development uses `0`.
+
+Recognized transient database failures return HTTP 503 with `Retry-After: 2`.
+The backend does not replay requests or writes automatically.
+
+New avatar uploads are stored in PostgreSQL. A media volume is needed only
+if you retain older filesystem-backed avatars.
 
 ### Frontend — Vercel
 Build command: `npm run build`
-Output directory: `dist`
-Set `VITE_API_URL` to your Railway backend URL and `VITE_GOOGLE_CLIENT_ID` to the same Google OAuth Web Client ID used by Railway.
+Output directory: `build`
+Node.js version: `24.x`
+Set `VITE_API_URL` to your Railway backend API URL, including `/api`, and `VITE_GOOGLE_CLIENT_ID` to the same Google OAuth Web Client ID used by Railway.
 
 Google Cloud OAuth Web Client authorized JavaScript origins should include
 `http://localhost:3000` and the production Vercel URL. This ID-token flow does

@@ -443,6 +443,7 @@ export default function Visualizer() {
     }
     setLoading(true);
     setError('');
+    setTimeline(null);
     setIsPlaying(false);
     try {
       const { data } = await visualizeCode({ language: detectedLanguage, code });
@@ -487,12 +488,14 @@ export default function Visualizer() {
 
       {error && <p className="viz-error">{error}</p>}
 
-      <div className={`viz-mode-notice ${language === 'python' ? 'real' : 'concept'}`}>
-        <strong>{language === 'python' ? 'Real execution trace' : 'Concept trace'}</strong>
+      <div className={`viz-mode-notice ${timeline?.mode === 'execution_trace' ? 'real' : 'concept'}`}>
+        <strong>{!timeline ? 'Visualization mode' : timeline.mode === 'execution_trace' ? 'Real execution trace' : 'Concept trace'}</strong>
         <span>
-          {language === 'python'
-            ? 'Python runs in a restricted backend tracer to capture stack frames, heap objects, and output.'
-            : `${getLanguageMeta(language).label} is explained line by line using structural analysis; it is not executed or presented as runtime memory.`}
+          {!timeline
+            ? 'Generate a visualization to see the mode returned by the backend.'
+            : timeline.mode === 'execution_trace'
+              ? 'This result captures runtime snapshots from the backend execution tracer.'
+              : 'This result explains code structure; it does not execute the program or show runtime memory.'}
         </span>
       </div>
 

@@ -190,11 +190,20 @@ container. The `Procfile` starts only the web process:
 Production rate limits use the existing PostgreSQL database cache, so no
 additional cache service or volume is required.
 
+`TRUSTED_PROXY_COUNT` is required when `DEBUG=False`. Before deploying, verify
+how many trusted proxies forward traffic into Django and how they sanitize
+client-supplied `X-Forwarded-For` headers. Set that verified hop count; use `1`
+only when the actual path has one trusted proxy. Do not guess a value from the
+hosting provider's name. Local development uses `0`.
+
+Recognized transient database failures return HTTP 503 with `Retry-After: 2`.
+The backend does not replay requests or writes automatically.
+
 ```
 web: gunicorn codeswitch.wsgi --bind 0.0.0.0:$PORT --access-logfile - --error-logfile -
 ```
 
-Required Railway env vars: `DATABASE_URL`, `SECRET_KEY`, `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, `GOOGLE_OAUTH_CLIENT_ID`, `AI_PROVIDER`, `AI_API_KEY`, `AI_API_KEY_2`, `AI_API_KEY_3`, `AI_MODEL`, `DEBUG=False`.
+Required Railway env vars: `DATABASE_URL`, `SECRET_KEY`, `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, `GOOGLE_OAUTH_CLIENT_ID`, `AI_PROVIDER`, `AI_API_KEY`, `AI_API_KEY_2`, `AI_API_KEY_3`, `AI_MODEL`, `TRUSTED_PROXY_COUNT`, `DEBUG=False`.
 
 Set `CORS_ALLOWED_ORIGINS` and `CSRF_TRUSTED_ORIGINS` to the exact Vercel frontend origin, for example `https://code-switchgg.vercel.app`, so the browser can send the auth cookies cross-site.
 
@@ -218,3 +227,9 @@ needed for the ID-token button flow.
 - [x] Public user profiles with stats
 - [x] Staff admin panel (user management, content CRUD, site stats)
 - [x] Brute-force lockout, rate limiting, CSP headers
+
+
+Frontend Vercel settings: build command `npm run build`, output directory `build`,
+Node.js `24.x` (matching `frontend/package.json`). Set `VITE_API_URL` to the
+backend API URL, including `/api`, and `VITE_GOOGLE_CLIENT_ID` to the backend's
+Google OAuth client ID.
