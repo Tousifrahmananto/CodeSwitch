@@ -89,7 +89,7 @@ def _printf_to_print(s):
         args = [a.strip() for a in m.group(2).split(',')]
         result_fmt = fmt
         for arg in args:
-            result_fmt = re.sub(r'%[dsfic]', '{' + arg + '}', result_fmt, count=1)
+            result_fmt = re.sub(r'%(?:\.\d+)?[dsficg]', '{' + arg + '}', result_fmt, count=1)
         if '{' in result_fmt:
             return f'print(f"{result_fmt}")'
         return f'print("{result_fmt}")'
@@ -122,7 +122,7 @@ def _py_print_to_printf(s, type_map=None):
     type_map = type_map or {}
 
     def spec(var):
-        return {'double': '%f', 'char[]': '%s'}.get(type_map.get(var), '%d')
+        return {'double': '%.15g', 'char[]': '%s'}.get(type_map.get(var), '%d')
 
     m = re.fullmatch(r'print\((.+)\)', s)
     if not m:
@@ -221,6 +221,76 @@ def _has_return_value(func_lines):
     return False
 
 
+def _assignment_types(lines):
+    types, assignments, loop_vars = {}, [], set()
+    initialized = set()
+    for raw in lines:
+        line = raw.strip()
+        loop = re.match(r'for (\w+) in range\(', line)
+        if loop:
+            loop_vars.add(loop.group(1))
+            initialized.add(loop.group(1))
+        match = re.fullmatch(r'([a-zA-Z_]\w*)\s*([+*-]?)=\s*(.+)', line)
+        if not match:
+            continue
+        var, operator, expression = match.groups()
+        if operator:
+            expression = f'{var} {operator} ({expression})'
+        assignments.append((var, expression))
+        try:
+            value = ast.literal_eval(expression)
+        except (ValueError, SyntaxError):
+            if var not in initialized:
+                raise ValueError(f'Unresolved initialization type for {var}.')
+            continue
+        kind = 'int' if type(value) is int else 'double' if type(value) is float else 'string' if isinstance(value, str) else None
+        if kind is None:
+            raise ValueError(f'Unsupported assignment type for {var}.')
+        if kind in ('int', 'double') and not re.fullmatch(r'-?\d+(?:\.\d+)?', expression):
+            raise ValueError(f'Unsupported numeric literal type for {var}.')
+        previous = types.get(var)
+        if previous and (previous == 'string') != (kind == 'string'):
+            raise ValueError(f'Incompatible type change for {var}.')
+        types[var] = 'double' if 'double' in (previous, kind) else kind
+        initialized.add(var)
+    for var in loop_vars:
+        if types.get(var, 'int') != 'int':
+            raise ValueError(f'Unsupported type change for loop variable {var}.')
+        types[var] = 'int'
+
+    # ponytail: infer literals and simple arithmetic; extend only if richer rule conversions are required.
+    def numeric_kind(node):
+        if isinstance(node, ast.Constant) and type(node.value) in (int, float):
+            return 'double' if type(node.value) is float else 'int'
+        if isinstance(node, ast.Name) and types.get(node.id) in ('int', 'double'):
+            return types[node.id]
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub)):
+            return numeric_kind(node.operand)
+        if isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Add, ast.Sub, ast.Mult)):
+            return 'double' if 'double' in (numeric_kind(node.left), numeric_kind(node.right)) else 'int'
+        raise ValueError('Unresolved numeric assignment type; only simple arithmetic is supported.')
+
+    changed = True
+    while changed:
+        changed = False
+        for var, expression in assignments:
+            if var not in types:
+                raise ValueError(f'Unresolved assignment type for {var}.')
+            try:
+                node = ast.parse(expression, mode='eval').body
+            except SyntaxError as exc:
+                raise ValueError(f'Unresolved assignment type for {var}.') from exc
+            if types[var] == 'string':
+                if not isinstance(node, ast.Constant) or not isinstance(node.value, str):
+                    raise ValueError(f'Unresolved string assignment type for {var}.')
+            elif numeric_kind(node) == 'double' and types[var] == 'int':
+                if var in loop_vars:
+                    raise ValueError(f'Unsupported type change for loop variable {var}.')
+                types[var] = 'double'
+                changed = True
+    return types
+
+
 def _process_python_to_c_body(lines, depth_offset=0, type_map=None):
     """Convert a list of Python lines to C lines (without outer braces).
     depth_offset: base indentation level added to all output.
@@ -229,6 +299,7 @@ def _process_python_to_c_body(lines, depth_offset=0, type_map=None):
     """
     if type_map is None:
         type_map = {}
+    planned_types = _assignment_types(lines)
     result = []
     block_stack = []
     block_kinds = []
@@ -305,8 +376,9 @@ def _process_python_to_c_body(lines, depth_offset=0, type_map=None):
             if var in type_map:
                 out = f'{var} = {m.group(2)};'
             else:
-                out = f'int {var} = {m.group(2)};'
-                type_map[var] = 'int'
+                kind = planned_types[var]
+                out = f'{kind} {var} = {m.group(2)};'
+                type_map[var] = kind
 
         elif re.match(r'(\w+)\s*=\s*(-?\d+\.\d+)$', stripped):
             m = re.match(r'(\w+)\s*=\s*(-?\d+\.\d+)$', stripped)
@@ -356,6 +428,7 @@ def _process_python_to_java_body(lines, depth_offset=0, type_map=None):
     """
     if type_map is None:
         type_map = {}
+    planned_types = _assignment_types(lines)
     result = []
     block_stack = []
     block_kinds = []
@@ -431,8 +504,9 @@ def _process_python_to_java_body(lines, depth_offset=0, type_map=None):
             if var in type_map:
                 out = f'{var} = {m.group(2)};'
             else:
-                out = f'int {var} = {m.group(2)};'
-                type_map[var] = 'int'
+                kind = planned_types[var]
+                out = f'{kind} {var} = {m.group(2)};'
+                type_map[var] = kind
 
         elif re.match(r'(\w+)\s*=\s*(-?\d+\.\d+)$', stripped):
             m = re.match(r'(\w+)\s*=\s*(-?\d+\.\d+)$', stripped)
@@ -869,14 +943,14 @@ def c_to_java(code: str) -> str:
             fmt = m.group(1)
             args = [a.strip() for a in m.group(2).split(',')]
             # Single format specifier with one arg → direct println
-            if re.match(r'^%[dsfic]$', fmt) and len(args) == 1:
+            if re.match(r'^%(?:\.\d+)?[dsficg]$', fmt) and len(args) == 1:
                 result.append(ind + f'System.out.println({args[0]});')
             else:
-                parts = re.split(r'(%[dsfic])', fmt)
+                parts = re.split(r'(%(?:\.\d+)?[dsficg])', fmt)
                 arg_idx = 0
                 java_parts = []
                 for part in parts:
-                    if re.match(r'%[dsfic]', part) and arg_idx < len(args):
+                    if re.match(r'%(?:\.\d+)?[dsficg]', part) and arg_idx < len(args):
                         java_parts.append(args[arg_idx])
                         arg_idx += 1
                     elif part:

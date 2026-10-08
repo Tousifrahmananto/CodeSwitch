@@ -86,3 +86,33 @@ class LoopAndDeclarationTests(TestCase):
             with self.subTest(source=source):
                 output = subprocess.check_output(['node', '-e', python_to_javascript(source)], text=True)
                 self.assertEqual(output.strip(), expected)
+
+
+class NumericTypeTests(TestCase):
+    def test_fractional_reassignment_uses_double_in_both_targets(self):
+        for converter in (python_to_c, python_to_java):
+            generated = converter('x = 1\nx = 1.5\nprint(x)')
+            self.assertIn('double x = 1;', generated)
+            self.assertNotIn('int x =', generated)
+        if shutil.which('gcc'):
+            self.assertEqual(c_safety.CStringSafetyTests.compile_and_run(python_to_c('x = 1\nx = 1.5\nprint(x)')).decode().strip(), '1.5')
+
+    def test_integer_only_and_function_scopes_stay_independent(self):
+        source = 'x = 1\ndef f():\n    x = 1\n    x = 1.5\n    print(x)\nf()\nprint(x)'
+        for converter in (python_to_c, python_to_java):
+            generated = converter(source)
+            self.assertIn('int x = 1;', generated)
+            self.assertIn('double x = 1;', generated)
+        if shutil.which('gcc'):
+            self.assertEqual(c_safety.CStringSafetyTests.compile_and_run(python_to_c(source)).decode().replace('\r\n', '\n').strip(), '1.5\n1')
+
+    def test_incompatible_and_unresolved_changes_fail_clearly(self):
+        for converter in (python_to_c, python_to_java):
+            for source in ['x = 1\nx = "text"', 'x = "text"\nx = 1', 'x = 1\nx = unknown()', 'x = 1\nx = []', 'x = x + 1\nx = 1']:
+                with self.subTest(converter=converter.__name__, source=source), self.assertRaisesRegex(ValueError, 'type'):
+                    converter(source)
+
+    def test_supported_accumulation_still_works(self):
+        if shutil.which('gcc'):
+            generated = python_to_c('x = 0\nfor i in range(4):\n    x = x + i\nprint(x)')
+            self.assertEqual(c_safety.CStringSafetyTests.compile_and_run(generated).decode().strip(), '6')
