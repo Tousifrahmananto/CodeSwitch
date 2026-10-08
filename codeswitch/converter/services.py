@@ -231,6 +231,7 @@ def _process_python_to_c_body(lines, depth_offset=0, type_map=None):
         type_map = {}
     result = []
     block_stack = []
+    block_kinds = []
     string_capacities = {}
 
     for raw in lines:
@@ -242,18 +243,26 @@ def _process_python_to_c_body(lines, depth_offset=0, type_map=None):
 
         m_elif = re.match(r'elif (.+):$', stripped)
         if m_elif or stripped == 'else:':
-            while block_stack and block_stack[-1] >= py_level:
+            while block_stack and block_stack[-1] > py_level:
                 block_stack.pop()
-            depth = len(block_stack) + depth_offset + 1
+                block_kinds.pop()
+                result.append(_ind(len(block_stack) + depth_offset + 1) + '}')
+            if not block_stack or block_stack[-1] != py_level or block_kinds[-1] != 'if':
+                raise ValueError('Unsupported branch: else/elif must belong to an if block.')
+            block_stack.pop()
+            block_kinds.pop()
+            ind = _ind(len(block_stack) + depth_offset + 1)
             if m_elif:
-                result.append(_ind(depth) + f'}} else if ({m_elif.group(1)}) {{')
+                result.append(ind + f'}} else if ({m_elif.group(1)}) {{')
             else:
-                result.append(_ind(depth) + '} else {')
+                result.append(ind + '} else {')
             block_stack.append(py_level)
+            block_kinds.append('if' if m_elif else 'other')
             continue
 
         while block_stack and block_stack[-1] >= py_level:
             block_stack.pop()
+            block_kinds.pop()
             depth = len(block_stack) + depth_offset + 1
             result.append(_ind(depth) + '}')
 
@@ -330,9 +339,11 @@ def _process_python_to_c_body(lines, depth_offset=0, type_map=None):
         result.append(ind + out)
         if opens_block:
             block_stack.append(py_level)
+            block_kinds.append('if' if stripped.startswith(('if ', 'elif ')) else 'other')
 
     while block_stack:
         block_stack.pop()
+        block_kinds.pop()
         depth = len(block_stack) + depth_offset + 1
         result.append(_ind(depth) + '}')
 
@@ -347,6 +358,7 @@ def _process_python_to_java_body(lines, depth_offset=0, type_map=None):
         type_map = {}
     result = []
     block_stack = []
+    block_kinds = []
 
     for raw in lines:
         stripped = raw.strip()
@@ -357,18 +369,26 @@ def _process_python_to_java_body(lines, depth_offset=0, type_map=None):
 
         m_elif = re.match(r'elif (.+):$', stripped)
         if m_elif or stripped == 'else:':
-            while block_stack and block_stack[-1] >= py_level:
+            while block_stack and block_stack[-1] > py_level:
                 block_stack.pop()
-            depth = len(block_stack) + depth_offset + 1
+                block_kinds.pop()
+                result.append(_ind(len(block_stack) + depth_offset + 1) + '}')
+            if not block_stack or block_stack[-1] != py_level or block_kinds[-1] != 'if':
+                raise ValueError('Unsupported branch: else/elif must belong to an if block.')
+            block_stack.pop()
+            block_kinds.pop()
+            ind = _ind(len(block_stack) + depth_offset + 1)
             if m_elif:
-                result.append(_ind(depth) + f'}} else if ({m_elif.group(1)}) {{')
+                result.append(ind + f'}} else if ({m_elif.group(1)}) {{')
             else:
-                result.append(_ind(depth) + '} else {')
+                result.append(ind + '} else {')
             block_stack.append(py_level)
+            block_kinds.append('if' if m_elif else 'other')
             continue
 
         while block_stack and block_stack[-1] >= py_level:
             block_stack.pop()
+            block_kinds.pop()
             depth = len(block_stack) + depth_offset + 1
             result.append(_ind(depth) + '}')
 
@@ -438,9 +458,11 @@ def _process_python_to_java_body(lines, depth_offset=0, type_map=None):
         result.append(ind + out)
         if opens_block:
             block_stack.append(py_level)
+            block_kinds.append('if' if stripped.startswith(('if ', 'elif ')) else 'other')
 
     while block_stack:
         block_stack.pop()
+        block_kinds.pop()
         depth = len(block_stack) + depth_offset + 1
         result.append(_ind(depth) + '}')
 
@@ -1048,6 +1070,7 @@ def python_to_javascript(code: str) -> str:
     lines = code.split('\n')
     result = []
     block_stack = []
+    block_kinds = []
     scopes = [(set(), True)]
 
     def declared(name):
@@ -1069,21 +1092,29 @@ def python_to_javascript(code: str) -> str:
         # Close open blocks at same or lower indent
         m_elif = re.match(r'elif (.+):$', stripped)
         if m_elif or stripped == 'else:':
-            while block_stack and block_stack[-1] >= py_level:
+            while block_stack and block_stack[-1] > py_level:
                 block_stack.pop()
+                block_kinds.pop()
                 scopes.pop()
                 result.append(_ind(len(block_stack)) + '}')
+            if not block_stack or block_stack[-1] != py_level or block_kinds[-1] != 'if':
+                raise ValueError('Unsupported branch: else/elif must belong to an if block.')
+            block_stack.pop()
+            block_kinds.pop()
+            scopes.pop()
             ind = _ind(len(block_stack))
             if m_elif:
                 result.append(ind + f'}} else if ({m_elif.group(1)}) {{')
             else:
                 result.append(ind + '} else {')
             block_stack.append(py_level)
+            block_kinds.append('if' if m_elif else 'other')
             scopes.append((set(), False))
             continue
 
         while block_stack and block_stack[-1] >= py_level:
             block_stack.pop()
+            block_kinds.pop()
             scopes.pop()
             result.append(_ind(len(block_stack)) + '}')
 
@@ -1116,6 +1147,7 @@ def python_to_javascript(code: str) -> str:
             scopes[-1][0].add(m.group(1))
             result.append(ind + f'function {m.group(1)}({m.group(2)}) {{')
             block_stack.append(py_level)
+            block_kinds.append('if' if stripped.startswith(('if ', 'elif ')) else 'other')
             scopes.append(({param.split('=', 1)[0].strip() for param in m.group(2).split(',')}, True))
             continue
 
@@ -1140,6 +1172,7 @@ def python_to_javascript(code: str) -> str:
             init_js = re.sub(r'^int ', 'let ', init)
             result.append(ind + f'for ({init_js}; {cond}; {inc}) {{')
             block_stack.append(py_level)
+            block_kinds.append('if' if stripped.startswith(('if ', 'elif ')) else 'other')
             scopes.append(({counter}, False))
             if already_declared:
                 result.append(_ind(len(block_stack)) + f'{loop_var} = {counter};')
@@ -1150,12 +1183,14 @@ def python_to_javascript(code: str) -> str:
         if m:
             result.append(ind + f'if ({m.group(1)}) {{')
             block_stack.append(py_level)
+            block_kinds.append('if' if stripped.startswith(('if ', 'elif ')) else 'other')
             scopes.append((set(), False))
             continue
         m = re.match(r'while (.+):$', stripped)
         if m:
             result.append(ind + f'while ({m.group(1)}) {{')
             block_stack.append(py_level)
+            block_kinds.append('if' if stripped.startswith(('if ', 'elif ')) else 'other')
             scopes.append((set(), False))
             continue
 
@@ -1175,6 +1210,7 @@ def python_to_javascript(code: str) -> str:
     # Close remaining blocks
     while block_stack:
         block_stack.pop()
+        block_kinds.pop()
         scopes.pop()
         result.append(_ind(len(block_stack)) + '}')
 
@@ -1240,15 +1276,18 @@ def javascript_to_python(code: str) -> str:
             result.append(ind + f'print({m.group(1).strip()})')
             continue
 
-        # function declaration
-        m = re.match(r'(?:function\s+|const\s+(\w+)\s*=\s*(?:function\s*)?\()(\w+)\s*\(([^)]*)\)\s*\{?$', stripped)
-        if not m:
-            m2 = re.match(r'function\s+(\w+)\s*\(([^)]*)\)\s*\{?$', stripped)
-            if m2:
-                result.append(ind + f'def {m2.group(1)}({m2.group(2)}):')
-                if stripped.rstrip().endswith('{'):
-                    depth += 1
-                continue
+        # Supported named function declarations only.
+        m = re.fullmatch(r'function\s+([a-zA-Z_]\w*)\s*\(([^)]*)\)\s*\{', stripped)
+        if m:
+            parameters = m.group(2).strip()
+            if not re.fullmatch(r'(?:[a-zA-Z_]\w*(?:\s*,\s*[a-zA-Z_]\w*)*)?', parameters):
+                raise ValueError('Unsupported JavaScript function parameters.')
+            result.append(ind + f'def {m.group(1)}({parameters}):')
+            depth += 1
+            continue
+        if (re.search(r'^(?:(?:export|default|async)\s+)*function\b|=\s*(?:async\s+)?function\b', stripped)
+                or re.search(r'(?:=\s*|^)(?:async\s+)?(?:\([^)]*\)|[a-zA-Z_]\w*)\s*=>', stripped)):
+            raise ValueError('Unsupported JavaScript function declaration.')
 
         # return
         m = re.match(r'return\s*(.*?);?$', stripped)
