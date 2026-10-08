@@ -11,6 +11,7 @@ export default defineConfig({
   },
   build: {
     outDir: 'build', // Django/Whitenoise expects the build in this folder
+    chunkSizeWarningLimit: 700,
   },
   server: {
     port: 3000,
