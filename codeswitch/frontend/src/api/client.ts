@@ -1,5 +1,5 @@
 import axios, { AxiosResponse, AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
-import type { AIErrorMetadata, User, ConversionRecord, CodeFile, LearningModule, Lesson, UserProgress, Quiz, SharedSnippet, PublicProfile, AdminStats, AdminUser, AdminConversion, AdminLesson, VisualizationTimeline, VerificationResult } from '../types';
+import type { AIErrorMetadata, QuizSubmissionResult, User, ConversionRecord, CodeFile, LearningModule, Lesson, UserProgress, Quiz, SharedSnippet, PublicProfile, AdminStats, AdminUser, AdminConversion, AdminLesson, VisualizationTimeline, VerificationResult } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 let csrfToken: string | null = null;
@@ -177,7 +177,7 @@ export const getLessonQuiz = (lessonId: number): Promise<AxiosResponse<Quiz>> =>
 export const submitQuiz = (
   quizId: number,
   answers: Record<string, number>
-): Promise<AxiosResponse<{ score: number; passed: boolean; correct_options: Record<string, number> }>> =>
+): Promise<AxiosResponse<QuizSubmissionResult>> =>
   client.post(`/quizzes/${quizId}/submit/`, { answers });
 
 // ── Public Profile ─────────────────────────────

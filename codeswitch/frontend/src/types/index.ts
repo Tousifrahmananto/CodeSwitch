@@ -75,7 +75,6 @@ export interface QuizQuestion {
 export interface QuizOption {
   id: number;
   option_text: string;
-  explanation: string;
 }
 
 export interface SharedSnippet {
@@ -241,4 +240,11 @@ export type TabName = 'Overview' | 'Users' | 'Conversions' | 'Modules';
 export interface AIErrorMetadata {
   ai_error_code?: 'ai_not_configured' | 'ai_quota_exhausted' | 'ai_timeout' | 'ai_invalid_response' | 'ai_incomplete_response' | 'ai_unavailable';
   ai_provider?: string;
+}
+
+export interface QuizSubmissionResult {
+  score: number;
+  passed: boolean;
+  correct_options: Record<string, number>;
+  explanations: Record<string, Record<string, string>>;
 }

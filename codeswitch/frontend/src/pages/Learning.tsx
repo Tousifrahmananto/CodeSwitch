@@ -1,12 +1,12 @@
 // src/pages/Learning.jsx
-import { useEffect, useState, memo } from 'react';
+import { useEffect, useRef, useState, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getModules, getModule, updateProgress, getProgress, convertCode, getLessonQuiz, submitQuiz } from '../api/client';
 import CodeEditor from '../components/CodeEditor';
 import { runCode, canRun } from '../api/executor';
 import { getLanguageMeta } from '../constants/languages';
 import type { CSSProperties, ReactNode } from 'react';
-import type { LearningModule, Lesson, Quiz, RunResult, UserProgress } from '../types';
+import type { LearningModule, Lesson, Quiz, QuizSubmissionResult, RunResult, UserProgress } from '../types';
 
 type LearningLanguage = 'c' | 'python' | 'java';
 const LANG_COLORS: Record<LearningLanguage, string> = {
@@ -380,9 +380,10 @@ function TryItSandbox({ exampleCode }: { exampleCode: Record<string, string> }) 
 function QuizPanel({ lessonId, onPass }: { lessonId: number; onPass?: () => void }) {
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [answers, setAnswers] = useState<Record<number, number>>({});
-  const [result, setResult] = useState<{ score: number; passed: boolean; correct_options: Record<string, number> } | null>(null);
+  const [result, setResult] = useState<QuizSubmissionResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [noQuiz, setNoQuiz] = useState(false);
+  const submittingRef = useRef(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -400,7 +401,9 @@ function QuizPanel({ lessonId, onPass }: { lessonId: number; onPass?: () => void
   }, [lessonId]);
 
   const handleSubmit = async () => {
-    if (!quiz) return;
+    if (!quiz || submittingRef.current) return;
+    submittingRef.current = true;
+    setError('');
     setSubmitting(true);
     try {
       const { data } = await submitQuiz(quiz.id, answers);
@@ -409,6 +412,7 @@ function QuizPanel({ lessonId, onPass }: { lessonId: number; onPass?: () => void
     } catch {
       setError('Failed to submit quiz. Try again.');
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -453,7 +457,8 @@ function QuizPanel({ lessonId, onPass }: { lessonId: number; onPass?: () => void
                 } else if (opt.id === userAnswer) {
                   cls += ' quiz-selected';
                 }
-                const showExplanation = result && opt.id === userAnswer && opt.id !== correctId && opt.explanation;
+                const explanation = result?.explanations?.[String(q.id)]?.[String(opt.id)];
+                const showExplanation = result && opt.id === userAnswer && opt.id !== correctId && explanation;
                 return (
                   <div key={opt.id}>
                     <label className={cls}>
@@ -468,7 +473,7 @@ function QuizPanel({ lessonId, onPass }: { lessonId: number; onPass?: () => void
                       {opt.option_text}
                     </label>
                     {showExplanation && (
-                      <p className="quiz-option-explanation">{opt.explanation}</p>
+                      <p className="quiz-option-explanation">{explanation}</p>
                     )}
                   </div>
                 );
@@ -519,11 +524,29 @@ export default function Learning() {
   const [loadError, setLoadError] = useState('');
   const [openingId, setOpeningId] = useState<number | null>(null);
 
+  const pendingLessonsRef = useRef(new Set<number>());
+  const completedIdsRef = useRef(new Set<number>());
+  const mountedRef = useRef(true);
+  const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const selectionRef = useRef({ moduleId: activeModule?.id, lessonId: activeLesson?.id });
+  selectionRef.current = { moduleId: activeModule?.id, lessonId: activeLesson?.id };
+  const [savingLessons, setSavingLessons] = useState(new Set<number>());
+  const [progressError, setProgressError] = useState('');
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+    };
+  }, []);
+
   useEffect(() => {
     Promise.all([getModules(), getProgress()])
       .then(([modRes, progRes]) => {
         setModules(modRes.data);
         const completedRecords = progRes.data.filter(p => p.completed);
+        completedIdsRef.current = new Set(completedRecords.map(p => p.lesson_id));
         // Feature 5: lesson_id → completion_date
         setCompletedLessons(new Map(completedRecords.map(p => [p.lesson_id, p.completion_date])));
         // Feature 2: count per module title
@@ -562,27 +585,34 @@ export default function Learning() {
   };
 
   const markComplete = async (lessonId: number) => {
+    if (completedIdsRef.current.has(lessonId) || pendingLessonsRef.current.has(lessonId)) return;
+    const moduleSnapshot = activeModule;
+    if (!moduleSnapshot) return;
+    pendingLessonsRef.current.add(lessonId);
+    setSavingLessons(prev => new Set([...prev, lessonId]));
+    setProgressError('');
     try {
       await updateProgress(lessonId);
-    } catch {
-      // best-effort — progress sync failure doesn't block UI update
-    }
-    // Feature 5: store completion date in Map
-    setCompletedLessons(prev => new Map<number, string | null>([...prev, [lessonId, new Date().toISOString()]]));
-    // Feature 2: increment module count
-    if (activeModule) {
-      setCompletedByModule(prev => ({
-        ...prev,
-        [activeModule.title]: (prev[activeModule.title] || 0) + 1,
-      }));
-    }
-    // Feature 4: auto-advance after 700ms if not the last lesson
-    if (activeModule) {
-      const lessons = activeModule.lessons || [];
-      const idx = lessons.findIndex(l => l.id === lessonId);
-      if (idx < lessons.length - 1) {
-        setTimeout(goToNext, 700);
+      if (!mountedRef.current) return;
+      completedIdsRef.current.add(lessonId);
+      setCompletedLessons(prev => new Map([...prev, [lessonId, new Date().toISOString()]]));
+      setCompletedByModule(prev => ({ ...prev, [moduleSnapshot.title]: (prev[moduleSnapshot.title] || 0) + 1 }));
+      const lessons = moduleSnapshot.lessons || [];
+      const index = lessons.findIndex(lesson => lesson.id === lessonId);
+      const sameLesson = () => selectionRef.current.moduleId === moduleSnapshot.id && selectionRef.current.lessonId === lessonId;
+      if (index >= 0 && index < lessons.length - 1 && sameLesson()) {
+        if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+        advanceTimerRef.current = setTimeout(() => {
+          if (!mountedRef.current || !sameLesson()) return;
+          setActiveLesson(lessons[index + 1]);
+          setActiveView('lesson');
+        }, 700);
       }
+    } catch {
+      if (mountedRef.current) setProgressError('Could not save progress. Please try again.');
+    } finally {
+      pendingLessonsRef.current.delete(lessonId);
+      if (mountedRef.current) setSavingLessons(prev => { const next = new Set(prev); next.delete(lessonId); return next; });
     }
   };
 
@@ -602,6 +632,7 @@ export default function Learning() {
 
     return (
       <div className="lesson-viewer">
+        {progressError && <p role="alert" className="quiz-error">{progressError}</p>}
         <div className="lesson-viewer-header">
           <button className="back-btn" onClick={() => setActiveModule(null)}>← Modules</button>
           <span className="module-title-sm">{activeModule.title}</span>
@@ -678,8 +709,8 @@ export default function Learning() {
                     )}
                     <div className="lesson-actions">
                       {!isCompleted && (
-                        <button className="btn-complete" onClick={() => markComplete(activeLesson.id)}>
-                          ✓ Mark as Complete
+                        <button className="btn-complete" onClick={() => markComplete(activeLesson.id)} disabled={savingLessons.has(activeLesson.id)}>
+                          {savingLessons.has(activeLesson.id) ? 'Saving progress…' : '✓ Mark as Complete'}
                         </button>
                       )}
                       {!isLast && isCompleted && (
