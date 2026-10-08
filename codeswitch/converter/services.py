@@ -6,6 +6,8 @@ Handles indentation tracking, flexible for-loop patterns,
 closing braces, and common language idioms.
 """
 import re
+import ast
+import json
 
 
 # ─────────────────────────────────────────────
@@ -114,6 +116,9 @@ def _py_range_to_c_for(var, range_str):
 
 def _printf_to_print(s):
     """Convert C printf(...) to Python print(...). Returns None if no match."""
+    literal = _literal_printf_text(s)
+    if literal is not None:
+        return f'print({literal!r})'
     # printf("text\n");  — no args
     m = re.match(r'printf\("(.*)\\n"\);$', s)
     if m:
@@ -134,47 +139,58 @@ def _printf_to_print(s):
     return None
 
 
-def _py_print_to_printf(s, type_map=None):
-    """Convert Python print(...) to C printf(...).
-    type_map: dict of {var_name: c_type} used to pick the right format specifier.
-    """
-    if type_map is None:
-        type_map = {}
-
-    def _spec(var):
-        t = type_map.get(var)
-        if t == 'double':
-            return '%f'
-        if t == 'char[]':
-            return '%s'
-        return '%d'  # default to int — safer than %s for untyped variables
-
-    # f-string: print(f"...")
-    m = re.match(r'print\(f(["\'])(.*)\1\)', s)
+def _literal_printf_text(s):
+    m = re.fullmatch(r'printf\("%s",\s*("(?:\\.|[^"\\])*")\);', s)
     if m:
-        content = m.group(2)
-        vars_found = re.findall(r'\{(\w+)\}', content)
-        fmt = content
-        for v in vars_found:
-            fmt = re.sub(r'\{' + v + r'\}', _spec(v), fmt, count=1)
-        if vars_found:
-            return f'printf("{fmt}\\n", {", ".join(vars_found)});'
-        return f'printf("{fmt}\\n");'
-
-    # String literal: print("...")
-    m = re.match(r'print\((["\'])(.*)\1\)', s)
-    if m:
-        return f'printf("{m.group(2)}\\n");'
-
-    # Variable/expression: print(x)
-    m = re.match(r'print\((.+)\)', s)
-    if m:
-        arg = m.group(1).strip()
-        if re.match(r'^[\w.]+$', arg):
-            return f'printf("{_spec(arg)}\\n", {arg});'
-        return f'printf("%d\\n", {arg});'
-
+        text = ast.literal_eval(m.group(1)).encode('latin1').decode('utf-8')
+        if text.endswith('\n'):
+            return text[:-1]
     return None
+
+
+def _c_string(value):
+    """Encode UTF-8 bytes independently of the compiler's source encoding."""
+    if '\0' in value:
+        raise ValueError('Embedded null characters are unsupported in C strings.')
+    return '"' + ''.join(
+        '\\' + chr(byte) if byte in (34, 92) else
+        chr(byte) if 32 <= byte < 127 else f'\\{byte:03o}'
+        for byte in value.encode('utf-8')
+    ) + '"'
+
+
+def _py_print_to_printf(s, type_map=None):
+    """Translate supported print arguments using a fixed or escaped format."""
+    type_map = type_map or {}
+
+    def spec(var):
+        return {'double': '%f', 'char[]': '%s'}.get(type_map.get(var), '%d')
+
+    m = re.fullmatch(r'print\((.+)\)', s)
+    if not m:
+        return None
+    argument = m.group(1)
+    if argument.startswith(('"', "'", 'f"', "f'")):
+        try:
+            expression = ast.parse(argument, mode='eval').body
+        except SyntaxError as exc:
+            raise ValueError('Unsupported print string literal.') from exc
+        if isinstance(expression, ast.Constant) and isinstance(expression.value, str):
+            return f'printf("%s", {_c_string(expression.value + chr(10))});'
+        if isinstance(expression, ast.JoinedStr):
+            fmt, variables = [], []
+            for part in expression.values:
+                if isinstance(part, ast.Constant):
+                    fmt.append(part.value.replace('%', '%%'))
+                elif (isinstance(part, ast.FormattedValue) and isinstance(part.value, ast.Name)
+                      and part.conversion == -1 and part.format_spec is None):
+                    variables.append(part.value.id)
+                    fmt.append(spec(part.value.id))
+                else:
+                    raise ValueError('Unsupported formatted string expression.')
+            return f'printf({_c_string("".join(fmt) + chr(10))}' + (', ' + ', '.join(variables) if variables else '') + ');'
+        raise ValueError('Unsupported print string expression.')
+    return f'printf("{spec(argument)}\\n", {argument});'
 
 
 def _py_print_to_println(s):
@@ -257,6 +273,7 @@ def _process_python_to_c_body(lines, depth_offset=0, type_map=None):
         type_map = {}
     result = []
     block_stack = []
+    string_capacities = {}
 
     for raw in lines:
         stripped = raw.strip()
@@ -336,11 +353,18 @@ def _process_python_to_c_body(lines, depth_offset=0, type_map=None):
         elif re.match(r'(\w+)\s*=\s*(["\'])(.*)\2$', stripped):
             m = re.match(r'(\w+)\s*=\s*(["\'])(.*)\2$', stripped)
             var = m.group(1)
+            value = ast.literal_eval(stripped.split('=', 1)[1].strip())
+            capacity = len(value.encode('utf-8')) + 1
             if var in type_map:
-                out = f'strcpy({var}, "{m.group(3)}");'
+                if type_map[var] != 'char[]' or var not in string_capacities:
+                    raise ValueError(f'Unsupported string reassignment for {var}.')
+                if capacity > string_capacities[var]:
+                    raise ValueError(f'String reassignment exceeds UTF-8 capacity for {var}.')
+                out = f'strcpy({var}, {_c_string(value)});'
             else:
-                out = f'char {var}[] = "{m.group(3)}";'
+                out = f'char {var}[{capacity}] = {_c_string(value)};'
                 type_map[var] = 'char[]'
+                string_capacities[var] = capacity
 
         else:
             out = f'{stripped};'
@@ -851,6 +875,10 @@ def c_to_java(code: str) -> str:
             continue
 
         # printf → System.out.println
+        literal = _literal_printf_text(stripped)
+        if literal is not None:
+            result.append(ind + f'System.out.println({json.dumps(literal, ensure_ascii=False)});')
+            continue
         m = re.match(r'printf\("(.*)\\n"\);$', stripped)
         if m:
             result.append(ind + f'System.out.println("{m.group(1)}");')
@@ -986,7 +1014,7 @@ def java_to_c(code: str) -> str:
         # System.out.println("...")
         m = re.match(r'System\.out\.println\("(.*)"\);', stripped)
         if m:
-            result.append(ind + f'printf("{m.group(1)}\\n");')
+            result.append(ind + f'printf("%s", {_c_string(ast.literal_eval(chr(34) + m.group(1) + chr(34)) + chr(10))});')
             continue
 
         # System.out.println(var)
@@ -994,7 +1022,7 @@ def java_to_c(code: str) -> str:
         if m:
             arg = m.group(1).strip()
             if re.match(r'^"', arg):
-                result.append(ind + f'printf("{arg[1:-1]}\\n");')
+                raise ValueError("Unsupported Java print string expression.")
             else:
                 result.append(ind + f'printf("%d\\n", {arg});')
             continue
@@ -1024,7 +1052,7 @@ def java_to_c(code: str) -> str:
             # String x = "...";  →  char x[] = "...";
             m = re.match(r'String\s+(\w+)\s*=\s*"(.*)";$', stripped)
             if m:
-                result.append(ind + f'char {m.group(1)}[] = "{m.group(2)}";')
+                result.append(ind + f'char {m.group(1)}[] = {_c_string(ast.literal_eval(chr(34) + m.group(2) + chr(34)))};')
                 continue
 
             # int/double var = val;
