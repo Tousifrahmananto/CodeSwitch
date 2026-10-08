@@ -11,7 +11,7 @@ from rest_framework.permissions import BasePermission, IsAuthenticated
 from converter.throttles import AdminThrottle
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework import status
+from rest_framework import serializers, status
 
 from converter.models import ConversionHistory
 from files.models import CodeFile
@@ -19,6 +19,18 @@ from learning.models import LearningModule, Lesson
 from codeswitch.pagination import OptionalPageNumberPagination
 
 User = get_user_model()
+
+
+class StrictBooleanField(serializers.BooleanField):
+    def to_internal_value(self, data):
+        if not isinstance(data, bool):
+            self.fail('invalid')
+        return super().to_internal_value(data)
+
+
+class AdminUserUpdateSerializer(serializers.Serializer):
+    is_staff = StrictBooleanField(required=False)
+    is_active = StrictBooleanField(required=False)
 
 
 class IsStaffUser(BasePermission):
@@ -84,15 +96,18 @@ class AdminUserDetailView(APIView):
         if not user:
             return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
 
+        serializer = AdminUserUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        flags = serializer.validated_data
+
         # Safety: can't remove your own staff status
-        if user == request.user and request.data.get('is_staff') is False:
+        if user == request.user and flags.get('is_staff') is False:
             return Response({'error': 'Cannot remove your own staff status.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if 'is_staff' in request.data:
-            user.is_staff = bool(request.data['is_staff'])
-        if 'is_active' in request.data:
-            user.is_active = bool(request.data['is_active'])
-        user.save(update_fields=['is_staff', 'is_active'])
+        for name, value in flags.items():
+            setattr(user, name, value)
+        if flags:
+            user.save(update_fields=list(flags))
 
         return Response({
             'id': user.id,

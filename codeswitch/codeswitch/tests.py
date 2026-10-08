@@ -1,5 +1,9 @@
 from django.db import OperationalError
 from django.test import TestCase, override_settings
+from django.contrib.auth import get_user_model
+from django.core.cache import cache
+from rest_framework.test import APIClient
+from rest_framework_simplejwt.tokens import RefreshToken
 
 
 
@@ -52,3 +56,44 @@ class HealthAndRequestIdTests(TestCase):
     def test_unrecognized_database_errors_are_not_disguised_as_transient(self):
         from .exception_handler import api_exception_handler
         self.assertIsNone(api_exception_handler(OperationalError('syntax error in SQL'), {}))
+
+
+@override_settings(AXES_ENABLED=False)
+class AdminFlagValidationTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
+        self.staff = get_user_model().objects.create_user('staff', password='Test1234!', is_staff=True)
+        self.target = get_user_model().objects.create_user('target', password='Test1234!')
+        self.client = APIClient(raise_request_exception=False)
+        self.client.cookies['access_token'] = str(RefreshToken.for_user(self.staff).access_token)
+
+    def test_invalid_flags_never_change_permissions(self):
+        for field in ('is_staff', 'is_active'):
+            for invalid in ('false', 'true', 0, 1, None, [], {}):
+                with self.subTest(field=field, invalid=invalid):
+                    cache.clear()
+                    response = self.client.patch(f'/api/admin/users/{self.target.pk}', {field: invalid}, format='json')
+                    self.assertEqual(response.status_code, 400)
+                    self.target.refresh_from_db()
+                    self.assertFalse(self.target.is_staff)
+                    self.assertTrue(self.target.is_active)
+        self.assertEqual(self.client.patch(f'/api/admin/users/{self.target.pk}', ['bad root'], format='json').status_code, 400)
+
+    def test_self_demotion_cannot_bypass_the_guard(self):
+        for value in (False, 0):
+            with self.subTest(value=value):
+                response = self.client.patch(f'/api/admin/users/{self.staff.pk}', {'is_staff': value}, format='json')
+                self.assertEqual(response.status_code, 400)
+                self.staff.refresh_from_db()
+                self.assertTrue(self.staff.is_staff)
+
+    def test_boolean_updates_preserve_unspecified_flags(self):
+        response = self.client.patch(f'/api/admin/users/{self.target.pk}', {'is_staff': True}, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data['is_staff'])
+        self.assertTrue(response.data['is_active'])
+        response = self.client.patch(f'/api/admin/users/{self.target.pk}', {'is_active': False}, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data['is_staff'])
+        self.assertFalse(response.data['is_active'])
