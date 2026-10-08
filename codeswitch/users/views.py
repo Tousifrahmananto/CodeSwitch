@@ -14,7 +14,7 @@ from django.middleware.csrf import get_token
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_protect
 from django.utils.text import slugify
-from .serializers import RegisterSerializer, UserProfileSerializer
+from .serializers import GoogleAuthSerializer, LoginSerializer, RegisterSerializer, UserProfileSerializer
 from converter.throttles import (
     CsrfTokenThrottle, LoginThrottle, ProfileWriteThrottle,
     PublicProfileThrottle, RegisterThrottle, TokenRefreshThrottle,
@@ -75,8 +75,10 @@ class LoginView(APIView):
     def post(self, request):
         from django.contrib.auth import authenticate
 
-        identifier = (request.data.get('username') or '').strip()
-        password = request.data.get('password')
+        serializer = LoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        identifier = serializer.validated_data['username']
+        password = serializer.validated_data['password']
 
         user = None
         if '@' in identifier:
@@ -117,9 +119,9 @@ class GoogleAuthView(APIView):
     throttle_classes = [LoginThrottle]
 
     def post(self, request):
-        credential = (request.data.get('credential') or '').strip()
-        if not credential:
-            return Response({'error': 'Google credential is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = GoogleAuthSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        credential = serializer.validated_data['credential']
 
         client_id = getattr(settings, 'GOOGLE_OAUTH_CLIENT_ID', '') or ''
         if not client_id:
@@ -205,6 +207,12 @@ class GoogleAuthView(APIView):
             if user is None:
                 return Response({'error': 'An account conflicts with this Google identity.'},
                                 status=status.HTTP_409_CONFLICT)
+
+        if not user.is_active:
+            response = Response({'error': 'This account is disabled.'}, status=status.HTTP_401_UNAUTHORIZED)
+            response.delete_cookie('access_token')
+            response.delete_cookie('refresh_token')
+            return response
 
         refresh = RefreshToken.for_user(user)
         response = Response({'user': UserProfileSerializer(user, context={'request': request}).data})

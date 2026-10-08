@@ -491,3 +491,61 @@ class ProfileTests(TestCase):
             response.data['avatar'],
             'http://testserver/media/avatars/test.png',
         )
+
+
+@override_settings(AXES_ENABLED=False, GOOGLE_OAUTH_CLIENT_ID='test-client')
+class AuthBoundaryTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
+        self.client = APIClient(raise_request_exception=False)
+
+    def test_login_rejects_non_text_fields_and_invalid_bodies(self):
+        for field in ('username', 'password'):
+            for invalid in (None, 123, True, [], {}):
+                with self.subTest(field=field, invalid=invalid):
+                    cache.clear()
+                    payload = {'username': 'user', 'password': 'Test1234!', field: invalid}
+                    self.assertEqual(self.client.post('/api/login', payload, format='json').status_code, 400)
+        for payload in ({}, ['bad root']):
+            cache.clear()
+            self.assertEqual(self.client.post('/api/login', payload, format='json').status_code, 400)
+
+    @patch('users.views.id_token.verify_oauth2_token')
+    def test_google_rejects_non_text_credentials_before_verification(self, verify):
+        for payload in ({}, ['bad root'], *({'credential': value} for value in (None, 123, True, [], {}, ' '))):
+            with self.subTest(payload=payload):
+                cache.clear()
+                self.assertEqual(self.client.post('/api/auth/google', payload, format='json').status_code, 400)
+        verify.assert_not_called()
+
+    @patch('users.views.id_token.verify_oauth2_token')
+    def test_inactive_google_account_is_denied_without_issuing_tokens(self, verify):
+        user = User.objects.create_user('disabled', 'disabled@example.com', 'Test1234!',
+                                        google_sub='google-disabled', is_active=False)
+        verify.return_value = {'sub': user.google_sub, 'email': user.email, 'email_verified': True}
+        self.client.cookies['access_token'] = 'obsolete-access'
+        self.client.cookies['refresh_token'] = 'obsolete-refresh'
+        with patch('users.views.RefreshToken.for_user') as issue_token:
+            response = self.client.post('/api/auth/google', {'credential': 'verified-token'}, format='json')
+        self.assertEqual(response.status_code, 401)
+        issue_token.assert_not_called()
+        for name in ('access_token', 'refresh_token'):
+            self.assertEqual(response.cookies[name].value, '')
+            self.assertEqual(response.cookies[name]['max-age'], 0)
+
+    def test_valid_login_preserves_password_whitespace_and_sets_cookies(self):
+        user = User.objects.create_user('login-user', 'login@example.com', ' Test1234! ')
+        response = self.client.post('/api/login', {'username': ' login@example.com ', 'password': ' Test1234! '}, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['user']['id'], user.pk)
+        self.assertTrue(response.cookies['access_token'].value)
+
+    @patch('users.views.id_token.verify_oauth2_token')
+    def test_active_google_account_still_signs_in(self, verify):
+        user = User.objects.create_user('active', 'active@example.com', 'Test1234!', google_sub='google-active')
+        verify.return_value = {'sub': user.google_sub, 'email': user.email, 'email_verified': True}
+        response = self.client.post('/api/auth/google', {'credential': 'verified-token'}, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['user']['id'], user.pk)
+        self.assertTrue(response.cookies['refresh_token'].value)

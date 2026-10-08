@@ -3,8 +3,18 @@ import base64
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from .models import _validate_avatar
+from converter.serializers import StrictTextField
 
 User = get_user_model()
+
+
+class LoginSerializer(serializers.Serializer):
+    username = StrictTextField()
+    password = StrictTextField(trim_whitespace=False, write_only=True)
+
+
+class GoogleAuthSerializer(serializers.Serializer):
+    credential = StrictTextField(write_only=True)
 
 
 def _check_password_strength(password):
