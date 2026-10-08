@@ -32,86 +32,44 @@ def _py_indent_level(line):
 
 
 def _c_for_to_python(s):
-    """
-    Parse a C-style for loop and return a Python range() string.
-    Handles: for(i=0;i<n;i++), for (int i=1; i<=10; i++), etc.
-    Returns None if pattern not recognised.
-    """
     body = s.rstrip('{').strip()
-    m = re.match(
-        r'for\s*\(\s*(?:int\s+)?(\w+)\s*=\s*([^;]+);\s*\w+\s*([<>]=?)\s*([^;]+);\s*\w+\s*(\+\+|--|\+=\s*\d+|-=\s*\d+)\s*\)',
-        body
-    )
-    if not m:
-        return None
-
-    var = m.group(1)
-    start = m.group(2).strip()
-    op = m.group(3)
-    end = m.group(4).strip()
-    inc_raw = m.group(5).strip()
-
-    if inc_raw == '++':
-        step = 1
-    elif inc_raw == '--':
-        step = -1
+    match = re.fullmatch(
+        r'for\s*\(\s*(?:(?:int|let|var)\s+)?(?P<var>[a-zA-Z_]\w*)\s*=\s*(?P<start>[^;]+);'
+        r'\s*(?P=var)\s*(?P<op>[<>]=?)\s*(?P<end>[^;]+);'
+        r'\s*(?P=var)\s*(?P<inc>\+\+|--|\+=\s*\d+|-=\s*\d+)\s*\)', body)
+    if not match:
+        raise ValueError('Unsupported loop syntax or inconsistent loop variable.')
+    var, start, op, end, increment = (match.group(key).strip() for key in ('var', 'start', 'op', 'end', 'inc'))
+    step = 1 if increment == '++' else -1 if increment == '--' else int(increment[2:]) * (1 if increment[0] == '+' else -1)
+    if step == 0 or (step > 0) != op.startswith('<'):
+        raise ValueError('Loop step must be nonzero and agree with its boundary.')
+    if op.endswith('='):
+        offset = 1 if step > 0 else -1
+        try:
+            end = str(int(end) + offset)
+        except ValueError:
+            end = f'({end}) + 1' if offset == 1 else f'({end}) - 1'
+    if step == 1:
+        arguments = end if start == '0' else f'{start}, {end}'
     else:
-        sm = re.match(r'([+-])=\s*(\d+)', inc_raw)
-        if sm:
-            step = int(sm.group(2)) if sm.group(1) == '+' else -int(sm.group(2))
-        else:
-            step = 1
-
-    if step > 0:
-        if op == '<':
-            if start == '0':
-                return f'for {var} in range({end}):'
-            return f'for {var} in range({start}, {end}):'
-        else:  # <=
-            try:
-                end_expr = str(int(end) + 1)
-            except ValueError:
-                end_expr = f'{end} + 1'
-            if start == '0':
-                return f'for {var} in range({end_expr}):'
-            return f'for {var} in range({start}, {end_expr}):'
-    else:
-        if op == '>':
-            try:
-                end_expr = str(int(end) - 1)
-            except ValueError:
-                end_expr = f'{end} - 1'
-            return f'for {var} in range({start}, {end_expr}, {step}):'
-        else:  # >=
-            if end == '0':
-                return f'for {var} in range({start}, -1, {step}):'
-            try:
-                end_expr = str(int(end) - 1)
-            except ValueError:
-                end_expr = f'{end} - 1'
-            return f'for {var} in range({start}, {end_expr}, {step}):'
+        arguments = f'{start}, {end}, {step}'
+    return f'for {var} in range({arguments}):'
 
 
 def _py_range_to_c_for(var, range_str):
-    """Convert Python range() args to C for-loop (init, cond, inc) tuple."""
-    args = [a.strip() for a in range_str.split(',')]
-    if len(args) == 1:
-        return f'int {var} = 0', f'{var} < {args[0]}', f'{var}++'
-    elif len(args) == 2:
-        return f'int {var} = {args[0]}', f'{var} < {args[1]}', f'{var}++'
-    else:
-        try:
-            step = int(args[2])
-            if step == 1:
-                return f'int {var} = {args[0]}', f'{var} < {args[1]}', f'{var}++'
-            elif step == -1:
-                return f'int {var} = {args[0]}', f'{var} > {args[1]}', f'{var}--'
-            elif step > 0:
-                return f'int {var} = {args[0]}', f'{var} < {args[1]}', f'{var} += {step}'
-            else:
-                return f'int {var} = {args[0]}', f'{var} > {args[1]}', f'{var} -= {-step}'
-        except ValueError:
-            return f'int {var} = {args[0]}', f'{var} < {args[1]}', f'{var} += {args[2]}'
+    args = [argument.strip() for argument in range_str.split(',')]
+    if not 1 <= len(args) <= 3 or any(not argument for argument in args):
+        raise ValueError('Unsupported range arguments.')
+    start, end = ('0', args[0]) if len(args) == 1 else (args[0], args[1])
+    try:
+        step = int(args[2]) if len(args) == 3 else 1
+    except ValueError as exc:
+        raise ValueError('Unsupported range step: a literal integer is required.') from exc
+    if step == 0:
+        raise ValueError('Range step cannot be zero.')
+    condition = f'{var} < {end}' if step > 0 else f'{var} > {end}'
+    increment = f'{var}++' if step == 1 else f'{var}--' if step == -1 else f'{var} += {step}' if step > 0 else f'{var} -= {-step}'
+    return f'int {var} = {start}', condition, increment
 
 
 def _printf_to_print(s):
@@ -1090,6 +1048,15 @@ def python_to_javascript(code: str) -> str:
     lines = code.split('\n')
     result = []
     block_stack = []
+    scopes = [(set(), True)]
+
+    def declared(name):
+        for names, function_scope in reversed(scopes):
+            if name in names:
+                return True
+            if function_scope:
+                break
+        return False
 
     for raw in lines:
         stripped = raw.strip()
@@ -1104,6 +1071,7 @@ def python_to_javascript(code: str) -> str:
         if m_elif or stripped == 'else:':
             while block_stack and block_stack[-1] >= py_level:
                 block_stack.pop()
+                scopes.pop()
                 result.append(_ind(len(block_stack)) + '}')
             ind = _ind(len(block_stack))
             if m_elif:
@@ -1111,10 +1079,12 @@ def python_to_javascript(code: str) -> str:
             else:
                 result.append(ind + '} else {')
             block_stack.append(py_level)
+            scopes.append((set(), False))
             continue
 
         while block_stack and block_stack[-1] >= py_level:
             block_stack.pop()
+            scopes.pop()
             result.append(_ind(len(block_stack)) + '}')
 
         ind = _ind(len(block_stack))
@@ -1143,8 +1113,10 @@ def python_to_javascript(code: str) -> str:
         # def → function
         m = re.match(r'def (\w+)\(([^)]*)\):', stripped)
         if m:
+            scopes[-1][0].add(m.group(1))
             result.append(ind + f'function {m.group(1)}({m.group(2)}) {{')
             block_stack.append(py_level)
+            scopes.append(({param.split('=', 1)[0].strip() for param in m.group(2).split(',')}, True))
             continue
 
         # return
@@ -1157,11 +1129,20 @@ def python_to_javascript(code: str) -> str:
         # for i in range(...)
         m = re.match(r'for (\w+) in range\(([^)]+)\):', stripped)
         if m:
-            init, cond, inc = _py_range_to_c_for(m.group(1), m.group(2))
-            # Convert C init to let
+            loop_var = m.group(1)
+            already_declared = declared(loop_var)
+            counter = loop_var
+            if already_declared:
+                counter = f'codeswitch_{loop_var}'
+                while re.search(r'\b' + counter + r'\b', code):
+                    counter += '_'
+            init, cond, inc = _py_range_to_c_for(counter, m.group(2))
             init_js = re.sub(r'^int ', 'let ', init)
             result.append(ind + f'for ({init_js}; {cond}; {inc}) {{')
             block_stack.append(py_level)
+            scopes.append(({counter}, False))
+            if already_declared:
+                result.append(_ind(len(block_stack)) + f'{loop_var} = {counter};')
             continue
 
         # if / elif / while
@@ -1169,17 +1150,23 @@ def python_to_javascript(code: str) -> str:
         if m:
             result.append(ind + f'if ({m.group(1)}) {{')
             block_stack.append(py_level)
+            scopes.append((set(), False))
             continue
         m = re.match(r'while (.+):$', stripped)
         if m:
             result.append(ind + f'while ({m.group(1)}) {{')
             block_stack.append(py_level)
+            scopes.append((set(), False))
             continue
 
         # Variable assignments  x = val  →  let x = val;
         m = re.match(r'([a-zA-Z_]\w*)\s*=\s*(.+)$', stripped)
         if m and not re.match(r'.*[=><!]=$', stripped):
-            result.append(ind + f'let {m.group(1)} = {m.group(2)};')
+            var = m.group(1)
+            prefix = '' if declared(var) else 'let '
+            if prefix:
+                scopes[-1][0].add(var)
+            result.append(ind + f'{prefix}{var} = {m.group(2)};')
             continue
 
         # Generic: add semicolon
@@ -1188,6 +1175,7 @@ def python_to_javascript(code: str) -> str:
     # Close remaining blocks
     while block_stack:
         block_stack.pop()
+        scopes.pop()
         result.append(_ind(len(block_stack)) + '}')
 
     return '\n'.join(result)
