@@ -92,6 +92,33 @@ def _get_api_keys() -> list:
     return keys
 
 
+class AIResponseError(ValueError):
+    def __init__(self, code):
+        self.code = code
+        super().__init__('AI returned an empty or incomplete response.')
+
+
+def _response_text(data, provider):
+    try:
+        if provider == 'gemini':
+            choice = data['candidates'][0]
+            reason = choice.get('finishReason')
+            complete = reason == 'STOP'
+            text = ''.join(part['text'] for part in choice['content']['parts'])
+        else:
+            choice = data['choices'][0]
+            reason = choice.get('finish_reason')
+            complete = reason == 'stop'
+            text = choice['message']['content']
+        if not complete:
+            raise AIResponseError('ai_incomplete_response' if reason else 'ai_invalid_response')
+        if not isinstance(text, str) or not _strip_markdown(text):
+            raise AIResponseError('ai_invalid_response')
+        return text
+    except (KeyError, IndexError, TypeError) as exc:
+        raise AIResponseError('ai_invalid_response') from exc
+
+
 def _call_gemini(api_key: str, model: str, user_prompt: str) -> str:
     """Call the Google Gemini generateContent REST API."""
     url = (
@@ -107,7 +134,7 @@ def _call_gemini(api_key: str, model: str, user_prompt: str) -> str:
         resp = requests.post(url, json=payload, timeout=25)
         resp.raise_for_status()
     data = resp.json()
-    return data['candidates'][0]['content']['parts'][0]['text']
+    return _response_text(data, 'gemini')
 
 
 def _call_openai_compatible(api_key: str, base_url: str, model: str, user_prompt: str) -> str:
@@ -129,7 +156,7 @@ def _call_openai_compatible(api_key: str, base_url: str, model: str, user_prompt
     with dependency_timer('ai_openai_compatible'):
         resp = requests.post(url, json=payload, headers=headers, timeout=25)
         resp.raise_for_status()
-    return resp.json()['choices'][0]['message']['content']
+    return _response_text(resp.json(), 'openai')
 
 
 # HTTP status codes that mean "this key is exhausted/invalid — try the next one"
@@ -179,6 +206,8 @@ def ai_convert_code(source_lang: str, target_lang: str, code: str, user_key: str
                 output = _strip_markdown(raw)
                 return {'success': True, 'output': output, 'engine': 'ai'}
 
+            except AIResponseError as exc:
+                return {'success': False, 'error': str(exc), 'ai_error_code': exc.code}
             except requests.HTTPError as exc:
                 status = exc.response.status_code if exc.response is not None else None
                 last_error_detail = f'HTTP {status} from {provider} (key slot #{key_index + 1})'
@@ -260,7 +289,7 @@ def ai_explain_code(source_lang: str, target_lang: str, input_code: str, output_
                     }
                     resp = requests.post(url, json=payload, timeout=25)
                     resp.raise_for_status()
-                    raw = resp.json()['candidates'][0]['content']['parts'][0]['text']
+                    raw = _response_text(resp.json(), 'gemini')
                 else:
                     url = f'{base_url.rstrip("/")}/chat/completions'
                     headers = {
@@ -278,10 +307,12 @@ def ai_explain_code(source_lang: str, target_lang: str, input_code: str, output_
                     }
                     resp = requests.post(url, json=payload, headers=headers, timeout=25)
                     resp.raise_for_status()
-                    raw = resp.json()['choices'][0]['message']['content']
+                    raw = _response_text(resp.json(), 'openai')
 
                 return {'success': True, 'explanation': raw.strip()}
 
+            except AIResponseError as exc:
+                return {'success': False, 'error': str(exc), 'ai_error_code': exc.code}
             except requests.HTTPError as exc:
                 status_code = exc.response.status_code if exc.response is not None else None
                 last_error_detail = f'HTTP {status_code} from {provider} (key slot #{key_index + 1})'

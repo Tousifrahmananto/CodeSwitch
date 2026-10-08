@@ -105,6 +105,11 @@ class RunCodeTests(TestCase):
             format='json')
         self.assertEqual(response.status_code, 400)
 
+    @patch('converter.views._execute_code', return_value={'stdout': 'x' * 100_001, 'stderr': '', 'code': 0})
+    def test_run_keeps_display_limit(self, execute):
+        response = self.client.post('/api/run/', {'language': 'python', 'code': 'print(1)'}, format='json')
+        self.assertEqual(len(response.data['stdout']), 100_000)
+
 
 @override_settings(AXES_ENABLED=False)
 class VerifyConversionTests(TestCase):
@@ -168,6 +173,20 @@ class VerifyConversionTests(TestCase):
         payload = {**self.payload, 'target_code': ''}
         response = self.client.post('/api/verify', payload, format='json')
         self.assertEqual(response.status_code, 400)
+
+    @patch('converter.views._pick_compiler', return_value='test-compiler')
+    @patch('converter.views.http_requests.post')
+    def test_verify_compares_suffixes_beyond_display_limit(self, mock_post, mock_compiler):
+        from unittest.mock import Mock
+        mock_post.side_effect = [Mock(**{'json.return_value': {
+            'status': '0', 'program_output': 'a' * 100_000 + suffix,
+        }}) for suffix in ('b', 'c')]
+        response = self.client.post('/api/verify', self.payload, format='json')
+        self.assertFalse(response.data['verified'])
+        self.assertFalse(response.data['comparison']['stdout_match'])
+        self.assertEqual(len(response.data['source']['stdout']), 100_000)
+        self.assertEqual(len(response.data['target']['stdout']), 100_000)
+        self.assertIn('display', response.data['summary'])
 
 
 @override_settings(AXES_ENABLED=False, PYTHON_EXECUTION_TRACING_ENABLED=True)

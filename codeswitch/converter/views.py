@@ -121,7 +121,7 @@ def _execute_code(language, code, stdin=''):
             'Execution service returned an invalid response.',
             status.HTTP_502_BAD_GATEWAY,
         ) from exc
-    stdout = (result.get('program_output') or '')[:MAX_EXECUTION_OUTPUT_LENGTH]
+    stdout = result.get('program_output') or ''
     compile_err = (result.get('compiler_output') or '').strip()
     runtime_err = (result.get('program_error') or '').strip()
     stderr = '\n'.join(part for part in (compile_err, runtime_err) if part)
@@ -137,6 +137,11 @@ def _normalize_program_output(value):
     """Ignore platform newline differences and trailing horizontal whitespace."""
     normalized = value.replace('\r\n', '\n').replace('\r', '\n')
     return '\n'.join(line.rstrip() for line in normalized.split('\n')).rstrip('\n')
+
+
+def _display_execution_result(result):
+    return {**result, 'stdout': result['stdout'][:MAX_EXECUTION_OUTPUT_LENGTH],
+            'stderr': result['stderr'][:MAX_EXECUTION_OUTPUT_LENGTH]}
 
 
 class ConvertCodeView(APIView):
@@ -300,7 +305,7 @@ class RunCodeView(APIView):
         except CodeExecutionServiceError as exc:
             return Response({'error': exc.message}, status=exc.status_code)
 
-        return Response(result)
+        return Response(_display_execution_result(result))
 
 
 class VerifyConversionView(APIView):
@@ -371,13 +376,16 @@ class VerifyConversionView(APIView):
         else:
             result_status = 'mismatch'
             summary = 'Both programs ran successfully, but their output differs.'
+            if (source_result['stdout'][:MAX_EXECUTION_OUTPUT_LENGTH]
+                    == target_result['stdout'][:MAX_EXECUTION_OUTPUT_LENGTH]):
+                summary += ' The difference occurs beyond the displayed output limit.'
 
         return Response({
             'verified': verified,
             'status': result_status,
             'summary': summary,
-            'source': source_result,
-            'target': target_result,
+            'source': _display_execution_result(source_result),
+            'target': _display_execution_result(target_result),
             'comparison': {
                 'stdout_match': stdout_match,
                 'exit_code_match': exit_code_match,
