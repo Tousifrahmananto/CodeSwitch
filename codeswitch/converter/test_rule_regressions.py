@@ -116,3 +116,30 @@ class NumericTypeTests(TestCase):
         if shutil.which('gcc'):
             generated = python_to_c('x = 0\nfor i in range(4):\n    x = x + i\nprint(x)')
             self.assertEqual(c_safety.CStringSafetyTests.compile_and_run(generated).decode().strip(), '6')
+
+
+class PrintAndReturnTypeTests(TestCase):
+    def test_float_expressions_and_function_returns_preserve_values(self):
+        fixtures = [
+            ('x = 1.5\nprint(x + 1)', '2.5'),
+            ('print(1.5)', '1.5'),
+            ('def value():\n    x = 1.5\n    return x\nprint(value())', '1.5'),
+            ('def value():\n    return 1.5\nprint(value())', '1.5'),
+        ]
+        for source, expected in fixtures:
+            with self.subTest(source=source):
+                self.assertEqual(c_safety.CStringSafetyTests.compile_and_run(python_to_c(source)).decode().strip(), expected)
+                java = python_to_java(source)
+                if 'def ' in source:
+                    self.assertIn('static double value()', java)
+
+    def test_unresolved_print_and_return_types_fail_explicitly(self):
+        for source in ('print(unknown)', 'print(unknown())', 'def f():\n    return unknown'):
+            with self.subTest(source=source), self.assertRaisesRegex(ValueError, 'type'):
+                python_to_c(source)
+
+    def test_java_variables_use_safe_c_formats(self):
+        from converter.services import java_to_c
+        source = 'public class Main {\npublic static void main(String[] args) {\ndouble x = 1.5;\nString s = "猫";\nSystem.out.println(x + 1);\nSystem.out.println(s);\n}\n}'
+        generated = java_to_c(source)
+        self.assertEqual(c_safety.CStringSafetyTests.compile_and_run(generated).decode('utf-8').replace('\r\n', '\n').strip(), '2.5\n猫')

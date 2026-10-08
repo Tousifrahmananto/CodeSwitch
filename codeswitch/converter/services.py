@@ -117,12 +117,57 @@ def _c_string(value):
     ) + '"'
 
 
+def _expression_type(expression, types):
+    def kind(node):
+        if isinstance(node, ast.Constant):
+            if type(node.value) is int:
+                return 'int'
+            if type(node.value) is float:
+                return 'double'
+            if isinstance(node.value, str):
+                return 'string'
+        if isinstance(node, ast.Name) and node.id in types:
+            return types[node.id]
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and not node.args and not node.keywords:
+            if types.get(node.func.id + '()') in ('int', 'double'):
+                return types[node.func.id + '()']
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub)):
+            result = kind(node.operand)
+            if result in ('int', 'double'):
+                return result
+        if isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Add, ast.Sub, ast.Mult)):
+            operands = (kind(node.left), kind(node.right))
+            if all(value in ('int', 'double') for value in operands):
+                return 'double' if 'double' in operands else 'int'
+        raise ValueError('Unresolved expression type; only known variables and simple arithmetic are supported.')
+    try:
+        return kind(ast.parse(expression, mode='eval').body)
+    except SyntaxError as exc:
+        raise ValueError('Unsupported expression type.') from exc
+
+
+def _function_return_types(func_blocks):
+    types = {}
+    for lines in func_blocks:
+        match = re.match(r'def (\w+)\(([^)]*)\):', lines[0].strip())
+        if match.group(2).strip():
+            raise ValueError('Unsupported function parameter types in C/Java rules.')
+        local_types = {**types, **_assignment_types(lines[1:])}
+        returns = [line.strip()[7:] for line in lines[1:] if line.strip().startswith('return ')]
+        kinds = [_expression_type(value, local_types) for value in returns]
+        if any(value not in ('int', 'double') for value in kinds):
+            raise ValueError('Unsupported function return type.')
+        types[match.group(1) + '()'] = 'double' if 'double' in kinds else 'int' if kinds else 'void'
+    return types
+
+
 def _py_print_to_printf(s, type_map=None):
     """Translate supported print arguments using a fixed or escaped format."""
     type_map = type_map or {}
 
     def spec(var):
-        return {'double': '%.15g', 'char[]': '%s'}.get(type_map.get(var), '%d')
+        kind = _expression_type(var, type_map)
+        return {'int': '%d', 'double': '%.15g', 'char[]': '%s', 'string': '%s'}[kind]
 
     m = re.fullmatch(r'print\((.+)\)', s)
     if not m:
@@ -211,14 +256,6 @@ def _extract_toplevel_funcs(lines):
             other_lines.append(raw)
             i += 1
     return func_blocks, other_lines
-
-
-def _has_return_value(func_lines):
-    """Return True if any line in a function body is a non-empty return."""
-    for line in func_lines[1:]:
-        if re.match(r'\s*return\s+\S', line):
-            return True
-    return False
 
 
 def _assignment_types(lines):
@@ -357,6 +394,7 @@ def _process_python_to_c_body(lines, depth_offset=0, type_map=None):
         elif re.match(r'for (\w+) in range\(([^)]+)\):', stripped):
             m = re.match(r'for (\w+) in range\(([^)]+)\):', stripped)
             init, cond, inc = _py_range_to_c_for(m.group(1), m.group(2))
+            type_map[m.group(1)] = 'int'
             out = f'for ({init}; {cond}; {inc}) {{'
             opens_block = True
 
@@ -485,6 +523,7 @@ def _process_python_to_java_body(lines, depth_offset=0, type_map=None):
         elif re.match(r'for (\w+) in range\(([^)]+)\):', stripped):
             m = re.match(r'for (\w+) in range\(([^)]+)\):', stripped)
             init, cond, inc = _py_range_to_c_for(m.group(1), m.group(2))
+            type_map[m.group(1)] = 'int'
             out = f'for ({init}; {cond}; {inc}) {{'
             opens_block = True
 
@@ -554,21 +593,22 @@ def python_to_c(code: str) -> str:
     """
     lines = code.split('\n')
     func_blocks, main_lines = _extract_toplevel_funcs(lines)
+    function_types = _function_return_types(func_blocks)
 
     result = ['#include <stdio.h>', '#include <string.h>', '']
 
     # Emit top-level functions before main()
     for func_lines in func_blocks:
         m = re.match(r'def (\w+)\(([^)]*)\):', func_lines[0].strip())
-        ret_type = 'int' if _has_return_value(func_lines) else 'void'
+        ret_type = function_types[m.group(1) + '()']
         result.append(f'{ret_type} {m.group(1)}({m.group(2)}) {{')
-        body = _process_python_to_c_body(func_lines[1:], depth_offset=0, type_map={})
+        body = _process_python_to_c_body(func_lines[1:], depth_offset=0, type_map=dict(function_types))
         result.extend(body)
         result.append('}')
         result.append('')
 
     result.append('int main() {')
-    body = _process_python_to_c_body(main_lines, depth_offset=0, type_map={})
+    body = _process_python_to_c_body(main_lines, depth_offset=0, type_map=dict(function_types))
     result.extend(body)
     result.append('    return 0;')
     result.append('}')
@@ -586,21 +626,22 @@ def python_to_java(code: str) -> str:
     """
     lines = code.split('\n')
     func_blocks, main_lines = _extract_toplevel_funcs(lines)
+    function_types = _function_return_types(func_blocks)
 
     result = ['public class Main {']
 
     # Emit top-level functions as static methods before main()
     for func_lines in func_blocks:
         m = re.match(r'def (\w+)\(([^)]*)\):', func_lines[0].strip())
-        ret_type = 'int' if _has_return_value(func_lines) else 'void'
+        ret_type = function_types[m.group(1) + '()']
         result.append(f'    static {ret_type} {m.group(1)}({m.group(2)}) {{')
-        body = _process_python_to_java_body(func_lines[1:], depth_offset=1, type_map={})
+        body = _process_python_to_java_body(func_lines[1:], depth_offset=1, type_map=dict(function_types))
         result.extend(body)
         result.append('    }')
         result.append('')
 
     result.append('    public static void main(String[] args) {')
-    body = _process_python_to_java_body(main_lines, depth_offset=1, type_map={})
+    body = _process_python_to_java_body(main_lines, depth_offset=1, type_map=dict(function_types))
     result.extend(body)
     result.append('    }')
     result.append('}')
@@ -1023,6 +1064,7 @@ def java_to_c(code: str) -> str:
     lines = code.split('\n')
     result = ['#include <stdio.h>', '#include <string.h>', '', 'int main() {']
     depth = 1  # start inside main
+    type_map = {}
 
     for raw in lines:
         stripped = raw.strip()
@@ -1078,11 +1120,16 @@ def java_to_c(code: str) -> str:
             if re.match(r'^"', arg):
                 raise ValueError("Unsupported Java print string expression.")
             else:
-                result.append(ind + f'printf("%d\\n", {arg});')
+                kind = _expression_type(arg, type_map)
+                specifier = {'int': '%d', 'double': '%.15g', 'string': '%s'}[kind]
+                result.append(ind + f'printf("{specifier}\\n", {arg});')
             continue
 
         # for loop
         if stripped.startswith('for'):
+            loop = re.match(r'for\s*\(\s*(int|double)\s+(\w+)', stripped)
+            if loop:
+                type_map[loop.group(2)] = loop.group(1)
             body = stripped.rstrip('{').strip()
             result.append(ind + body + (' {' if stripped.rstrip().endswith('{') else ''))
             if stripped.rstrip().endswith('{'):
@@ -1106,23 +1153,27 @@ def java_to_c(code: str) -> str:
             # String x = "...";  →  char x[] = "...";
             m = re.match(r'String\s+(\w+)\s*=\s*"(.*)";$', stripped)
             if m:
+                type_map[m.group(1)] = 'string'
                 result.append(ind + f'char {m.group(1)}[] = {_c_string(ast.literal_eval(chr(34) + m.group(2) + chr(34)))};')
                 continue
 
             # int/double var = val;
             m = re.match(r'(?:int|long|short)\s+(\w+)\s*=\s*(.+);$', stripped)
             if m:
+                type_map[m.group(1)] = 'int'
                 result.append(ind + f'int {m.group(1)} = {m.group(2)};')
                 continue
 
             m = re.match(r'(?:double|float)\s+(\w+)\s*=\s*(.+);$', stripped)
             if m:
+                type_map[m.group(1)] = 'double'
                 result.append(ind + f'double {m.group(1)} = {m.group(2)};')
                 continue
 
             # String x; → char x[256];
             m = re.match(r'String\s+(\w+);$', stripped)
             if m:
+                type_map[m.group(1)] = 'string'
                 result.append(ind + f'char {m.group(1)}[256];')
                 continue
 
