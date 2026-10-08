@@ -1,4 +1,5 @@
 from django.test import TestCase, override_settings
+from django.core.cache import cache
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -21,6 +22,8 @@ def _make_authed_client(user):
 class ConvertCodeTests(TestCase):
 
     def setUp(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
         self.user = User.objects.create_user(
             username='converter_user', email='conv@example.com', password='Test1234!')
         self.client = _make_authed_client(self.user)
@@ -66,6 +69,8 @@ class ConvertCodeTests(TestCase):
 class RunCodeTests(TestCase):
 
     def setUp(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
         self.client = APIClient()
 
     @patch('converter.views._pick_compiler', return_value='cpython-3.12.0')
@@ -105,6 +110,8 @@ class RunCodeTests(TestCase):
 class VerifyConversionTests(TestCase):
 
     def setUp(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
         self.user = User.objects.create_user(
             username='verify_user', email='verify@example.com', password='Test1234!')
         self.client = _make_authed_client(self.user)
@@ -167,6 +174,8 @@ class VerifyConversionTests(TestCase):
 class VisualizeCodeTests(TestCase):
 
     def setUp(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
         self.user = User.objects.create_user(
             username='visual_user', email='visual@example.com', password='Test1234!')
         self.client = _make_authed_client(self.user)
@@ -335,6 +344,8 @@ class VisualizeCodeTests(TestCase):
 class SnippetTests(TestCase):
 
     def setUp(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
         self.user = User.objects.create_user(
             username='snippet_user', email='snip@example.com', password='Test1234!')
         self.authed = _make_authed_client(self.user)
@@ -376,6 +387,8 @@ class SnippetTests(TestCase):
 class ConversionHistoryTests(TestCase):
 
     def setUp(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
         self.user = User.objects.create_user(
             username='hist_user', email='hist@example.com', password='Test1234!')
         self.client = _make_authed_client(self.user)
