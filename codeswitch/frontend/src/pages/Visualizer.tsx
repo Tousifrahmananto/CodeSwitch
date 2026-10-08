@@ -385,6 +385,15 @@ export default function Visualizer() {
   const [speed, setSpeed] = useState(900);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const requestRef = useRef<AbortController | null>(null);
+
+  const cancelRequest = () => {
+    requestRef.current?.abort();
+    setLoading(false);
+  };
+
+  useEffect(() => () => requestRef.current?.abort(), []);
+
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const traceSteps = timeline?.trace || [];
@@ -397,6 +406,7 @@ export default function Visualizer() {
 
   useEffect(() => {
     if (!incomingState?.code || typeof incomingState.code !== 'string') return;
+    cancelRequest();
     const nextLanguage = normalizeIncomingLanguage(incomingState.language);
     setLanguage(nextLanguage);
     setCode(incomingState.code);
@@ -424,6 +434,7 @@ export default function Visualizer() {
   }, [isPlaying, speed, timeline, isRealTrace, traceSteps.length]);
 
   const handleLanguageChange = (next: VisualizerLanguage) => {
+    cancelRequest();
     setLanguage(next);
     setCode(EXAMPLES[next]);
     setTimeline(null);
@@ -441,19 +452,24 @@ export default function Visualizer() {
     if (detectedLanguage !== language) {
       setLanguage(detectedLanguage);
     }
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
     setLoading(true);
     setError('');
     setTimeline(null);
     setIsPlaying(false);
     try {
-      const { data } = await visualizeCode({ language: detectedLanguage, code });
+      const { data } = await visualizeCode({ language: detectedLanguage, code }, { signal: controller.signal });
+      if (controller.signal.aborted || requestRef.current !== controller) return;
       setTimeline(data);
       setActiveIndex(0);
     } catch (err: unknown) {
+      if (controller.signal.aborted || requestRef.current !== controller) return;
       const axiosErr = err as { response?: { data?: { error?: string } } };
       setError(axiosErr.response?.data?.error || 'Could not generate visualization.');
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted && requestRef.current === controller) setLoading(false);
     }
   };
 
@@ -508,6 +524,7 @@ export default function Visualizer() {
           <CodeEditor
             value={code}
             onChange={value => {
+              cancelRequest();
               setCode(value ?? '');
               setTimeline(null);
               setActiveIndex(0);

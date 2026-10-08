@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import CodeEditor from '../components/CodeEditor';
 import LanguageSelector from '../components/LanguageSelector';
 import Logo from '../components/Logo';
@@ -33,6 +33,16 @@ export default function Playground({ onBack }: PlaygroundProps) {
   const [runLoading, setRunLoading] = useState(false);
   const [runOutput, setRunOutput] = useState<RunResult | null>(null);
   const [runError, setRunError] = useState('');
+  const runRef = useRef<AbortController | null>(null);
+
+  const invalidateRun = () => {
+    runRef.current?.abort();
+    setRunLoading(false);
+    setRunOutput(null);
+    setRunError('');
+  };
+
+  useEffect(() => () => runRef.current?.abort(), []);
 
   useEffect(() => {
     document.title = 'Playground | CodeSwitch — No Sign-In Required';
@@ -48,6 +58,7 @@ export default function Playground({ onBack }: PlaygroundProps) {
   const isLoggedIn = !!localStorage.getItem('user');
 
   const handleLangChange = (newLang: string) => {
+    invalidateRun();
     const nextLang = newLang as PlaygroundLanguage;
     setLang(nextLang);
     setCode(STARTER_CODE[nextLang]);
@@ -58,17 +69,22 @@ export default function Playground({ onBack }: PlaygroundProps) {
 
   const handleRun = async () => {
     if (!code.trim()) return;
+    runRef.current?.abort();
+    const controller = new AbortController();
+    runRef.current = controller;
     setRunLoading(true);
     setRunOutput(null);
     setRunError('');
     try {
-      const result = await runCode(lang, code, stdin);
+      const result = await runCode(lang, code, stdin, { signal: controller.signal });
+      if (controller.signal.aborted || runRef.current !== controller) return;
       setRunOutput(result);
     } catch (err: unknown) {
+      if (controller.signal.aborted || runRef.current !== controller) return;
       const message = err instanceof Error ? err.message : 'Could not reach execution server. Check your connection.';
       setRunError(message);
     } finally {
-      setRunLoading(false);
+      if (!controller.signal.aborted && runRef.current === controller) setRunLoading(false);
     }
   };
 
@@ -154,7 +170,7 @@ export default function Playground({ onBack }: PlaygroundProps) {
         <div>
           <CodeEditor
             value={code}
-            onChange={(value) => setCode(value ?? '')}
+            onChange={(value) => { invalidateRun(); setCode(value ?? ''); }}
             language={lang}
             height="460px"
           />
@@ -167,7 +183,7 @@ export default function Playground({ onBack }: PlaygroundProps) {
             className="w-full bg-bg border border-border rounded px-3 py-2 text-sm font-mono text-primary resize-y focus:outline-none focus:border-accent"
             placeholder="Enter input for your program here (one value per line)..."
             value={stdin}
-            onChange={e => setStdin(e.target.value)}
+            onChange={e => { invalidateRun(); setStdin(e.target.value); }}
             rows={3}
             spellCheck={false}
           />

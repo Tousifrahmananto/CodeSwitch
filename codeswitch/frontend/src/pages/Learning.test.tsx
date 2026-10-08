@@ -1,11 +1,13 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
 import Learning from './Learning';
 import * as api from '../api/client';
+import {runCode} from '../api/executor';
+vi.mock('../api/executor',()=>({runCode:vi.fn(),canRun:()=>true}));
 
 vi.mock('../api/client', () => ({ getModules: vi.fn(), getModule: vi.fn(), updateProgress: vi.fn(), getProgress: vi.fn(), convertCode: vi.fn(), getLessonQuiz: vi.fn(), submitQuiz: vi.fn() }));
-vi.mock('../components/CodeEditor', () => ({ default: () => null }));
+vi.mock('../components/CodeEditor', () => ({ default: ({value,onChange,readOnly}:any) => <textarea aria-label="Editor" readOnly={readOnly} value={value} onChange={e=>onChange?.(e.target.value)}/> }));
 const lessons = [1, 2, 3].map(id => ({ id, title: `Lesson ${id}`, content: 'content', example_code: '', order: id }));
 const module = { id: 1, title: 'Basics', description: 'Basics', difficulty: 'beginner', language: 'python', lesson_count: 3, lessons };
 
@@ -59,4 +61,21 @@ it('prevents duplicate completion and does not advance another lesson', async ()
     fireEvent.click(screen.getByRole('button', { name: '← Modules' }));
     expect(screen.getByText('1/3')).toBeInTheDocument();
   } finally { vi.useRealTimers(); }
+});
+
+async function openSandbox() {
+ vi.mocked(api.getModule).mockResolvedValue({data:{...module,lessons:[{...lessons[0],example_code:JSON.stringify({python:'print(1)',c:'int main() {}',java:'class Main {}'})}]}} as never);
+ await open(); return within(document.querySelector('.try-it-sandbox')!);
+}
+it('discards C conversion when the sandbox target changes to Java',async()=>{
+ let finish!:(v:any)=>void;vi.mocked(api.convertCode).mockReturnValue(new Promise(r=>finish=r));
+ const sandbox=await openSandbox();fireEvent.click(sandbox.getByRole('button',{name:'Convert'}));
+ fireEvent.click(sandbox.getAllByRole('button',{name:'Java'})[1]);
+ await act(async()=>finish({data:{output:'int main() {}'}}));
+ expect(sandbox.queryByText('JAVA Output')).not.toBeInTheDocument();expect(vi.mocked(api.convertCode).mock.calls[0][1]?.signal?.aborted).toBe(true);
+});
+it('reset discards a pending sandbox run',async()=>{
+ let finish!:(v:any)=>void;vi.mocked(runCode).mockReturnValue(new Promise(r=>finish=r));
+ const sandbox=await openSandbox();fireEvent.click(sandbox.getByRole('button',{name:'▶ Run'}));fireEvent.click(sandbox.getByRole('button',{name:'Reset'}));
+ await act(async()=>finish({stdout:'obsolete sandbox output',stderr:'',code:0}));expect(screen.queryByText('obsolete sandbox output')).not.toBeInTheDocument();
 });

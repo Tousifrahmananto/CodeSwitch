@@ -178,8 +178,27 @@ function TryItSandbox({ exampleCode }: { exampleCode: Record<string, string> }) 
   const [runOutput, setRunOutput] = useState<RunResult | null>(null);
   const [runLoading, setRunLoading] = useState(false);
   const [runError, setRunError] = useState('');
+  const convertRef = useRef<AbortController | null>(null);
+  const runRef = useRef<AbortController | null>(null);
+
+  const invalidateSandbox = () => {
+    convertRef.current?.abort();
+    runRef.current?.abort();
+    setSandboxLoading(false);
+    setRunLoading(false);
+    setSandboxOutput('');
+    setSandboxError('');
+    setRunOutput(null);
+    setRunError('');
+  };
+
+  useEffect(() => () => {
+    convertRef.current?.abort();
+    runRef.current?.abort();
+  }, []);
 
   const handleSourceChange = (lang: string) => {
+    invalidateSandbox();
     setSandboxSource(lang);
     setSandboxCode(exampleCode[lang] || '');
     setSandboxOutput('');
@@ -193,6 +212,9 @@ function TryItSandbox({ exampleCode }: { exampleCode: Record<string, string> }) 
       setSandboxError('Source and target languages must differ.');
       return;
     }
+    convertRef.current?.abort();
+    const controller = new AbortController();
+    convertRef.current = controller;
     setSandboxLoading(true);
     setSandboxError('');
     try {
@@ -200,33 +222,41 @@ function TryItSandbox({ exampleCode }: { exampleCode: Record<string, string> }) 
         source_language: sandboxSource,
         target_language: sandboxTarget,
         code: sandboxCode,
-      });
+      }, { signal: controller.signal });
+      if (controller.signal.aborted || convertRef.current !== controller) return;
       setSandboxOutput(data.output);
     } catch (err: unknown) {
+      if (controller.signal.aborted || convertRef.current !== controller) return;
       const maybe = err as { response?: { data?: { error?: string } }; message?: string };
       setSandboxError(maybe.response?.data?.error || maybe.message || 'Conversion failed. Try again.');
     } finally {
-      setSandboxLoading(false);
+      if (!controller.signal.aborted && convertRef.current === controller) setSandboxLoading(false);
     }
   };
 
   const handleRun = async () => {
     if (!sandboxCode.trim()) return;
+    runRef.current?.abort();
+    const controller = new AbortController();
+    runRef.current = controller;
     setRunLoading(true);
     setRunOutput(null);
     setRunError('');
     try {
-      const result = await runCode(sandboxSource, sandboxCode);
+      const result = await runCode(sandboxSource, sandboxCode, '', { signal: controller.signal });
+      if (controller.signal.aborted || runRef.current !== controller) return;
       setRunOutput(result);
     } catch (err: unknown) {
+      if (controller.signal.aborted || runRef.current !== controller) return;
       const message = err instanceof Error ? err.message : 'Could not reach execution server.';
       setRunError(message);
     } finally {
-      setRunLoading(false);
+      if (!controller.signal.aborted && runRef.current === controller) setRunLoading(false);
     }
   };
 
   const handleReset = () => {
+    invalidateSandbox();
     setSandboxCode(exampleCode[sandboxSource] || '');
     setSandboxOutput('');
     setSandboxError('');
@@ -323,7 +353,9 @@ function TryItSandbox({ exampleCode }: { exampleCode: Record<string, string> }) 
                   key={lang}
                   className={`sandbox-lang-pill${sandboxTarget === lang ? ' active' : ''}${sandboxSource === lang ? ' disabled' : ''}`}
                   style={sandboxTarget === lang ? getPillStyle(meta.color) : undefined}
-                  onClick={() => sandboxSource !== lang && setSandboxTarget(lang)}
+                  onClick={() => {
+                    if (sandboxSource !== lang) { invalidateSandbox(); setSandboxTarget(lang); }
+                  }}
                   title={sandboxSource === lang ? `Same as source (${meta.label})` : meta.label}
                 >
                   <span
@@ -341,7 +373,7 @@ function TryItSandbox({ exampleCode }: { exampleCode: Record<string, string> }) 
       {sandboxError && <p className="sandbox-error">{sandboxError}</p>}
       <CodeEditor
         value={sandboxCode}
-        onChange={(value) => setSandboxCode(value ?? '')}
+        onChange={(value) => { invalidateSandbox(); setSandboxCode(value ?? ''); }}
         language={sandboxSource}
         height="200px"
       />
