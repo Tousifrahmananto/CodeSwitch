@@ -6,7 +6,7 @@ import DiffView from '../components/DiffView';
 import { runCode, canRun } from '../api/executor';
 import { getLanguageMeta } from '../constants/languages';
 import type { CSSProperties } from 'react';
-import type { RunResult, VerificationResult } from '../types';
+import type { AIErrorMetadata, RunResult, VerificationResult } from '../types';
 
 const LANGUAGES = ['python', 'c', 'java', 'javascript', 'cpp'] as const;
 type ConverterLanguage = (typeof LANGUAGES)[number];
@@ -33,6 +33,12 @@ const FILE_EXTENSIONS: Record<ConverterLanguage, string> = {
   java: 'java',
   javascript: 'js',
   cpp: 'cpp',
+};
+
+const PROVIDER_KEY_LINKS: Record<string, { label: string; url: string }> = {
+  groq: { label: 'Groq Console', url: 'https://console.groq.com/keys' },
+  gemini: { label: 'Gemini Studio', url: 'https://aistudio.google.com/apikey' },
+  openai: { label: 'OpenAI Platform', url: 'https://platform.openai.com/api-keys' },
 };
 
 export default function Converter() {
@@ -76,6 +82,8 @@ export default function Converter() {
   const [showExplanation, setShowExplanation] = useState(false);
 
   // User API key state
+  const [aiProvider, setAiProvider] = useState('');
+  const providerKeyLink = PROVIDER_KEY_LINKS[aiProvider];
   const [quotaExhausted, setQuotaExhausted] = useState(false);
   const [userKeyInput, setUserKeyInput] = useState('');
   const [userApiKey, setUserApiKey] = useState('');
@@ -140,8 +148,13 @@ export default function Converter() {
   const handleConvertRef = useRef<() => void>(() => { });
   const handleRunRef = useRef<() => void>(() => { });
 
-  const isQuotaError = (msg: string) =>
-    msg.includes('All API keys exhausted') || msg.includes('AI_API_KEY not set');
+  const isQuotaError = (code?: string) => code === 'ai_not_configured' || code === 'ai_quota_exhausted';
+  const showKeyRecovery = (metadata: AIErrorMetadata) => {
+    if (isQuotaError(metadata.ai_error_code)) {
+      setAiProvider(metadata.ai_provider || '');
+      setQuotaExhausted(true);
+    }
+  };
 
   const handleConvert = async (apiKeyOverride?: string) => {
     if (!inputCode.trim()) return setError('Please enter some code.');
@@ -176,13 +189,14 @@ export default function Converter() {
       if (controller.signal.aborted || revisionRef.current !== revision) return;
       invalidateRequests();
       setOutputCode(data.output);
+      showKeyRecovery(data);
       setEngine(data.engine || 'rules');
     } catch (err: any) {
       if (controller.signal.aborted || revisionRef.current !== revision) return;
       if (err.name === 'CanceledError' || err.name === 'AbortError') return;
       const msg: string = err.response?.data?.error || 'Conversion failed.';
       setError(msg);
-      if (isQuotaError(msg)) setQuotaExhausted(true);
+      showKeyRecovery(err.response?.data || {});
     } finally {
       if (controller.signal.aborted || revisionRef.current !== revision) return;
       if (elapsedIntervalRef.current) { clearInterval(elapsedIntervalRef.current); elapsedIntervalRef.current = null; }
@@ -287,10 +301,9 @@ export default function Converter() {
     } catch (err: any) {
       if (controller.signal.aborted || revisionRef.current !== revision) return;
       if (err.name === 'CanceledError' || err.name === 'AbortError') return;
-      const msg: string = err.response?.data?.error || '';
-      if (isQuotaError(msg)) {
-        setQuotaExhausted(true);
-        setExplanation('AI capacity reached — add your own API key below to continue.');
+      if (isQuotaError(err.response?.data?.ai_error_code)) {
+        showKeyRecovery(err.response.data);
+        setExplanation('Add an API key below to continue using AI.');
       } else {
         setExplanation('Could not generate explanation. Please try again.');
       }
@@ -538,15 +551,15 @@ export default function Converter() {
       {quotaExhausted && (
         <div className="bg-surface border border-border rounded p-4 mb-4 flex flex-col gap-3">
           <div>
-            <p className="text-sm font-semibold text-primary mb-1">AI capacity reached</p>
-            <p className="text-xs text-muted">Our AI quota is temporarily exhausted. Add your own free API key to keep using AI-powered conversions.</p>
+            <p className="text-sm font-semibold text-primary mb-1">AI key required</p>
+            <p className="text-xs text-muted">AI is not configured or its keys cannot serve this request. Add a key for the configured provider to continue.</p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap text-xs text-muted">
-            <span>Get a free key:</span>
-            <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">Groq Console</a>
-            <span>·</span>
-            <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">Gemini Studio</a>
-          </div>
+          {providerKeyLink && (
+            <div className="flex items-center gap-2 text-xs text-muted">
+              <span>Get a key:</span>
+              <a href={providerKeyLink.url} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">{providerKeyLink.label}</a>
+            </div>
+          )}
           <div className="flex gap-2">
             <input
               type="password"

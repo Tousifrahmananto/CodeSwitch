@@ -179,14 +179,14 @@ def _generate_text(user_prompt, system_prompt, temperature, max_tokens, user_key
     provider = _get('AI_PROVIDER', 'gemini').lower().strip()
     api_keys = ([user_key.strip()] if user_key and user_key.strip() else []) + _get_api_keys()
     if not api_keys:
-        return {'success': False, 'error': 'AI service is not configured.', 'ai_error_code': 'ai_not_configured'}
+        return {'success': False, 'error': 'AI service is not configured.', 'ai_provider': provider, 'ai_error_code': 'ai_not_configured'}
     model = _get_model(provider)
     base_url = _get('AI_BASE_URL', _BASE_URLS.get(provider, _BASE_URLS['openai']))
     deadline = time.monotonic() + AI_ATTEMPT_BUDGET
     for key_index, api_key in enumerate(api_keys):
         remaining = deadline - time.monotonic()
         if remaining <= 0:
-            return {'success': False, 'error': 'AI request timed out.', 'ai_error_code': 'ai_timeout'}
+            return {'success': False, 'error': 'AI request timed out.', 'ai_provider': provider, 'ai_error_code': 'ai_timeout'}
         connect = min(AI_CONNECT_TIMEOUT, remaining / 2)
         timeout = (connect, min(AI_READ_TIMEOUT, remaining - connect))
         try:
@@ -195,26 +195,26 @@ def _generate_text(user_prompt, system_prompt, temperature, max_tokens, user_key
             else:
                 text = _call_openai_compatible(api_key, base_url, model, user_prompt, timeout, system_prompt, temperature, max_tokens)
             if time.monotonic() >= deadline:
-                return {'success': False, 'error': 'AI request timed out.', 'ai_error_code': 'ai_timeout'}
+                return {'success': False, 'error': 'AI request timed out.', 'ai_provider': provider, 'ai_error_code': 'ai_timeout'}
             return {'success': True, 'text': text}
         except AIResponseError as exc:
-            return {'success': False, 'error': str(exc), 'ai_error_code': exc.code}
+            return {'success': False, 'error': str(exc), 'ai_provider': provider, 'ai_error_code': exc.code}
         except requests.Timeout:
-            return {'success': False, 'error': 'AI request timed out.', 'ai_error_code': 'ai_timeout'}
+            return {'success': False, 'error': 'AI request timed out.', 'ai_provider': provider, 'ai_error_code': 'ai_timeout'}
         except requests.HTTPError as exc:
             status = exc.response.status_code if exc.response is not None else None
             logger.warning('AI HTTP %s from %s (key slot %s)', status, provider, key_index + 1)
             if status in _ROTATE_STATUSES:
                 continue
-            return {'success': False, 'error': 'AI service temporarily unavailable.', 'ai_error_code': 'ai_unavailable'}
+            return {'success': False, 'error': 'AI service temporarily unavailable.', 'ai_provider': provider, 'ai_error_code': 'ai_unavailable'}
         except (ValueError, KeyError, TypeError):
-            return {'success': False, 'error': 'AI returned an invalid response.', 'ai_error_code': 'ai_invalid_response'}
+            return {'success': False, 'error': 'AI returned an invalid response.', 'ai_provider': provider, 'ai_error_code': 'ai_invalid_response'}
         except requests.RequestException:
-            return {'success': False, 'error': 'AI service temporarily unavailable.', 'ai_error_code': 'ai_unavailable'}
+            return {'success': False, 'error': 'AI service temporarily unavailable.', 'ai_provider': provider, 'ai_error_code': 'ai_unavailable'}
         except Exception as exc:
             logger.error('AI request failed: %s', type(exc).__name__)
-            return {'success': False, 'error': 'AI service temporarily unavailable.', 'ai_error_code': 'ai_unavailable'}
-    return {'success': False, 'error': 'AI keys are invalid or their quota is exhausted.', 'ai_error_code': 'ai_quota_exhausted'}
+            return {'success': False, 'error': 'AI service temporarily unavailable.', 'ai_provider': provider, 'ai_error_code': 'ai_unavailable'}
+    return {'success': False, 'error': 'AI keys are invalid or their quota is exhausted.', 'ai_provider': provider, 'ai_error_code': 'ai_quota_exhausted'}
 
 
 def ai_convert_code(source_lang: str, target_lang: str, code: str, user_key: str = None) -> dict:

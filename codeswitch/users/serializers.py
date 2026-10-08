@@ -60,8 +60,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'email_verified', 'first_name', 'last_name', 'bio', 'avatar', 'date_joined')
-        read_only_fields = ('id', 'email_verified', 'date_joined')
+        fields = ('id', 'username', 'email', 'email_verified', 'first_name', 'last_name', 'bio', 'avatar', 'date_joined', 'is_staff')
+        read_only_fields = ('id', 'email_verified', 'date_joined', 'is_staff')
 
     def validate_email(self, value):
         queryset = User.objects.filter(email__iexact=value)

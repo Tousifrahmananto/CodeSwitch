@@ -64,6 +64,25 @@ class ConvertCodeTests(TestCase):
             format='json')
         self.assertEqual(response.status_code, 400)
 
+    @patch('converter.ai_service.ai_convert_code')
+    def test_rule_fallback_preserves_ai_recovery_metadata(self, ai):
+        ai.return_value = {'success': False, 'error': 'AI keys are exhausted.',
+                           'ai_error_code': 'ai_quota_exhausted', 'ai_provider': 'gemini'}
+        response = self.client.post('/api/convert', {'source_language': 'python', 'target_language': 'c', 'code': 'print(1)'}, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['engine'], 'rules')
+        self.assertEqual(response.data['ai_error_code'], 'ai_quota_exhausted')
+        self.assertEqual(response.data['ai_provider'], 'gemini')
+
+    @patch('converter.views.ai_explain_code')
+    def test_explanation_failure_preserves_ai_recovery_metadata(self, ai):
+        ai.return_value = {'success': False, 'error': 'AI request timed out.',
+                           'ai_error_code': 'ai_timeout', 'ai_provider': 'groq'}
+        response = self.client.post('/api/explain/', {'source_language': 'python', 'target_language': 'c', 'input_code': 'print(1)', 'output_code': 'puts("1");'}, format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data['ai_error_code'], 'ai_timeout')
+        self.assertEqual(response.data['ai_provider'], 'groq')
+
 
 @override_settings(AXES_ENABLED=False)
 class RunCodeTests(TestCase):

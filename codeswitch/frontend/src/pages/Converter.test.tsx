@@ -16,6 +16,22 @@ function mount() {
   fireEvent.change(screen.getAllByLabelText('Code')[0], { target: { value: 'print(1)' } });
 }
 
+it('opens provider-specific recovery after a successful rules fallback', async () => {
+  vi.mocked(api.convertCode).mockResolvedValue({ data: { output: 'converted', engine: 'rules', ai_error_code: 'ai_quota_exhausted', ai_provider: 'gemini' } } as never);
+  mount();
+  fireEvent.click(screen.getByRole('button', { name: 'Convert' }));
+  expect(await screen.findByRole('link', { name: 'Gemini Studio' })).toHaveAttribute('href', 'https://aistudio.google.com/apikey');
+  expect(screen.queryByRole('link', { name: 'Groq Console' })).not.toBeInTheDocument();
+});
+
+it.each(['ai_not_configured', 'ai_timeout', 'ai_invalid_response'])('shows key recovery only for configuration or quota failures: %s', async (code) => {
+  vi.mocked(api.convertCode).mockRejectedValue({ response: { data: { error: 'AI unavailable', ai_error_code: code, ai_provider: 'groq' } } });
+  mount();
+  fireEvent.click(screen.getByRole('button', { name: 'Convert' }));
+  await screen.findByText('AI unavailable');
+  expect(Boolean(screen.queryByPlaceholderText('Paste your API key here'))).toBe(code === 'ai_not_configured');
+});
+
 it('discards a conversion after changing the target language', async () => {
   let resolve!: (value: any) => void;
   vi.mocked(api.convertCode).mockReturnValue(new Promise(r => { resolve = r; }));

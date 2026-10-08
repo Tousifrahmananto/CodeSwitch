@@ -353,6 +353,17 @@ class ProfileTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['username'], 'testuser')
 
+    def test_staff_flag_is_private_and_cannot_be_granted_by_profile_writes(self):
+        self.assertFalse(self.client.get('/api/profile').data['is_staff'])
+        response = self.client.patch('/api/profile', {'is_staff': True}, format='json')
+        self.assertFalse(response.data['is_staff'])
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.is_staff)
+        self.user.is_staff = True
+        self.user.save(update_fields=['is_staff'])
+        self.assertTrue(self.client.get('/api/me/').data['is_staff'])
+        self.assertNotIn('is_staff', self.client.get('/api/profile/testuser/').data)
+
     def test_profile_get_includes_absolute_avatar_url(self):
         self.user.avatar.name = 'avatars/test.png'
         self.user.save(update_fields=['avatar'])

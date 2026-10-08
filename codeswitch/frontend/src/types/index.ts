@@ -237,3 +237,8 @@ export interface AdminLesson extends Lesson {
 export type Language = 'python' | 'c' | 'java' | 'javascript' | 'cpp' | 'other';
 export type Difficulty = 'beginner' | 'intermediate' | 'advanced';
 export type TabName = 'Overview' | 'Users' | 'Conversions' | 'Modules';
+
+export interface AIErrorMetadata {
+  ai_error_code?: 'ai_not_configured' | 'ai_quota_exhausted' | 'ai_timeout' | 'ai_invalid_response' | 'ai_incomplete_response' | 'ai_unavailable';
+  ai_provider?: string;
+}

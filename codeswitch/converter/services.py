@@ -1345,11 +1345,14 @@ def convert_code(source_lang: str, target_lang: str, code: str, user_key: str = 
     if ai_result['success']:
         return ai_result
 
+    metadata = {key: ai_result[key] for key in ('ai_error_code', 'ai_provider') if key in ai_result}
+
     # ── 2. Fall back to rule-based conversion ──────────────────────────────────
     converter = CONVERTERS.get((src, tgt))
     if not converter:
         return {
             'success': False,
+            **metadata,
             'error': (
                 f'Conversion from {source_lang} to {target_lang} is not supported. '
                 f'(AI fallback reason: {ai_result.get("error", "unknown")})'
@@ -1358,6 +1361,6 @@ def convert_code(source_lang: str, target_lang: str, code: str, user_key: str = 
 
     try:
         output = converter(code)
-        return {'success': True, 'output': output, 'engine': 'rules'}
+        return {'success': True, 'output': output, 'engine': 'rules', **metadata}
     except Exception as e:
-        return {'success': False, 'error': f'Conversion error: {str(e)}'}
+        return {'success': False, 'error': f'Conversion error: {str(e)}', **metadata}

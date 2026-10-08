@@ -183,6 +183,7 @@ class ConvertCodeView(APIView):
         user_key = request.headers.get('X-User-Api-Key') or None
         result = convert_code(source, target, code, user_key=user_key)
 
+        metadata = {key: result[key] for key in ('ai_error_code', 'ai_provider') if key in result}
         if result['success']:
             record_conversion(result.get('engine', 'rules'), 'success')
             # Save to history
@@ -194,12 +195,12 @@ class ConvertCodeView(APIView):
                 output_code=result['output'],
             )
             return Response(
-                {'output': result['output'], 'engine': result.get('engine', 'rules')},
+                {'output': result['output'], 'engine': result.get('engine', 'rules'), **metadata},
                 status=status.HTTP_200_OK
             )
         else:
             record_conversion(result.get('engine', 'unknown'), 'error')
-            return Response({'error': result['error']}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': result['error'], **metadata}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class ConversionHistoryView(APIView):
@@ -432,10 +433,11 @@ class ExplainCodeView(APIView):
         result = ai_explain_code(source, target, input_code, output_code,
                                   user_key=request.headers.get('X-User-Api-Key') or None)
 
+        metadata = {key: result[key] for key in ('ai_error_code', 'ai_provider') if key in result}
         if result['success']:
             return Response({'explanation': result['explanation']}, status=status.HTTP_200_OK)
         else:
-            return Response({'error': result['error']}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': result['error'], **metadata}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class VisualizeCodeView(APIView):

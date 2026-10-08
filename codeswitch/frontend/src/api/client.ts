@@ -1,5 +1,5 @@
 import axios, { AxiosResponse, AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
-import type { User, ConversionRecord, CodeFile, LearningModule, Lesson, UserProgress, Quiz, SharedSnippet, PublicProfile, AdminStats, AdminUser, AdminConversion, AdminLesson, VisualizationTimeline, VerificationResult } from '../types';
+import type { AIErrorMetadata, User, ConversionRecord, CodeFile, LearningModule, Lesson, UserProgress, Quiz, SharedSnippet, PublicProfile, AdminStats, AdminUser, AdminConversion, AdminLesson, VisualizationTimeline, VerificationResult } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 let csrfToken: string | null = null;
@@ -102,7 +102,7 @@ export const updateProfile = (formData: FormData): Promise<AxiosResponse<User>> 
 export const convertCode = (
   data: { source_language: string; target_language: string; code: string },
   config?: AxiosRequestConfig,
-): Promise<AxiosResponse<{ output: string; engine: string }>> =>
+): Promise<AxiosResponse<{ output: string; engine: string } & AIErrorMetadata>> =>
   client.post('/convert', data, config);
 
 export const getConversionHistory = (): Promise<AxiosResponse<ConversionRecord[]>> =>
@@ -111,7 +111,7 @@ export const getConversionHistory = (): Promise<AxiosResponse<ConversionRecord[]
 export const explainCode = (
   data: { input_code: string; output_code: string; source_language: string; target_language: string },
   config?: AxiosRequestConfig,
-): Promise<AxiosResponse<{ explanation: string }>> =>
+): Promise<AxiosResponse<{ explanation: string } & AIErrorMetadata>> =>
   client.post('/explain/', data, config);
 
 export const visualizeCode = (
