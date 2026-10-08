@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import serializers
+from .http_client import request_json
 from .services import convert_code
 from .ai_service import ai_explain_code
 from .models import ConversionHistory, SharedSnippet
@@ -43,6 +44,7 @@ _LANG_OPTIONS = {
 }
 
 EXECUTION_LANGUAGES = {'python', 'c', 'java', 'javascript', 'cpp'}
+EXECUTION_BUDGET = 20
 MAX_EXECUTION_CODE_LENGTH = 10_000
 MAX_EXECUTION_STDIN_LENGTH = 10_000
 MAX_EXECUTION_OUTPUT_LENGTH = 100_000
@@ -55,29 +57,35 @@ class CodeExecutionServiceError(Exception):
         self.status_code = status_code
 
 
-def _get_wandbox_compilers():
+def _get_wandbox_compilers(deadline):
     global _wandbox_compilers, _wandbox_compilers_fetched_at
-    with _wandbox_lock:
+    if not _wandbox_lock.acquire(timeout=max(0, deadline - time.monotonic())):
+        raise CodeExecutionServiceError('Execution timed out.', status.HTTP_504_GATEWAY_TIMEOUT)
+    try:
         if _wandbox_compilers is not None and time.monotonic() - _wandbox_compilers_fetched_at < _WANDBOX_CACHE_TTL:
             return _wandbox_compilers
         try:
             with dependency_timer('wandbox_list'):
-                resp = http_requests.get('https://wandbox.org/api/list.json', timeout=10)
-                resp.raise_for_status()
-                _wandbox_compilers = resp.json()
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise http_requests.Timeout()
+                _wandbox_compilers = request_json('get', 'https://wandbox.org/api/list.json', deadline,
+                                                  timeout=(min(3, remaining / 2), min(10, remaining / 2)))
                 _wandbox_compilers_fetched_at = time.monotonic()
         except Exception:
             # Keep stale successful data; otherwise retry on the next request.
             return _wandbox_compilers or []
         return _wandbox_compilers or []
+    finally:
+        _wandbox_lock.release()
 
 
-def _pick_compiler(language):
+def _pick_compiler(language, deadline):
     """Return the best available Wandbox compiler name for the given language."""
     prefix = _LANG_PREFIX.get(language)
     if not prefix:
         return None
-    compilers = _get_wandbox_compilers()
+    compilers = _get_wandbox_compilers(deadline)
     names = [c['name'] for c in compilers if c['name'].startswith(prefix)]
     if not names:
         return None
@@ -86,9 +94,12 @@ def _pick_compiler(language):
     return stable[-1] if stable else names[-1]
 
 
-def _execute_code(language, code, stdin=''):
+def _execute_code(language, code, stdin='', deadline=None):
     """Execute already-validated code through Wandbox and normalize its result."""
-    compiler = _pick_compiler(language)
+    deadline = deadline if deadline is not None else time.monotonic() + EXECUTION_BUDGET
+    if deadline <= time.monotonic():
+        raise CodeExecutionServiceError('Execution timed out.', status.HTTP_504_GATEWAY_TIMEOUT)
+    compiler = _pick_compiler(language, deadline)
     if not compiler:
         raise CodeExecutionServiceError(
             'Could not find a compiler. The execution service may be temporarily unavailable.',
@@ -98,13 +109,14 @@ def _execute_code(language, code, stdin=''):
     options = _LANG_OPTIONS.get(language, '')
     try:
         with dependency_timer('wandbox_compile'):
-            resp = http_requests.post(
-                'https://wandbox.org/api/compile.json',
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise http_requests.Timeout()
+            result = request_json(
+                'post', 'https://wandbox.org/api/compile.json', deadline,
                 json={'compiler': compiler, 'code': code, 'options': options, 'stdin': stdin},
-                timeout=30,
+                timeout=(min(3, remaining / 2), min(10, remaining / 2)),
             )
-            resp.raise_for_status()
-            result = resp.json()
     except http_requests.Timeout as exc:
         raise CodeExecutionServiceError(
             'Execution timed out.', status.HTTP_504_GATEWAY_TIMEOUT
@@ -294,8 +306,9 @@ class VerifyConversionView(APIView):
         stdin = serializer.validated_data['stdin']
 
         try:
-            source_result = _execute_code(source_language, source_code, stdin)
-            target_result = _execute_code(target_language, target_code, stdin)
+            deadline = time.monotonic() + EXECUTION_BUDGET
+            source_result = _execute_code(source_language, source_code, stdin, deadline=deadline)
+            target_result = _execute_code(target_language, target_code, stdin, deadline=deadline)
         except CodeExecutionServiceError as exc:
             return Response({'error': exc.message}, status=exc.status_code)
 

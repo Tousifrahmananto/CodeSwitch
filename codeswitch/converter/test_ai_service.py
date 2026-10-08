@@ -2,6 +2,14 @@ from unittest import TestCase
 from unittest.mock import Mock, patch
 
 from converter import ai_service
+import json
+
+
+def http_response(data):
+    response = Mock(headers={})
+    response.raw.stream.side_effect = lambda **kwargs: iter([json.dumps(data).encode()])
+    return response
+
 
 
 class AIResponseValidationTests(TestCase):
@@ -12,7 +20,7 @@ class AIResponseValidationTests(TestCase):
                                          'content': {'parts': [{'text': text}]}}]} if provider == 'gemini'
                         else {'choices': [{'finish_reason': 'stop' if finished else 'length',
                                            'message': {'content': text}}]})
-                response = Mock(**{'json.return_value': data})
+                response = http_response(data)
                 with patch.object(ai_service, '_get', side_effect=lambda key, default='': provider if key == 'AI_PROVIDER' else default), \
                      patch.object(ai_service, '_get_api_keys', return_value=['test-key']), \
                      patch.object(ai_service.requests, 'post', return_value=response):
@@ -28,7 +36,7 @@ class AIResponseValidationTests(TestCase):
         ]:
             with patch.object(ai_service, '_get', side_effect=lambda key, default='': provider if key == 'AI_PROVIDER' else default), \
                  patch.object(ai_service, '_get_api_keys', return_value=['test-key']), \
-                 patch.object(ai_service.requests, 'post', return_value=Mock(**{'json.return_value': data})):
+                 patch.object(ai_service.requests, 'post', return_value=http_response(data)):
                 self.assertEqual(ai_service.ai_convert_code('python', 'c', 'print(1)')['output'], 'result')
                 self.assertEqual(ai_service.ai_explain_code('python', 'c', 'print(1)', 'puts("1");')['explanation'], 'result')
 
@@ -37,7 +45,7 @@ class AIBudgetTests(TestCase):
     def test_only_authentication_and_quota_responses_rotate_keys(self):
         import requests
         for status in (401, 403, 429, 500):
-            response = Mock(**{'json.return_value': {'choices': [{'finish_reason': 'stop', 'message': {'content': 'result'}}]}})
+            response = http_response({'choices': [{'finish_reason': 'stop', 'message': {'content': 'result'}}]})
             with patch.object(ai_service, '_get_api_keys', return_value=['one', 'two']), \
                  patch.object(ai_service, '_get', side_effect=lambda key, default='': 'groq' if key == 'AI_PROVIDER' else default), \
                  patch.object(ai_service.requests, 'post', side_effect=[requests.HTTPError(response=Mock(status_code=status)), response]) as post:
@@ -95,20 +103,18 @@ class GroqModelMigrationTests(TestCase):
         }.get(key, default)
 
     @patch.object(ai_service, '_get')
-    @patch.object(ai_service, 'requests')
+    @patch.object(ai_service.requests, 'post')
     def test_both_helpers_use_replacement_for_retired_model(self, requests, config):
         config.side_effect = self.config
-        response = Mock()
-        response.json.return_value = {'choices': [{'finish_reason': 'stop', 'message': {'content': 'result'}}]}
-        requests.post.return_value = response
+        requests.return_value = http_response({'choices': [{'finish_reason': 'stop', 'message': {'content': 'result'}}]})
 
         conversion = ai_service.ai_convert_code('python', 'c', 'print(1)')
         explanation = ai_service.ai_explain_code('python', 'c', 'print(1)', 'puts("1");')
 
         self.assertTrue(conversion['success'])
         self.assertTrue(explanation['success'])
-        self.assertEqual(requests.post.call_count, 2)
-        for call in requests.post.call_args_list:
+        self.assertEqual(requests.call_count, 2)
+        for call in requests.call_args_list:
             self.assertEqual(call.kwargs['json']['model'], 'openai/gpt-oss-20b')
 
     def test_other_model_settings_are_preserved(self):

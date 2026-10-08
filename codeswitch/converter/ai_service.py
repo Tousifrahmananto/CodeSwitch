@@ -24,6 +24,7 @@ import os
 import re
 import logging
 import time
+from .http_client import request_json
 
 import requests
 from codeswitch.observability import dependency_timer
@@ -126,7 +127,7 @@ def _response_text(data, provider):
         raise AIResponseError('ai_invalid_response') from exc
 
 
-def _call_gemini(api_key, model, user_prompt, timeout, system_prompt, temperature, max_tokens):
+def _call_gemini(api_key, model, user_prompt, timeout, system_prompt, temperature, max_tokens, deadline):
     """Call the Google Gemini generateContent REST API."""
     url = (
         f'https://generativelanguage.googleapis.com/v1beta/models/'
@@ -138,13 +139,11 @@ def _call_gemini(api_key, model, user_prompt, timeout, system_prompt, temperatur
         'generationConfig': {'temperature': temperature, 'maxOutputTokens': max_tokens},
     }
     with dependency_timer('ai_gemini'):
-        resp = requests.post(url, json=payload, timeout=timeout)
-        resp.raise_for_status()
-    data = resp.json()
+        data = request_json('post', url, deadline, json=payload, timeout=timeout)
     return _response_text(data, 'gemini')
 
 
-def _call_openai_compatible(api_key, base_url, model, user_prompt, timeout, system_prompt, temperature, max_tokens):
+def _call_openai_compatible(api_key, base_url, model, user_prompt, timeout, system_prompt, temperature, max_tokens, deadline):
     """Call any OpenAI-compatible /chat/completions endpoint."""
     url = f'{base_url.rstrip("/")}/chat/completions'
     headers = {
@@ -161,9 +160,8 @@ def _call_openai_compatible(api_key, base_url, model, user_prompt, timeout, syst
         'max_tokens': max_tokens,
     }
     with dependency_timer('ai_openai_compatible'):
-        resp = requests.post(url, json=payload, headers=headers, timeout=timeout)
-        resp.raise_for_status()
-    return _response_text(resp.json(), 'openai')
+        data = request_json('post', url, deadline, json=payload, headers=headers, timeout=timeout)
+    return _response_text(data, 'openai')
 
 
 # HTTP status codes that mean "this key is exhausted/invalid — try the next one"
@@ -191,9 +189,9 @@ def _generate_text(user_prompt, system_prompt, temperature, max_tokens, user_key
         timeout = (connect, min(AI_READ_TIMEOUT, remaining - connect))
         try:
             if provider == 'gemini':
-                text = _call_gemini(api_key, model, user_prompt, timeout, system_prompt, temperature, max_tokens)
+                text = _call_gemini(api_key, model, user_prompt, timeout, system_prompt, temperature, max_tokens, deadline)
             else:
-                text = _call_openai_compatible(api_key, base_url, model, user_prompt, timeout, system_prompt, temperature, max_tokens)
+                text = _call_openai_compatible(api_key, base_url, model, user_prompt, timeout, system_prompt, temperature, max_tokens, deadline)
             if time.monotonic() >= deadline:
                 return {'success': False, 'error': 'AI request timed out.', 'ai_provider': provider, 'ai_error_code': 'ai_timeout'}
             return {'success': True, 'text': text}

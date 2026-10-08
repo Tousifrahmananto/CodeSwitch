@@ -1,3 +1,4 @@
+import json
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -29,6 +30,8 @@ class EndpointThrottleTests(TestCase):
     def test_authenticated_run_is_rate_limited(self, request_post, _compiler):
         request_post.return_value.raise_for_status.return_value = None
         request_post.return_value.json.return_value = {'status': '0'}
+        request_post.return_value.headers = {}
+        request_post.return_value.raw.stream.side_effect = lambda **kwargs: iter([b'{"status":"0"}'])
         client = authed_client(self.user)
         payload = {'language': 'python', 'code': 'print(1)'}
         for _ in range(30):

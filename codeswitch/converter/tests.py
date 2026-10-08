@@ -1,3 +1,4 @@
+import json
 from django.test import TestCase, override_settings
 from django.core.cache import cache
 from django.contrib.auth import get_user_model
@@ -99,6 +100,8 @@ class RunCodeTests(TestCase):
         mock_post.return_value.json.return_value = {
             'status': '0', 'program_output': '1\n', 'compiler_output': '', 'program_error': ''
         }
+        mock_post.return_value.headers = {}
+        mock_post.return_value.raw.stream.side_effect = lambda **kwargs: iter([json.dumps(mock_post.return_value.json.return_value).encode()])
         response = self.client.post('/api/run/',
             {'language': 'python', 'code': 'print(1)'},
             format='json')
@@ -152,6 +155,14 @@ class VerifyConversionTests(TestCase):
         self.assertEqual(response.status_code, 401)
 
     @patch('converter.views._execute_code')
+    def test_verification_shares_one_execution_deadline(self, execute):
+        execute.return_value = {'stdout': '1', 'stderr': '', 'code': 0}
+        response = self.client.post('/api/verify', self.payload, format='json')
+        self.assertEqual(response.status_code, 200)
+        first, second = execute.call_args_list
+        self.assertEqual(first.kwargs['deadline'], second.kwargs['deadline'])
+
+    @patch('converter.views._execute_code')
     def test_verify_matching_programs(self, mock_execute):
         mock_execute.side_effect = [
             {'stdout': '3\n', 'stderr': '', 'code': 0},
@@ -200,6 +211,11 @@ class VerifyConversionTests(TestCase):
         mock_post.side_effect = [Mock(**{'json.return_value': {
             'status': '0', 'program_output': 'a' * 100_000 + suffix,
         }}) for suffix in ('b', 'c')]
+        responses = list(mock_post.side_effect)
+        for response_mock in responses:
+            response_mock.headers = {}
+            response_mock.raw.stream.side_effect = lambda response_mock=response_mock, **kwargs: iter([json.dumps(response_mock.json.return_value).encode()])
+        mock_post.side_effect = responses
         response = self.client.post('/api/verify', self.payload, format='json')
         self.assertFalse(response.data['verified'])
         self.assertFalse(response.data['comparison']['stdout_match'])
