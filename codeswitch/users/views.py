@@ -2,7 +2,10 @@ from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
+from rest_framework.exceptions import AuthenticationFailed, ValidationError
+import time
 from rest_framework_simplejwt.exceptions import TokenError
 from django.contrib.auth import get_user_model
 from django.conf import settings
@@ -22,7 +25,7 @@ from google.oauth2 import id_token
 User = get_user_model()
 
 
-def _set_auth_cookies(response, refresh):
+def _set_auth_cookies(response, refresh, access=None):
     """Attach access + refresh tokens as httpOnly cookies.
 
     In production the frontend (Vercel) and backend (Railway) are on different
@@ -34,13 +37,16 @@ def _set_auth_cookies(response, refresh):
     # Cross-origin production: SameSite=None (must pair with Secure=True)
     # Same-origin local dev:   SameSite=Lax  (works on localhost without HTTPS)
     samesite = 'None' if not settings.DEBUG else 'Lax'
+    refresh = RefreshToken(refresh) if isinstance(refresh, str) else refresh
+    access = AccessToken(access) if access else refresh.access_token
+    now = int(time.time())
     response.set_cookie(
         'access_token',
-        str(refresh.access_token),
+        str(access),
         httponly=True,
         secure=secure,
         samesite=samesite,
-        max_age=3600,          # 1 hour — matches SIMPLE_JWT ACCESS_TOKEN_LIFETIME
+        max_age=max(0, access['exp'] - now),
     )
     response.set_cookie(
         'refresh_token',
@@ -48,7 +54,7 @@ def _set_auth_cookies(response, refresh):
         httponly=True,
         secure=secure,
         samesite=samesite,
-        max_age=604800,        # 7 days — matches SIMPLE_JWT REFRESH_TOKEN_LIFETIME
+        max_age=max(0, refresh['exp'] - now),
     )
 
 
@@ -230,14 +236,14 @@ class CookieTokenRefreshView(APIView):
 
     def post(self, request):
         refresh_token = request.COOKIES.get('refresh_token')
-        if not refresh_token:
-            return Response({'error': 'No refresh token.'}, status=status.HTTP_401_UNAUTHORIZED)
         try:
-            refresh = RefreshToken(refresh_token)
+            serializer = TokenRefreshSerializer(data={'refresh': refresh_token})
+            serializer.is_valid(raise_exception=True)
+            tokens = serializer.validated_data
             response = Response({'detail': 'Token refreshed.'})
-            _set_auth_cookies(response, refresh)
+            _set_auth_cookies(response, tokens.get('refresh', refresh_token), tokens['access'])
             return response
-        except TokenError:
+        except (TokenError, AuthenticationFailed, ValidationError, User.DoesNotExist):
             response = Response({'error': 'Invalid or expired refresh token.'}, status=status.HTTP_401_UNAUTHORIZED)
             response.delete_cookie('access_token')
             response.delete_cookie('refresh_token')

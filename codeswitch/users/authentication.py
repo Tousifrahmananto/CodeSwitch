@@ -1,7 +1,7 @@
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework.authentication import CSRFCheck
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, AuthenticationFailed
 
 
 def _csrf_failure_reason(request):
@@ -24,9 +24,9 @@ class JWTCookieAuthentication(JWTAuthentication):
             return None
         try:
             validated_token = self.get_validated_token(raw_token)
-        except (InvalidToken, TokenError):
+            user = self.get_user(validated_token)
+        except (InvalidToken, TokenError, AuthenticationFailed):
             return None
-        user = self.get_user(validated_token)
         reason = _csrf_failure_reason(request)
         if reason:
             raise PermissionDenied(f'CSRF Failed: {reason}')

@@ -4,6 +4,7 @@ import type { User, ConversionRecord, CodeFile, LearningModule, Lesson, UserProg
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 let csrfToken: string | null = null;
 let csrfRequest: Promise<string> | null = null;
+let refreshRequest: Promise<unknown> | null = null;
 
 export const ensureCsrfToken = (): Promise<string> => {
   if (csrfToken) return Promise.resolve(csrfToken);
@@ -41,11 +42,15 @@ client.interceptors.response.use(
       original._retry = true;
       try {
         // The refresh_token cookie is automatically included via withCredentials
-        const token = await ensureCsrfToken();
-        await axios.post(`${API_BASE}/token/refresh/`, {}, {
-          withCredentials: true,
-          headers: { 'X-CSRFToken': token },
-        });
+        if (!refreshRequest) {
+          refreshRequest = ensureCsrfToken()
+            .then(token => axios.post(`${API_BASE}/token/refresh/`, {}, {
+              withCredentials: true,
+              headers: { 'X-CSRFToken': token },
+            }))
+            .finally(() => { refreshRequest = null; });
+        }
+        await refreshRequest;
         // Retry the original request — the new access_token cookie will be included
         return client(original);
       } catch {

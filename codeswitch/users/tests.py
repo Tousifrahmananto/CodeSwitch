@@ -8,6 +8,8 @@ from unittest.mock import patch
 from PIL import Image
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.tokens import AccessToken
 
 User = get_user_model()
 
@@ -19,6 +21,79 @@ VALID_USER = {
 
 # Registration requires password confirmation
 REGISTER_DATA = {**VALID_USER, 'password2': 'Test1234!'}
+
+
+@override_settings(AXES_ENABLED=False)
+class SessionRecoveryTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
+        self.user = User.objects.create_user(**VALID_USER)
+        self.refresh = RefreshToken.for_user(self.user)
+        self.client = APIClient()
+        self.client.cookies['refresh_token'] = str(self.refresh)
+
+    def test_refresh_rotates_and_blacklists_previous_token(self):
+        response = self.client.post('/api/token/refresh/')
+        self.assertEqual(response.status_code, 200)
+        self.assertNotEqual(response.cookies['refresh_token'].value, str(self.refresh))
+        with self.assertRaises(TokenError):
+            RefreshToken(str(self.refresh))
+        for name, token_class in [('access_token', AccessToken), ('refresh_token', RefreshToken)]:
+            token = token_class(response.cookies[name].value)
+            remaining = token['exp'] - int(token.current_time.timestamp())
+            self.assertAlmostEqual(int(response.cookies[name]['max-age']), remaining, delta=1)
+
+    def test_disabled_or_deleted_refresh_users_are_rejected_and_cookies_cleared(self):
+        for deleted in (False, True):
+            with self.subTest(deleted=deleted):
+                if deleted:
+                    self.user.delete()
+                else:
+                    self.user.is_active = False
+                    self.user.save(update_fields=['is_active'])
+                self.client.cookies['refresh_token'] = str(self.refresh)
+                response = self.client.post('/api/token/refresh/')
+                self.assertEqual(response.status_code, 401)
+                self.assertEqual(response.cookies['access_token']['max-age'], 0)
+                self.assertEqual(response.cookies['refresh_token']['max-age'], 0)
+
+    def test_disabled_or_deleted_access_user_can_logout_and_login_with_csrf(self):
+        other = User.objects.create_user(username='other', password='Test1234!')
+        for deleted in (False, True):
+            with self.subTest(deleted=deleted):
+                if deleted:
+                    self.user.delete()
+                else:
+                    self.user.is_active = False
+                    self.user.save(update_fields=['is_active'])
+                client = APIClient(enforce_csrf_checks=True)
+                client.cookies['access_token'] = str(self.refresh.access_token)
+                self.assertEqual(client.post('/api/logout').status_code, 403)
+                csrf = client.get('/api/csrf/').data['csrf_token']
+                self.assertEqual(client.post('/api/logout', HTTP_X_CSRFTOKEN=csrf).status_code, 200)
+                client.cookies['access_token'] = str(self.refresh.access_token)
+                response = client.post('/api/login', {'username': other.username, 'password': 'Test1234!'},
+                                       format='json', HTTP_X_CSRFTOKEN=csrf)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.data['user']['id'], other.pk)
+
+    def test_refresh_requires_csrf(self):
+        client = APIClient(enforce_csrf_checks=True)
+        client.cookies['refresh_token'] = str(self.refresh)
+        self.assertEqual(client.post('/api/token/refresh/').status_code, 403)
+
+    def test_cookie_lifetimes_follow_actual_token_expiry(self):
+        from datetime import timedelta
+        from rest_framework.response import Response
+        from users.views import _set_auth_cookies
+        self.refresh.set_exp(lifetime=timedelta(minutes=4))
+        access = self.refresh.access_token
+        access.set_exp(lifetime=timedelta(seconds=30))
+        response = Response()
+        _set_auth_cookies(response, self.refresh, str(access))
+        self.assertAlmostEqual(response.cookies['access_token']['max-age'], 30, delta=1)
+        self.assertAlmostEqual(response.cookies['refresh_token']['max-age'], 240, delta=1)
 
 
 @override_settings(AXES_ENABLED=False)
