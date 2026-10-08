@@ -9,6 +9,7 @@ import time
 from rest_framework_simplejwt.exceptions import TokenError
 from django.contrib.auth import get_user_model
 from django.conf import settings
+from django.db import IntegrityError, transaction
 from django.middleware.csrf import get_token
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_protect
@@ -146,57 +147,64 @@ class GoogleAuthView(APIView):
         if not email_verified:
             return Response({'error': 'Google email must be verified.'}, status=status.HTTP_403_FORBIDDEN)
 
-        user = User.objects.filter(google_sub=google_sub).first()
-        if user is None:
-            existing = User.objects.filter(email__iexact=email).first()
-            if existing:
-                if existing.google_sub and existing.google_sub != google_sub:
-                    return Response(
-                        {'error': 'This email is already linked to another Google account.'},
-                        status=status.HTTP_409_CONFLICT,
-                    )
-                explicitly_linking_current_user = (
-                    request.user.is_authenticated and request.user.pk == existing.pk
-                )
-                if not existing.email_verified and not explicitly_linking_current_user:
-                    return Response(
-                        {
-                            'error': (
-                                'An account already uses this email. Sign in with its password '
-                                'before linking Google.'
+        try:
+            with transaction.atomic():
+                user = User.objects.filter(google_sub=google_sub).first()
+                if user is None:
+                    existing = User.objects.filter(email__iexact=email).first()
+                    if existing:
+                        if existing.google_sub and existing.google_sub != google_sub:
+                            return Response(
+                                {'error': 'This email is already linked to another Google account.'},
+                                status=status.HTTP_409_CONFLICT,
                             )
-                        },
-                        status=status.HTTP_409_CONFLICT,
-                    )
-                existing.google_sub = google_sub
-                existing.google_email_verified = True
-                existing.email_verified = True
-                if not existing.first_name and payload.get('given_name'):
-                    existing.first_name = payload.get('given_name', '')[:150]
-                if not existing.last_name and payload.get('family_name'):
-                    existing.last_name = payload.get('family_name', '')[:150]
-                existing.save(update_fields=[
-                    'google_sub', 'google_email_verified', 'email_verified',
-                    'first_name', 'last_name',
-                ])
-                user = existing
-            else:
-                user = User(
-                    username=_unique_google_username(email),
-                    email=email,
-                    first_name=(payload.get('given_name') or '')[:150],
-                    last_name=(payload.get('family_name') or '')[:150],
-                    google_sub=google_sub,
-                    google_email_verified=True,
-                    email_verified=True,
-                )
-                user.set_unusable_password()
-                user.save()
-        elif not user.google_email_verified:
-            user.google_email_verified = True
-            if (user.email or '').casefold() == email.casefold():
-                user.email_verified = True
-            user.save(update_fields=['google_email_verified', 'email_verified'])
+                        explicitly_linking_current_user = (
+                            request.user.is_authenticated and request.user.pk == existing.pk
+                        )
+                        if not existing.email_verified and not explicitly_linking_current_user:
+                            return Response(
+                                {
+                                    'error': (
+                                        'An account already uses this email. Sign in with its password '
+                                        'before linking Google.'
+                                    )
+                                },
+                                status=status.HTTP_409_CONFLICT,
+                            )
+                        existing.google_sub = google_sub
+                        existing.google_email_verified = True
+                        existing.email_verified = True
+                        if not existing.first_name and payload.get('given_name'):
+                            existing.first_name = payload.get('given_name', '')[:150]
+                        if not existing.last_name and payload.get('family_name'):
+                            existing.last_name = payload.get('family_name', '')[:150]
+                        existing.save(update_fields=[
+                            'google_sub', 'google_email_verified', 'email_verified',
+                            'first_name', 'last_name',
+                        ])
+                        user = existing
+                    else:
+                        user = User(
+                            username=_unique_google_username(email),
+                            email=email,
+                            first_name=(payload.get('given_name') or '')[:150],
+                            last_name=(payload.get('family_name') or '')[:150],
+                            google_sub=google_sub,
+                            google_email_verified=True,
+                            email_verified=True,
+                        )
+                        user.set_unusable_password()
+                        user.save()
+                elif not user.google_email_verified:
+                    user.google_email_verified = True
+                    if (user.email or '').casefold() == email.casefold():
+                        user.email_verified = True
+                    user.save(update_fields=['google_email_verified', 'email_verified'])
+        except IntegrityError:
+            user = User.objects.filter(google_sub=google_sub).first()
+            if user is None:
+                return Response({'error': 'An account conflicts with this Google identity.'},
+                                status=status.HTTP_409_CONFLICT)
 
         refresh = RefreshToken.for_user(user)
         response = Response({'user': UserProfileSerializer(user, context={'request': request}).data})

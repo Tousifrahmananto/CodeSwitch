@@ -188,6 +188,33 @@ class GoogleAuthTests(TestCase):
         return payload
 
     @patch('users.views.id_token.verify_oauth2_token')
+    def test_overlapping_first_google_signins_resolve_only_matching_identity(self, verify):
+        from django.db.models.query import QuerySet
+        verify.return_value = self._payload()
+        winner = User.objects.create_user(username='winning', email='google@example.com',
+                                          google_sub='google-sub-123', email_verified=True)
+        original_first = QuerySet.first
+        for unrelated in (False, True):
+            with self.subTest(unrelated=unrelated):
+                winner.google_sub = 'another-google-sub' if unrelated else 'google-sub-123'
+                winner.save(update_fields=['google_sub'])
+                reads = [0]
+                def stale_first(queryset):
+                    if queryset.model is User and reads[0] < 2:
+                        reads[0] += 1
+                        return None
+                    return original_first(queryset)
+                client = APIClient(raise_request_exception=False)
+                with patch.object(QuerySet, 'first', stale_first):
+                    response = client.post('/api/auth/google', {'credential': 'id-token'}, format='json')
+                self.assertEqual(response.status_code, 409 if unrelated else 200)
+                self.assertEqual(User.objects.count(), 1)
+                if not unrelated:
+                    self.assertEqual(response.data['user']['id'], winner.pk)
+                else:
+                    self.assertNotIn('access_token', response.cookies)
+
+    @patch('users.views.id_token.verify_oauth2_token')
     def test_google_auth_creates_user_and_sets_cookies(self, verify_mock):
         verify_mock.return_value = self._payload()
         response = self.client.post('/api/auth/google', {'credential': 'id-token'}, format='json')
