@@ -2,6 +2,7 @@ import re
 import base64
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
+from .models import _validate_avatar
 
 User = get_user_model()
 
@@ -55,7 +56,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
-    avatar = serializers.ImageField(required=False, allow_null=True, write_only=True)
+    avatar = serializers.ImageField(required=False, allow_null=True, write_only=True, validators=[_validate_avatar])
 
     class Meta:
         model = User

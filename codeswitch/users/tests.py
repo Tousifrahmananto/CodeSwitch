@@ -297,6 +297,22 @@ class ProfileTests(TestCase):
         self.assertEqual(self.user.first_name, 'Updated')
         self.assertEqual(self.user.bio, 'New bio')
 
+    def test_avatar_rejects_oversized_and_disallowed_images_before_storage(self):
+        for image_format, content_type, padding in [
+            ('PNG', 'image/png', b'x' * (5 * 1024 * 1024)),
+            ('GIF', 'image/gif', b''),
+        ]:
+            with self.subTest(content_type=content_type):
+                image = BytesIO()
+                Image.new('RGB', (1, 1)).save(image, format=image_format)
+                avatar = SimpleUploadedFile('avatar.' + image_format.lower(),
+                                            image.getvalue() + padding, content_type=content_type)
+                response = self.client.patch('/api/profile', {'avatar': avatar}, format='multipart')
+                self.assertEqual(response.status_code, 400)
+                self.user.refresh_from_db()
+                self.assertFalse(self.user.avatar_blob)
+                self.assertFalse(self.user.avatar)
+
     def test_cookie_authenticated_profile_write_requires_csrf(self):
         client = APIClient(enforce_csrf_checks=True)
         client.cookies['access_token'] = str(RefreshToken.for_user(self.user).access_token)

@@ -6,18 +6,6 @@ import { SankeyChart, SankeyLink, SankeyNode, SankeyTooltip, type SankeyData } f
 import { getLanguageMeta } from '../constants/languages';
 import type { CodeFile, ConversionRecord, LearningModule, User, UserProgress } from '../types';
 
-const _dashCache: {
-  data: {
-    profile: User;
-    history: ConversionRecord[];
-    progress: UserProgress[];
-    files: CodeFile[];
-    modules: LearningModule[];
-  } | null;
-  ts: number;
-} = { data: null, ts: 0 };
-const CACHE_TTL = 5 * 60 * 1000;
-
 function LangChip({ lang }: { lang: string }) {
   const meta = getLanguageMeta(lang);
   return (
@@ -228,28 +216,18 @@ function cacheBustAvatarUrl(url: string | null, signature?: string | null): stri
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const fresh = _dashCache.data && Date.now() - _dashCache.ts < CACHE_TTL
-    ? _dashCache.data : null;
-
-  const [profile, setProfile] = useState<User | null>(fresh?.profile ?? null);
-  const [history, setHistory] = useState<ConversionRecord[]>(fresh?.history ?? []);
-  const [progress, setProgress] = useState<UserProgress[]>(fresh?.progress ?? []);
-  const [files, setFiles] = useState<CodeFile[]>(fresh?.files ?? []);
-  const [modules, setModules] = useState<LearningModule[]>(fresh?.modules ?? []);
+  const [profile, setProfile] = useState<User | null>(null);
+  const [history, setHistory] = useState<ConversionRecord[]>([]);
+  const [progress, setProgress] = useState<UserProgress[]>([]);
+  const [files, setFiles] = useState<CodeFile[]>([]);
+  const [modules, setModules] = useState<LearningModule[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(!fresh);
+  const [loading, setLoading] = useState(true);
   const [avatarFailed, setAvatarFailed] = useState(false);
   const [publicAvatar, setPublicAvatar] = useState<string | null>(null);
 
   useEffect(() => {
-    if (fresh) {
-      getProfile().then(profileRes => {
-        setProfile(profileRes.data);
-        setAvatarFailed(false);
-        if (_dashCache.data) _dashCache.data.profile = profileRes.data;
-      }).catch(() => {});
-      return;
-    }
+    let cancelled = false;
     Promise.all([
       getProfile(),
       getConversionHistory(),
@@ -257,6 +235,7 @@ export default function Dashboard() {
       getFiles(),
       getModules(),
     ]).then(([profileRes, historyRes, progressRes, filesRes, modulesRes]) => {
+      if (cancelled) return;
       const data = {
         profile: profileRes.data,
         history: historyRes.data,
@@ -264,15 +243,14 @@ export default function Dashboard() {
         files: filesRes.data,
         modules: modulesRes.data,
       };
-      _dashCache.data = data;
-      _dashCache.ts = Date.now();
       setProfile(data.profile);
       setHistory(data.history);
       setProgress(data.progress);
       setFiles(data.files);
       setModules(data.modules);
-    }).catch(() => setLoadError('Failed to load dashboard data.'))
-      .finally(() => setLoading(false));
+    }).catch(() => { if (!cancelled) setLoadError('Failed to load dashboard data.'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
   const completedLessons = progress.filter(p => p.completed).length;
@@ -331,9 +309,7 @@ export default function Dashboard() {
         setPublicAvatar(nextAvatar);
         if (nextAvatar && !profile.avatar) {
           setProfile(current => current ? { ...current, avatar: nextAvatar } : current);
-          if (_dashCache.data?.profile && _dashCache.data.profile.username === profile.username) {
-            _dashCache.data.profile = { ..._dashCache.data.profile, avatar: nextAvatar };
-          }
+
         }
       })
       .catch(() => {});
