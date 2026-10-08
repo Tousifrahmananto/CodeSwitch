@@ -121,8 +121,8 @@ export const verifyConversion = (data: {
   source_code: string;
   target_code: string;
   stdin?: string;
-}): Promise<AxiosResponse<VerificationResult>> =>
-  client.post('/verify', data);
+}, config?: AxiosRequestConfig): Promise<AxiosResponse<VerificationResult>> =>
+  client.post('/verify', data, config);
 
 // ── Snippets ──────────────────────────────────
 export const createSnippet = (data: {

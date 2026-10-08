@@ -3,14 +3,15 @@
  * Uses the shared axios client so the correct API base URL is always used.
  */
 import client from './client';
+import type { AxiosRequestConfig } from 'axios';
 import type { RunResult } from '../types';
 
 /**
  * Run code via the backend execution proxy.
  */
-export async function runCode(language: string, code: string, stdin = ''): Promise<RunResult> {
+export async function runCode(language: string, code: string, stdin = '', config?: AxiosRequestConfig): Promise<RunResult> {
   try {
-    const { data } = await client.post<RunResult>('/run/', { language, code, stdin });
+    const { data } = await client.post<RunResult>('/run/', { language, code, stdin }, config);
     return {
       stdout: data.stdout || '',
       stderr: data.stderr || '',

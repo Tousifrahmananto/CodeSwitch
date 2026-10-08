@@ -1,5 +1,5 @@
 // src/pages/FileManager.jsx
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getFiles, createFile, updateFile, deleteFile } from '../api/client';
 import CodeEditor from '../components/CodeEditor';
 import LanguageSelector from '../components/LanguageSelector';
@@ -15,6 +15,8 @@ const FILE_EXT: Record<string, string> = {
 };
 
 export default function FileManager() {
+  const revisionRef = useRef(0);
+  const changeForm = (next: FileForm) => { revisionRef.current += 1; setForm(next); };
   const [files, setFiles] = useState<CodeFile[]>([]);
   const [selected, setSelected] = useState<CodeFile | null>(null);
   const [form, setForm] = useState<FileForm>(EMPTY_FORM);
@@ -38,19 +40,20 @@ export default function FileManager() {
       setError('Filename is required.');
       return;
     }
+    const revision = revisionRef.current;
+    const snapshot = { ...form };
     setSaving(true);
     try {
       if (selected) {
-        await updateFile(selected.id, form);
-        setFiles(prev => prev.map(f => f.id === selected.id ? { ...f, ...form } : f));
+        const { data: saved } = await updateFile(selected.id, snapshot);
+        setFiles(prev => prev.map(f => f.id === selected.id ? saved : f));
       } else {
-        const { data: newFile } = await createFile(form);
+        const { data: newFile } = await createFile(snapshot);
         setFiles(prev => [...prev, newFile]);
       }
-      setSelected(null);
-      setForm(EMPTY_FORM);
+      if (revisionRef.current === revision) { setSelected(null); changeForm(EMPTY_FORM); }
     } catch {
-      setError('Failed to save file. Please try again.');
+      if (revisionRef.current === revision) setError('Failed to save file. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -58,16 +61,17 @@ export default function FileManager() {
 
   const handleSelect = (f: CodeFile) => {
     setSelected(f);
-    setForm({ filename: f.filename, language: f.language, code_content: f.code_content });
+    changeForm({ filename: f.filename, language: f.language, code_content: f.code_content });
   };
 
   const handleDelete = async (id: number) => {
     setError(null);
+    const revision = revisionRef.current;
     setDeletingId(id);
     try {
       await deleteFile(id);
       setFiles(prev => prev.filter(f => f.id !== id));
-      if (selected?.id === id) { setSelected(null); setForm(EMPTY_FORM); }
+      if (selected?.id === id && revisionRef.current === revision) { setSelected(null); changeForm(EMPTY_FORM); }
     } catch {
       setError('Failed to delete file. Please try again.');
     } finally {
@@ -75,7 +79,7 @@ export default function FileManager() {
     }
   };
 
-  const handleNew = () => { setSelected(null); setForm(EMPTY_FORM); };
+  const handleNew = () => { setSelected(null); changeForm(EMPTY_FORM); };
 
   const handleDownload = () => {
     if (!form.code_content) return;
@@ -123,16 +127,16 @@ export default function FileManager() {
           className="w-full bg-bg border border-border rounded px-3 py-2 text-sm text-primary focus:outline-none focus:border-accent"
           placeholder="Filename (e.g. hello.py)"
           value={form.filename}
-          onChange={(e) => setForm({ ...form, filename: e.target.value })}
+          onChange={(e) => changeForm({ ...form, filename: e.target.value })}
         />
         <LanguageSelector
           value={form.language}
-          onChange={(lang) => setForm({ ...form, language: lang })}
+          onChange={(lang) => changeForm({ ...form, language: lang })}
           languages={LANGUAGES}
         />
         <CodeEditor
           value={form.code_content}
-          onChange={(val) => setForm({ ...form, code_content: val ?? '' })}
+          onChange={(val) => changeForm({ ...form, code_content: val ?? '' })}
           language={form.language}
           height="380px"
         />

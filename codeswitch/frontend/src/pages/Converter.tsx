@@ -84,6 +84,11 @@ export default function Converter() {
   // Abort controllers for in-flight AI requests — cancelled on unmount or new request
   const convertControllerRef = useRef<AbortController | null>(null);
   const explainControllerRef = useRef<AbortController | null>(null);
+  const runControllerRef = useRef<AbortController | null>(null);
+  const targetRunControllerRef = useRef<AbortController | null>(null);
+  const verifyControllerRef = useRef<AbortController | null>(null);
+  const revisionRef = useRef(0);
+  const requestRefs = [convertControllerRef, explainControllerRef, runControllerRef, targetRunControllerRef, verifyControllerRef];
   const elapsedIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [convertElapsed, setConvertElapsed] = useState(0);
 
@@ -93,11 +98,31 @@ export default function Converter() {
 
   useEffect(() => {
     return () => {
-      convertControllerRef.current?.abort();
-      explainControllerRef.current?.abort();
+      requestRefs.forEach(ref => ref.current?.abort());
       if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current);
     };
   }, []);
+
+  const invalidateRequests = () => {
+    revisionRef.current += 1;
+    requestRefs.forEach(ref => ref.current?.abort());
+    if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current);
+    elapsedIntervalRef.current = null;
+    setLoading(false);
+    setConvertElapsed(0);
+    setRunLoading(false);
+    setRunLoadingTarget(false);
+    setVerifyLoading(false);
+    setExplainLoading(false);
+    setExplanation('');
+    setShowExplanation(false);
+    setVerification(null);
+    setRunOutput(null);
+    setRunOutputTarget(null);
+    setRunError('');
+    setRunErrorTarget('');
+    setVerifyError('');
+  };
 
   // Close theme picker on outside click
   useEffect(() => {
@@ -121,7 +146,7 @@ export default function Converter() {
   const handleConvert = async (apiKeyOverride?: string) => {
     if (!inputCode.trim()) return setError('Please enter some code.');
     if (sourceLang === targetLang) return setError('Source and target languages must differ.');
-    convertControllerRef.current?.abort();
+    invalidateRequests();
     const controller = new AbortController();
     convertControllerRef.current = controller;
     setLoading(true);
@@ -136,6 +161,7 @@ export default function Converter() {
     setVerifyError('');
     setConvertElapsed(0);
     elapsedIntervalRef.current = setInterval(() => setConvertElapsed(e => e + 1), 1000);
+    const revision = revisionRef.current;
     try {
       const { data } = await convertCode({
         source_language: sourceLang,
@@ -147,14 +173,18 @@ export default function Converter() {
           ? { 'X-User-Api-Key': apiKeyOverride || userApiKey }
           : undefined,
       });
+      if (controller.signal.aborted || revisionRef.current !== revision) return;
+      invalidateRequests();
       setOutputCode(data.output);
       setEngine(data.engine || 'rules');
     } catch (err: any) {
+      if (controller.signal.aborted || revisionRef.current !== revision) return;
       if (err.name === 'CanceledError' || err.name === 'AbortError') return;
       const msg: string = err.response?.data?.error || 'Conversion failed.';
       setError(msg);
       if (isQuotaError(msg)) setQuotaExhausted(true);
     } finally {
+      if (controller.signal.aborted || revisionRef.current !== revision) return;
       if (elapsedIntervalRef.current) { clearInterval(elapsedIntervalRef.current); elapsedIntervalRef.current = null; }
       setConvertElapsed(0);
       setLoading(false);
@@ -163,32 +193,46 @@ export default function Converter() {
 
   const handleRun = async () => {
     if (!inputCode.trim()) return;
+    runControllerRef.current?.abort();
+    const controller = new AbortController();
+    runControllerRef.current = controller;
     setRunLoading(true);
     setRunOutput(null);
     setRunError('');
+    const revision = revisionRef.current;
     try {
-      const result = await runCode(sourceLang, inputCode, runStdin);
+      const result = await runCode(sourceLang, inputCode, runStdin, { signal: controller.signal });
+      if (controller.signal.aborted || revisionRef.current !== revision) return;
       setRunOutput(result);
     } catch (err: unknown) {
+      if (controller.signal.aborted || revisionRef.current !== revision) return;
       const message = err instanceof Error ? err.message : 'Could not reach execution server. Check your connection.';
       setRunError(message);
     } finally {
+      if (controller.signal.aborted || revisionRef.current !== revision) return;
       setRunLoading(false);
     }
   };
 
   const handleRunTarget = async () => {
     if (!outputCode.trim()) return;
+    targetRunControllerRef.current?.abort();
+    const controller = new AbortController();
+    targetRunControllerRef.current = controller;
     setRunLoadingTarget(true);
     setRunOutputTarget(null);
     setRunErrorTarget('');
+    const revision = revisionRef.current;
     try {
-      const result = await runCode(targetLang, outputCode, runStdin);
+      const result = await runCode(targetLang, outputCode, runStdin, { signal: controller.signal });
+      if (controller.signal.aborted || revisionRef.current !== revision) return;
       setRunOutputTarget(result);
     } catch (err: unknown) {
+      if (controller.signal.aborted || revisionRef.current !== revision) return;
       const message = err instanceof Error ? err.message : 'Could not reach execution server. Check your connection.';
       setRunErrorTarget(message);
     } finally {
+      if (controller.signal.aborted || revisionRef.current !== revision) return;
       setRunLoadingTarget(false);
     }
   };
@@ -227,6 +271,7 @@ export default function Converter() {
     explainControllerRef.current = controller;
     setExplainLoading(true);
     setShowExplanation(true);
+    const revision = revisionRef.current;
     try {
       const { data } = await explainCode({
         input_code: inputCode,
@@ -237,8 +282,10 @@ export default function Converter() {
         signal: controller.signal,
         headers: userApiKey ? { 'X-User-Api-Key': userApiKey } : undefined,
       });
+      if (controller.signal.aborted || revisionRef.current !== revision) return;
       setExplanation(data.explanation);
     } catch (err: any) {
+      if (controller.signal.aborted || revisionRef.current !== revision) return;
       if (err.name === 'CanceledError' || err.name === 'AbortError') return;
       const msg: string = err.response?.data?.error || '';
       if (isQuotaError(msg)) {
@@ -248,6 +295,7 @@ export default function Converter() {
         setExplanation('Could not generate explanation. Please try again.');
       }
     } finally {
+      if (controller.signal.aborted || revisionRef.current !== revision) return;
       setExplainLoading(false);
     }
   };
@@ -284,9 +332,13 @@ export default function Converter() {
 
   const handleVerify = async () => {
     if (!inputCode.trim() || !outputCode.trim()) return;
+    verifyControllerRef.current?.abort();
+    const controller = new AbortController();
+    verifyControllerRef.current = controller;
     setVerifyLoading(true);
     setVerifyError('');
     setVerification(null);
+    const revision = revisionRef.current;
     try {
       const { data } = await verifyConversion({
         source_language: sourceLang,
@@ -294,16 +346,19 @@ export default function Converter() {
         source_code: inputCode,
         target_code: outputCode,
         stdin: runStdin,
-      });
+      }, { signal: controller.signal });
+      if (controller.signal.aborted || revisionRef.current !== revision) return;
       setVerification(data);
       setRunOutput(data.source);
       setRunOutputTarget(data.target);
       setRunError('');
       setRunErrorTarget('');
     } catch (err: unknown) {
+      if (controller.signal.aborted || revisionRef.current !== revision) return;
       const axiosErr = err as { response?: { data?: { error?: string } } };
       setVerifyError(axiosErr.response?.data?.error || 'Could not verify this conversion.');
     } finally {
+      if (controller.signal.aborted || revisionRef.current !== revision) return;
       setVerifyLoading(false);
     }
   };
@@ -375,6 +430,7 @@ export default function Converter() {
                 className={`sandbox-lang-pill${sourceLang === lang ? ' active' : ''}`}
                 style={getPillStyle(lang)}
                 onClick={() => {
+                  invalidateRequests();
                   const previousSource = sourceLang;
                   setSourceLang(lang);
                   if (lang === targetLang) setTargetLang(previousSource);
@@ -419,6 +475,7 @@ export default function Converter() {
                 style={getPillStyle(lang)}
                 onClick={() => {
                   if (sourceLang === lang) return;
+                  invalidateRequests();
                   setTargetLang(lang);
                   setOutputCode('');
                   setEngine('');
@@ -541,6 +598,7 @@ export default function Converter() {
           <CodeEditor
             value={inputCode}
             onChange={(value) => {
+              invalidateRequests();
               setInputCode(value ?? '');
               setOutputCode('');
               setEngine('');
@@ -575,6 +633,7 @@ export default function Converter() {
             <CodeEditor
               value={outputCode}
               onChange={(value) => {
+                invalidateRequests();
                 setOutputCode(value ?? '');
                 setVerification(null);
                 setVerifyError('');
@@ -596,6 +655,7 @@ export default function Converter() {
           placeholder="Enter input for your program here (one value per line)..."
           value={runStdin}
           onChange={e => {
+            invalidateRequests();
             setRunStdin(e.target.value);
             setVerification(null);
             setVerifyError('');
