@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense, Component } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense, Component } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import {
   BrowserRouter,
@@ -337,6 +337,9 @@ function AppRoutes({
 
 // ── Root App ────────────────────────────────────────────────────────────────
 export default function App() {
+  const sessionRevision = useRef(0);
+  const logoutPending = useRef(false);
+  const [logoutError, setLogoutError] = useState('');
   const [user, setUser] = useState<User | null>(() => {
     try {
       const stored = localStorage.getItem('user');
@@ -355,26 +358,42 @@ export default function App() {
   // Silently validate session on mount
   useEffect(() => {
     if (!localStorage.getItem('user')) return;
+    const revision = sessionRevision.current;
+    let active = true;
     getMe()
       .then(r => {
+        if (!active || sessionRevision.current !== revision) return;
         setUser(r.data);
         localStorage.setItem('user', JSON.stringify(r.data));
       })
       .catch(() => {
+        if (!active || sessionRevision.current !== revision) return;
         setUser(null);
         localStorage.removeItem('user');
       });
+    return () => { active = false; };
   }, []);
 
   const handleLogin = (userData: User) => {
+    sessionRevision.current += 1;
     localStorage.setItem('user', JSON.stringify(userData));
     setUser(userData);
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('user');
-    setUser(null);
-    logout().catch(() => {});
+  const handleLogout = async () => {
+    if (logoutPending.current) return;
+    logoutPending.current = true;
+    sessionRevision.current += 1;
+    setLogoutError('');
+    try {
+      await logout();
+      localStorage.removeItem('user');
+      setUser(null);
+    } catch {
+      setLogoutError('Could not log out. Please try again.');
+    } finally {
+      logoutPending.current = false;
+    }
   };
 
   const handleToggleTheme = () => {
@@ -385,6 +404,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      {logoutError && <p role="alert" className="fixed top-2 right-2 z-50 bg-surface text-danger p-3 rounded">{logoutError}</p>}
       <AppRoutes
         user={user}
         theme={theme}

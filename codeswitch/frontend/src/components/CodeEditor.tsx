@@ -1,4 +1,5 @@
 import Editor, { BeforeMount } from '@monaco-editor/react';
+import { useEffect, useState } from 'react';
 
 interface CodeEditorProps {
   value: string;
@@ -71,10 +72,18 @@ export default function CodeEditor({
   height = '400px',
   theme,
 }: CodeEditorProps) {
+  const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  useEffect(() => {
+    let active = true;
+    import('./monaco').then(() => { if (active) setReady(true); })
+      .catch(() => { if (active) setLoadError(true); });
+    return () => { active = false; };
+  }, []);
   const activeTheme = theme || localStorage.getItem('editor_theme') || 'vs-dark';
   return (
     <div className="monaco-wrapper" style={{ height }}>
-      <Editor
+      {loadError ? <p role="alert">Could not load the editor. Please refresh.</p> : !ready ? <p>Loading editor…</p> : <Editor
         height={height}
         language={LANG_MAP[language] || 'plaintext'}
         value={value}
@@ -92,7 +101,7 @@ export default function CodeEditor({
           tabSize: 4,
           automaticLayout: true,
         }}
-      />
+      />}
     </div>
   );
 }
