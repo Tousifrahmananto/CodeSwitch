@@ -69,13 +69,19 @@ class ModuleLessonsView(generics.ListAPIView):
         return Lesson.objects.filter(module_id=self.kwargs['pk'])
 
 
+class ProgressInputSerializer(serializers.Serializer):
+    lesson_id = serializers.IntegerField(min_value=1, max_value=2**63 - 1)
+
+
 class UpdateProgressView(APIView):
     """POST /api/progress/update — Mark a lesson as complete."""
     permission_classes = [IsAuthenticated]
     throttle_classes = [WriteThrottle]
 
     def post(self, request):
-        lesson_id = request.data.get('lesson_id')
+        serializer = ProgressInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        lesson_id = serializer.validated_data['lesson_id']
         try:
             lesson = Lesson.objects.get(id=lesson_id)
         except Lesson.DoesNotExist:

@@ -9,7 +9,7 @@ from codeswitch.pagination import OptionalPageNumberPagination
 
 class CodeFileSerializer(serializers.ModelSerializer):
     filename = serializers.CharField(max_length=255)
-    code_content = serializers.CharField(max_length=100_000, trim_whitespace=False)
+    code_content = serializers.CharField(max_length=100_000, trim_whitespace=False, allow_blank=True)
     class Meta:
         model = CodeFile
         fields = ('id', 'filename', 'language', 'code_content', 'created_at', 'updated_at')

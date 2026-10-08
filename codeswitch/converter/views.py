@@ -17,7 +17,8 @@ from .throttles import (
     VerifySustainedThrottle, VisualizerBurstThrottle,
     VisualizerSustainedThrottle,
 )
-from .serializers import SharedSnippetCreateSerializer
+from .serializers import (SharedSnippetCreateSerializer, ConversionInputSerializer, ExecutionInputSerializer,
+                          ExplanationInputSerializer, VisualizationInputSerializer, VerificationInputSerializer)
 from .visualizer import build_visualization
 from codeswitch.observability import dependency_timer, record_conversion
 from codeswitch.pagination import OptionalPageNumberPagination
@@ -156,28 +157,11 @@ class ConvertCodeView(APIView):
     MAX_CODE_LENGTH = 50_000
 
     def post(self, request):
-        source = request.data.get('source_language', '').lower()
-        target = request.data.get('target_language', '').lower()
-        code = request.data.get('code', '')
-
-        if not source or not target or not code:
-            return Response(
-                {'error': 'source_language, target_language, and code are required.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        if source not in self.VALID_LANGUAGES or target not in self.VALID_LANGUAGES:
-            return Response(
-                {'error': f'Languages must be one of: {", ".join(sorted(self.VALID_LANGUAGES))}.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        if len(code) > self.MAX_CODE_LENGTH:
-            return Response(
-                {'error': f'Code must be under {self.MAX_CODE_LENGTH:,} characters.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        # Strip null bytes that could cause issues in downstream processing
+        serializer = ConversionInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        source = serializer.validated_data['source_language']
+        target = serializer.validated_data['target_language']
+        code = serializer.validated_data['code']
         code = code.replace('\x00', '')
 
         user_key = request.headers.get('X-User-Api-Key') or None
@@ -278,28 +262,11 @@ class RunCodeView(APIView):
     MAX_STDIN_LENGTH = MAX_EXECUTION_STDIN_LENGTH
 
     def post(self, request):
-        language = request.data.get('language', '').lower().strip()
-        code = request.data.get('code', '')
-        stdin = request.data.get('stdin', '')
-
-        if language not in self.SUPPORTED:
-            return Response(
-                {'error': f'Unsupported language: {language}.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if not code.strip():
-            return Response({'error': 'No code provided.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        if len(code) > self.MAX_CODE_LENGTH:
-            return Response(
-                {'error': f'Code must be under {self.MAX_CODE_LENGTH:,} characters.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if len(stdin) > self.MAX_STDIN_LENGTH:
-            return Response(
-                {'error': f'Standard input must be under {self.MAX_STDIN_LENGTH:,} characters.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        serializer = ExecutionInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        language = serializer.validated_data['language']
+        code = serializer.validated_data['code']
+        stdin = serializer.validated_data['stdin']
 
         try:
             result = _execute_code(language, code, stdin)
@@ -318,37 +285,13 @@ class VerifyConversionView(APIView):
     throttle_classes = [VerifyBurstThrottle, VerifySustainedThrottle]
 
     def post(self, request):
-        source_language = request.data.get('source_language', '').lower().strip()
-        target_language = request.data.get('target_language', '').lower().strip()
-        source_code = request.data.get('source_code', '')
-        target_code = request.data.get('target_code', '')
-        stdin = request.data.get('stdin', '')
-
-        if source_language not in EXECUTION_LANGUAGES or target_language not in EXECUTION_LANGUAGES:
-            return Response(
-                {'error': 'Source and target languages must support execution.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if source_language == target_language:
-            return Response(
-                {'error': 'Source and target languages must differ.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if not source_code.strip() or not target_code.strip():
-            return Response(
-                {'error': 'Source code and converted code are required.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if len(source_code) > MAX_EXECUTION_CODE_LENGTH or len(target_code) > MAX_EXECUTION_CODE_LENGTH:
-            return Response(
-                {'error': f'Each code sample must be under {MAX_EXECUTION_CODE_LENGTH:,} characters.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if len(stdin) > MAX_EXECUTION_STDIN_LENGTH:
-            return Response(
-                {'error': f'Standard input must be under {MAX_EXECUTION_STDIN_LENGTH:,} characters.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        serializer = VerificationInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        source_language = serializer.validated_data['source_language']
+        target_language = serializer.validated_data['target_language']
+        source_code = serializer.validated_data['source_code']
+        target_code = serializer.validated_data['target_code']
+        stdin = serializer.validated_data['stdin']
 
         try:
             source_result = _execute_code(source_language, source_code, stdin)
@@ -407,28 +350,12 @@ class ExplainCodeView(APIView):
     MAX_CODE_LENGTH = 50_000
 
     def post(self, request):
-        source = request.data.get('source_language', '').lower()
-        target = request.data.get('target_language', '').lower()
-        input_code = request.data.get('input_code', '')
-        output_code = request.data.get('output_code', '')
-
-        if not source or not target or not input_code or not output_code:
-            return Response(
-                {'error': 'source_language, target_language, input_code, and output_code are required.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        if source not in self.VALID_LANGUAGES or target not in self.VALID_LANGUAGES:
-            return Response(
-                {'error': f'Languages must be one of: {", ".join(sorted(self.VALID_LANGUAGES))}.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        if len(input_code) > self.MAX_CODE_LENGTH or len(output_code) > self.MAX_CODE_LENGTH:
-            return Response(
-                {'error': f'Code must be under {self.MAX_CODE_LENGTH:,} characters.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        serializer = ExplanationInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        source = serializer.validated_data['source_language']
+        target = serializer.validated_data['target_language']
+        input_code = serializer.validated_data['input_code']
+        output_code = serializer.validated_data['output_code']
 
         result = ai_explain_code(source, target, input_code, output_code,
                                   user_key=request.headers.get('X-User-Api-Key') or None)
@@ -450,8 +377,11 @@ class VisualizeCodeView(APIView):
     throttle_classes = [VisualizerBurstThrottle, VisualizerSustainedThrottle]
 
     def post(self, request):
-        language = request.data.get('language', '')
-        code = request.data.get('code', '')
+        serializer = VisualizationInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        language = serializer.validated_data['language']
+        code = serializer.validated_data['code']
+
         try:
             timeline = build_visualization(language, code)
         except ValueError as exc:
