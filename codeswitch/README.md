@@ -136,6 +136,11 @@ python manage.py runserver
 | GET/POST | `/api/files/` | Yes |
 | GET/PUT/DELETE | `/api/files/<id>/` | Yes |
 
+File lists return `{count, next, previous, results}` with 50 items by default
+(`page` and `page_size`, maximum 100). List items omit `code_content`; retrieve
+one file to load its source. Deploy the frontend and backend together when
+adopting this response format.
+
 ### Learning
 | Method | Endpoint | Auth |
 |---|---|---|
@@ -198,6 +203,12 @@ hosting provider's name. Local development uses `0`.
 
 Recognized transient database failures return HTTP 503 with `Retry-After: 2`.
 The backend does not replay requests or writes automatically.
+
+External JSON requests use short-lived Python processes so the overall deadline
+also covers DNS lookup, response headers, and body decoding. AI attempts share a
+20-second budget; Google certificate fetches have an eight-second budget.
+Dependency timing metrics remain enabled. Outbound trace spans record the method,
+host, and status without URLs or credential headers.
 
 ```
 web: gunicorn codeswitch.wsgi --bind 0.0.0.0:$PORT --access-logfile - --error-logfile -

@@ -19,15 +19,16 @@ it('loads fresh private data when another account opens the dashboard', async ()
   vi.mocked(api.getProgress).mockResolvedValue({ data: [] } as never);
   vi.mocked(api.getModules).mockResolvedValue({ data: [] } as never);
   vi.mocked(api.getPublicProfile).mockResolvedValue({ data: {} } as never);
-  vi.mocked(api.getFiles).mockResolvedValue({ data: [{ id: 1, name: 'Alice private file', language: 'python', updated_at: '2026-10-08' }] } as never);
+  vi.mocked(api.getFiles).mockResolvedValue({ data: { count: 1, results: [{ id: 1, filename: 'Alice private file', language: 'python', updated_at: '2026-10-08' }], next: null } } as never);
   const first = render(<MemoryRouter><Dashboard /></MemoryRouter>);
   await screen.findByText('alice@example.com');
   first.unmount();
   vi.mocked(api.getProfile).mockResolvedValue({ data: { username: 'Bob', email: 'bob@example.com' } } as never);
-  vi.mocked(api.getFiles).mockResolvedValue({ data: [] } as never);
+  vi.mocked(api.getFiles).mockResolvedValue({ data: { count: 0, results: [], next: null } } as never);
   render(<MemoryRouter><Dashboard /></MemoryRouter>);
   expect(screen.queryByText('alice@example.com')).not.toBeInTheDocument();
   expect(screen.queryByText('Alice private file')).not.toBeInTheDocument();
   await screen.findByText('bob@example.com');
   await waitFor(() => expect(api.getFiles).toHaveBeenCalledTimes(2));
+  expect(api.getFiles).toHaveBeenLastCalledWith(1, 1);
 });

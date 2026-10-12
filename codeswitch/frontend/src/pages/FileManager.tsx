@@ -1,10 +1,10 @@
 // src/pages/FileManager.jsx
 import { useEffect, useRef, useState } from 'react';
-import { getFiles, createFile, updateFile, deleteFile } from '../api/client';
+import { getFiles, getFile, createFile, updateFile, deleteFile } from '../api/client';
 import CodeEditor from '../components/CodeEditor';
 import LanguageSelector from '../components/LanguageSelector';
 import { getLanguageMeta } from '../constants/languages';
-import type { CodeFile } from '../types';
+import type { CodeFileSummary } from '../types';
 
 const LANGUAGES = ['python', 'c', 'cpp', 'java', 'javascript', 'other'];
 type FileForm = { filename: string; language: string; code_content: string };
@@ -17,19 +17,33 @@ const FILE_EXT: Record<string, string> = {
 export default function FileManager() {
   const revisionRef = useRef(0);
   const changeForm = (next: FileForm) => { revisionRef.current += 1; setForm(next); };
-  const [files, setFiles] = useState<CodeFile[]>([]);
-  const [selected, setSelected] = useState<CodeFile | null>(null);
+  const [files, setFiles] = useState<CodeFileSummary[]>([]);
+  const [selected, setSelected] = useState<CodeFileSummary | null>(null);
+  const [nextPage, setNextPage] = useState<number | null>(null);
+  const [loadingList, setLoadingList] = useState(false);
+  const [loadingFile, setLoadingFile] = useState(false);
+  const [fileLoaded, setFileLoaded] = useState(true);
+  const listRequestRef = useRef(0);
+  const selectionRequestRef = useRef(0);
   const [form, setForm] = useState<FileForm>(EMPTY_FORM);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
-  const load = async () => {
+  const load = async (page = 1) => {
+    const request = ++listRequestRef.current;
+    setLoadingList(true);
     try {
-      const r = await getFiles();
-      setFiles(r.data);
+      const { data } = await getFiles(page);
+      if (listRequestRef.current !== request) return;
+      setFiles(previous => page === 1 ? data.results : [
+        ...previous, ...data.results.filter(file => !previous.some(existing => existing.id === file.id)),
+      ]);
+      setNextPage(data.next ? page + 1 : null);
     } catch {
-      setError('Failed to load files.');
+      if (listRequestRef.current === request) setError('Failed to load files.');
+    } finally {
+      if (listRequestRef.current === request) setLoadingList(false);
     }
   };
   useEffect(() => { load(); }, []);
@@ -45,12 +59,11 @@ export default function FileManager() {
     setSaving(true);
     try {
       if (selected) {
-        const { data: saved } = await updateFile(selected.id, snapshot);
-        setFiles(prev => prev.map(f => f.id === selected.id ? saved : f));
+        await updateFile(selected.id, snapshot);
       } else {
-        const { data: newFile } = await createFile(snapshot);
-        setFiles(prev => [...prev, newFile]);
+        await createFile(snapshot);
       }
+      await load();
       if (revisionRef.current === revision) { setSelected(null); changeForm(EMPTY_FORM); }
     } catch {
       if (revisionRef.current === revision) setError('Failed to save file. Please try again.');
@@ -59,9 +72,25 @@ export default function FileManager() {
     }
   };
 
-  const handleSelect = (f: CodeFile) => {
+  const handleSelect = async (f: CodeFileSummary) => {
+    const request = ++selectionRequestRef.current;
     setSelected(f);
-    changeForm({ filename: f.filename, language: f.language, code_content: f.code_content });
+    changeForm({ filename: f.filename, language: f.language, code_content: '' });
+    const revision = revisionRef.current;
+    setLoadingFile(true);
+    setFileLoaded(false);
+    setError(null);
+    try {
+      const { data } = await getFile(f.id);
+      if (selectionRequestRef.current === request && revisionRef.current === revision) {
+        changeForm({ filename: data.filename, language: data.language, code_content: data.code_content });
+      }
+      if (selectionRequestRef.current === request) setFileLoaded(true);
+    } catch {
+      if (selectionRequestRef.current === request) setError('Failed to open file. Select it again to retry.');
+    } finally {
+      if (selectionRequestRef.current === request) setLoadingFile(false);
+    }
   };
 
   const handleDelete = async (id: number) => {
@@ -70,7 +99,7 @@ export default function FileManager() {
     setDeletingId(id);
     try {
       await deleteFile(id);
-      setFiles(prev => prev.filter(f => f.id !== id));
+      await load();
       if (selected?.id === id && revisionRef.current === revision) { setSelected(null); changeForm(EMPTY_FORM); }
     } catch {
       setError('Failed to delete file. Please try again.');
@@ -79,7 +108,13 @@ export default function FileManager() {
     }
   };
 
-  const handleNew = () => { setSelected(null); changeForm(EMPTY_FORM); };
+  const handleNew = () => {
+    selectionRequestRef.current += 1;
+    setLoadingFile(false);
+    setFileLoaded(true);
+    setSelected(null);
+    changeForm(EMPTY_FORM);
+  };
 
   const handleDownload = () => {
     if (!form.code_content) return;
@@ -119,10 +154,12 @@ export default function FileManager() {
             >{deletingId === f.id ? '…' : '×'}</button>
           </div>
         ))}
+        {nextPage && <button className="text-sm text-accent p-2 disabled:opacity-50" disabled={loadingList}
+          onClick={() => load(nextPage)}>Load more files</button>}
       </div>
 
       <div className="bg-surface border border-border rounded p-4 flex flex-col gap-2.5">
-        <h3 className="text-sm font-semibold text-primary">{selected ? 'Edit File' : 'New File'}</h3>
+        <h3 className="text-sm font-semibold text-primary">{loadingFile ? 'Opening file…' : selected ? 'Edit File' : 'New File'}</h3>
         <input
           className="w-full bg-bg border border-border rounded px-3 py-2 text-sm text-primary focus:outline-none focus:border-accent"
           placeholder="Filename (e.g. hello.py)"
@@ -144,7 +181,7 @@ export default function FileManager() {
           <button
             className="bg-accent hover:bg-accent-h text-white border-none rounded px-5 py-2 text-sm font-semibold transition-colors self-start cursor-pointer disabled:opacity-50"
             onClick={handleSave}
-            disabled={saving}
+            disabled={saving || loadingFile || (selected !== null && !fileLoaded)}
           >{saving ? 'Saving…' : '💾 Save'}</button>
           <button
             className="bg-transparent border border-border text-primary hover:bg-border rounded px-5 py-2 text-sm font-medium transition-colors self-start cursor-pointer disabled:opacity-40"

@@ -1,5 +1,5 @@
 import axios, { AxiosResponse, AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
-import type { AIErrorMetadata, QuizSubmissionResult, User, ConversionRecord, CodeFile, LearningModule, Lesson, UserProgress, Quiz, SharedSnippet, PublicProfile, AdminStats, AdminUser, AdminConversion, AdminLesson, VisualizationTimeline, VerificationResult } from '../types';
+import type { AIErrorMetadata, QuizSubmissionResult, User, ConversionRecord, CodeFile, CodeFileSummary, Page, LearningModule, Lesson, UserProgress, Quiz, SharedSnippet, PublicProfile, AdminStats, AdminUser, AdminConversion, AdminLesson, VisualizationTimeline, VerificationResult } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 let csrfToken: string | null = null;
@@ -143,8 +143,8 @@ export const getSnippet = (slug: string): Promise<AxiosResponse<SharedSnippet>> 
   client.get(`/snippets/${slug}/`);
 
 // ── Files ─────────────────────────────────────
-export const getFiles = (): Promise<AxiosResponse<CodeFile[]>> =>
-  client.get('/files');
+export const getFiles = (page = 1, pageSize = 50): Promise<AxiosResponse<Page<CodeFileSummary>>> =>
+  client.get('/files', { params: { page, page_size: pageSize } });
 
 export const createFile = (data: Omit<CodeFile, 'id' | 'created_at' | 'updated_at'>): Promise<AxiosResponse<CodeFile>> =>
   client.post('/files', data);

@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 from django.db.models import Count
 from django.utils import timezone
 from datetime import timedelta
+import json
 
 from rest_framework.permissions import BasePermission, IsAuthenticated
 from converter.throttles import AdminThrottle
@@ -14,11 +15,43 @@ from rest_framework.views import APIView
 from rest_framework import serializers, status
 
 from converter.models import ConversionHistory
+from converter.serializers import StrictTextField
 from files.models import CodeFile
 from learning.models import LearningModule, Lesson
 from codeswitch.pagination import OptionalPageNumberPagination
 
 User = get_user_model()
+
+
+class AdminModuleSerializer(serializers.ModelSerializer):
+    title = StrictTextField(max_length=200)
+    description = StrictTextField(allow_blank=True, required=False, trim_whitespace=False)
+
+    class Meta:
+        model = LearningModule
+        fields = ('title', 'description', 'language', 'difficulty')
+        extra_kwargs = {'language': {'default': 'general'}, 'difficulty': {'default': 'beginner'}}
+
+
+class AdminLessonSerializer(serializers.ModelSerializer):
+    title = StrictTextField(max_length=200)
+    content = StrictTextField(allow_blank=True, required=False, trim_whitespace=False)
+    example_code = StrictTextField(allow_blank=True, default='{}', trim_whitespace=False)
+
+    class Meta:
+        model = Lesson
+        fields = ('title', 'content', 'example_code', 'order')
+
+    def validate_example_code(self, value):
+        if not value.strip():
+            return value
+        try:
+            examples = json.loads(value)
+        except (ValueError, TypeError) as exc:
+            raise serializers.ValidationError('Examples must be a JSON object of language names and code strings.') from exc
+        if not isinstance(examples, dict) or any(not isinstance(code, str) for code in examples.values()):
+            raise serializers.ValidationError('Each language example must be a code string.')
+        return value
 
 
 class StrictBooleanField(serializers.BooleanField):
@@ -174,16 +207,9 @@ class AdminModulesView(APIView):
         return Response(list(modules))
 
     def post(self, request):
-        title = request.data.get('title', '').strip()
-        if not title:
-            return Response({'error': 'Title is required.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        module = LearningModule.objects.create(
-            title=title,
-            description=request.data.get('description', ''),
-            language=request.data.get('language', 'general'),
-            difficulty=request.data.get('difficulty', 'beginner'),
-        )
+        serializer = AdminModuleSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        module = serializer.save()
         return Response({'id': module.id, 'title': module.title}, status=status.HTTP_201_CREATED)
 
 
@@ -203,11 +229,9 @@ class AdminModuleDetailView(APIView):
         if not module:
             return Response({'error': 'Module not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        module.title       = request.data.get('title', module.title)
-        module.description = request.data.get('description', module.description)
-        module.language    = request.data.get('language', module.language)
-        module.difficulty  = request.data.get('difficulty', module.difficulty)
-        module.save()
+        serializer = AdminModuleSerializer(module, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        module = serializer.save()
         return Response({'id': module.id, 'title': module.title})
 
     def delete(self, request, pk):
@@ -255,17 +279,11 @@ class AdminModuleLessonsView(APIView):
         if not module:
             return Response({'error': 'Module not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        title = request.data.get('title', '').strip()
-        if not title:
-            return Response({'error': 'Title is required.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        lesson = Lesson.objects.create(
-            module=module,
-            title=title,
-            content=request.data.get('content', ''),
-            example_code=request.data.get('example_code', '{}'),
-            order=request.data.get('order', module.lessons.count() + 1),
-        )
+        serializer = AdminLessonSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        if 'order' not in serializer.validated_data:
+            serializer.validated_data['order'] = module.lessons.count() + 1
+        lesson = serializer.save(module=module)
         return Response({'id': lesson.id, 'title': lesson.title}, status=status.HTTP_201_CREATED)
 
 
@@ -297,11 +315,9 @@ class AdminLessonDetailView(APIView):
         if not lesson:
             return Response({'error': 'Lesson not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        lesson.title        = request.data.get('title', lesson.title)
-        lesson.content      = request.data.get('content', lesson.content)
-        lesson.example_code = request.data.get('example_code', lesson.example_code)
-        lesson.order        = request.data.get('order', lesson.order)
-        lesson.save()
+        serializer = AdminLessonSerializer(lesson, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        lesson = serializer.save()
         return Response({'id': lesson.id, 'title': lesson.title})
 
     def delete(self, request, pk):

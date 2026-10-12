@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework import serializers
 from .models import CodeFile
 from converter.throttles import FileWriteThrottle, TrackedUserThrottle
-from codeswitch.pagination import OptionalPageNumberPagination
+from codeswitch.pagination import DefaultPageNumberPagination
 
 
 class CodeFileSerializer(serializers.ModelSerializer):
@@ -16,18 +16,27 @@ class CodeFileSerializer(serializers.ModelSerializer):
         read_only_fields = ('id', 'created_at', 'updated_at')
 
 
+class CodeFileSummarySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CodeFile
+        fields = ('id', 'filename', 'language', 'created_at', 'updated_at')
+
+
 class FileListCreateView(generics.ListCreateAPIView):
     """
-    GET  /api/files — List all files for the current user.
+    GET  /api/files — Paginated file metadata for the current user.
     POST /api/files — Create a new file.
     """
     serializer_class = CodeFileSerializer
     permission_classes = [IsAuthenticated]
     throttle_classes = [TrackedUserThrottle, FileWriteThrottle]
-    pagination_class = OptionalPageNumberPagination
+    pagination_class = DefaultPageNumberPagination
+
+    def get_serializer_class(self):
+        return CodeFileSummarySerializer if self.request.method == 'GET' else CodeFileSerializer
 
     def get_queryset(self):
-        return CodeFile.objects.filter(user=self.request.user)
+        return CodeFile.objects.filter(user=self.request.user).defer('code_content')
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)

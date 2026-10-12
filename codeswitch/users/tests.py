@@ -25,6 +25,17 @@ REGISTER_DATA = {**VALID_USER, 'password2': 'Test1234!'}
 
 @override_settings(AXES_ENABLED=False)
 class SessionRecoveryTests(TestCase):
+    @override_settings(DEBUG=False, SECURE_SSL_REDIRECT=False)
+    def test_production_logout_and_invalid_refresh_clear_cross_site_cookies(self):
+        for endpoint in ('/api/logout', '/api/token/refresh/'):
+            with self.subTest(endpoint=endpoint):
+                self.client.cookies['refresh_token'] = 'invalid-token'
+                response = self.client.post(endpoint)
+                for name in ('access_token', 'refresh_token'):
+                    self.assertEqual(response.cookies[name]['max-age'], 0)
+                    self.assertEqual(response.cookies[name]['samesite'], 'None')
+                    self.assertTrue(response.cookies[name]['secure'])
+
     def setUp(self):
         cache.clear()
         self.addCleanup(cache.clear)
@@ -171,6 +182,24 @@ class LoginTests(TestCase):
 
 @override_settings(AXES_ENABLED=False, GOOGLE_OAUTH_CLIENT_ID='google-client-id.apps.googleusercontent.com')
 class GoogleAuthTests(TestCase):
+    @patch('users.views.request_json', return_value={'key-id': 'certificate'})
+    def test_google_certificate_transport_has_a_bounded_budget(self, request):
+        import time
+        from users.views import _google_cert_request
+        started = time.monotonic()
+        response = _google_cert_request('https://example.com/certs')
+        self.assertEqual(response.status, 200)
+        self.assertEqual(response.data, b'{"key-id": "certificate"}')
+        self.assertAlmostEqual(request.call_args.args[2] - started, 8, delta=.1)
+        self.assertEqual(request.call_args.kwargs['timeout'], (3, 5))
+
+    @patch('users.views.id_token.verify_oauth2_token')
+    def test_certificate_fetch_failures_are_temporary_errors(self, verify):
+        from google.auth.exceptions import TransportError
+        verify.side_effect = TransportError('certificate service unavailable')
+        response = self.client.post('/api/auth/google', {'credential': 'test'}, format='json')
+        self.assertEqual(response.status_code, 503)
+
 
     def setUp(self):
         cache.clear()

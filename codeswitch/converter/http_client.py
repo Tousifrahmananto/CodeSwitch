@@ -1,49 +1,66 @@
 import json
-import gzip
-import zlib
+import subprocess
+import sys
 import time
+from urllib.parse import urlsplit
+from opentelemetry import trace
 
 import requests
-from urllib3.exceptions import ReadTimeoutError, HTTPError as TransportError
 
 
 def request_json(method, url, deadline, **kwargs):
-    kwargs['headers'] = {**kwargs.get('headers', {}), 'Accept-Encoding': 'identity'}
-    response = getattr(requests, method)(url, stream=True, **kwargs)
-    try:
-        response.raise_for_status()
+    with trace.get_tracer(__name__).start_as_current_span(
+        'http.request', kind=trace.SpanKind.CLIENT,
+        attributes={'http.request.method': method.upper(), 'server.address': urlsplit(url).hostname or ''},
+    ) as span:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             raise requests.Timeout()
-        # ponytail: urllib3 exposes no public transport timeout setter; update with transport changes.
-        transport = response.raw._fp.fp.raw._sock
-        read_timeout = kwargs['timeout'][1]
-        transport.settimeout(min(read_timeout, remaining))
-        body = bytearray()
+        # A process can be stopped during DNS, slow headers, and decompression as well as body reads.
         try:
-            for chunk in response.raw.stream(amt=1, decode_content=False):
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    raise requests.Timeout()
-                body.extend(chunk)
-                transport.settimeout(min(read_timeout, remaining))
-        except ReadTimeoutError as exc:
+            result = subprocess.run(
+                [sys.executable, __file__],
+                input=json.dumps({'method': method, 'url': url, 'kwargs': kwargs}),
+                capture_output=True, text=True, encoding='utf-8', timeout=remaining,
+            )
+        except subprocess.TimeoutExpired as exc:
             raise requests.Timeout() from exc
-        except TransportError as exc:
-            raise requests.RequestException() from exc
-        except requests.ConnectionError as exc:
-            if exc.args and isinstance(exc.args[0], ReadTimeoutError):
-                raise requests.Timeout() from exc
-            raise
-        encoding = response.headers.get('Content-Encoding', '').lower()
-        if encoding == 'gzip':
-            body = gzip.decompress(body)
-        elif encoding == 'deflate':
-            body = zlib.decompress(body)
-        elif encoding not in ('', 'identity'):
-            raise ValueError('Unsupported response encoding.')
-        if time.monotonic() >= deadline:
+        if result.returncode:
+            raise requests.RequestException('HTTP transport failed.')
+        response = json.loads(result.stdout)
+        if 'status' in response:
+            span.set_attribute('http.response.status_code', response['status'])
+        if response.get('error') == 'timeout':
             raise requests.Timeout()
-        return json.loads(body)
-    finally:
-        response.close()
+        if response.get('error') == 'http':
+            failed = requests.Response()
+            failed.status_code = response['status']
+            raise requests.HTTPError(response=failed)
+        if response.get('error') == 'invalid':
+            raise ValueError('Invalid JSON response.')
+        if response.get('error'):
+            raise requests.RequestException('HTTP transport failed.')
+        return response['data']
+
+
+def _request_in_child(request):
+    kwargs = request['kwargs']
+    if isinstance(kwargs.get('timeout'), list):
+        kwargs['timeout'] = tuple(kwargs['timeout'])
+    kwargs['headers'] = {**kwargs.get('headers', {}), 'Accept-Encoding': 'identity'}
+    try:
+        with requests.request(request['method'], request['url'], stream=True, **kwargs) as response:
+            response.raise_for_status()
+            return {'data': response.json(), 'status': response.status_code}
+    except requests.Timeout:
+        return {'error': 'timeout'}
+    except requests.HTTPError as exc:
+        return {'error': 'http', 'status': exc.response.status_code}
+    except ValueError:
+        return {'error': 'invalid'}
+    except requests.RequestException:
+        return {'error': 'unavailable'}
+
+
+if __name__ == '__main__':
+    json.dump(_request_in_child(json.load(sys.stdin)), sys.stdout)

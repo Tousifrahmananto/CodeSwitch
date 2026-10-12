@@ -4,7 +4,7 @@ import { getProfile, getConversionHistory, getProgress, getFiles, getModules, ge
 import { resolveMediaUrl } from '../api/media';
 import { SankeyChart, SankeyLink, SankeyNode, SankeyTooltip, type SankeyData } from '../components/charts/sankey';
 import { getLanguageMeta } from '../constants/languages';
-import type { CodeFile, ConversionRecord, LearningModule, User, UserProgress } from '../types';
+import type { ConversionRecord, LearningModule, User, UserProgress } from '../types';
 
 function LangChip({ lang }: { lang: string }) {
   const meta = getLanguageMeta(lang);
@@ -219,7 +219,7 @@ export default function Dashboard() {
   const [profile, setProfile] = useState<User | null>(null);
   const [history, setHistory] = useState<ConversionRecord[]>([]);
   const [progress, setProgress] = useState<UserProgress[]>([]);
-  const [files, setFiles] = useState<CodeFile[]>([]);
+  const [fileCount, setFileCount] = useState(0);
   const [modules, setModules] = useState<LearningModule[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -232,7 +232,7 @@ export default function Dashboard() {
       getProfile(),
       getConversionHistory(),
       getProgress(),
-      getFiles(),
+      getFiles(1, 1),
       getModules(),
     ]).then(([profileRes, historyRes, progressRes, filesRes, modulesRes]) => {
       if (cancelled) return;
@@ -240,13 +240,13 @@ export default function Dashboard() {
         profile: profileRes.data,
         history: historyRes.data,
         progress: progressRes.data,
-        files: filesRes.data,
+        fileCount: filesRes.data.count,
         modules: modulesRes.data,
       };
       setProfile(data.profile);
       setHistory(data.history);
       setProgress(data.progress);
-      setFiles(data.files);
+      setFileCount(data.fileCount);
       setModules(data.modules);
     }).catch(() => { if (!cancelled) setLoadError('Failed to load dashboard data.'); })
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -431,11 +431,11 @@ export default function Dashboard() {
           action={!completedLessons ? { label: 'Browse modules', onClick: () => navigate('/learning') } : undefined}
         />
         <StatCard
-          value={files.length}
+          value={fileCount}
           label="Files Saved"
           icon="▣"
-          helper={files.length ? 'Saved snippets ready to reopen.' : 'No files yet - save one from the Converter.'}
-          action={!files.length ? { label: 'Create file', onClick: () => navigate('/files') } : undefined}
+          helper={fileCount ? 'Saved snippets ready to reopen.' : 'No files yet - save one from the Converter.'}
+          action={!fileCount ? { label: 'Create file', onClick: () => navigate('/files') } : undefined}
         />
         <StatCard
           value={`${progressPct}%`}

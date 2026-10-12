@@ -261,8 +261,13 @@ The Django admin is at **http://localhost:8000/admin**
 
 | Method | Endpoint | Description | Auth |
 |---|---|---|---|
-| `GET/POST` | `/api/files/` | List / create files | Yes |
+| `GET/POST` | `/api/files/` | List paginated metadata / create files | Yes |
 | `GET/PUT/DELETE` | `/api/files/<id>/` | Retrieve, update, or delete a file | Yes |
+
+File lists return `{count, next, previous, results}` with 50 items by default
+(`page` and `page_size`, maximum 100). List items omit `code_content`; retrieve
+one file to load its source. Deploy the frontend and backend together when
+adopting this response format.
 
 ### Learning
 
@@ -405,6 +410,12 @@ hosting provider's name. Local development uses `0`.
 
 Recognized transient database failures return HTTP 503 with `Retry-After: 2`.
 The backend does not replay requests or writes automatically.
+
+External JSON requests use short-lived Python processes so the overall deadline
+also covers DNS lookup, response headers, and body decoding. AI attempts share a
+20-second budget; Google certificate fetches have an eight-second budget.
+Dependency timing metrics remain enabled. Outbound trace spans record the method,
+host, and status without URLs or credential headers.
 
 New avatar uploads are stored in PostgreSQL. A media volume is needed only
 if you retain older filesystem-backed avatars.

@@ -5,7 +5,22 @@ import tempfile
 from pathlib import Path
 from unittest import TestCase, skipUnless
 
-from converter.services import python_to_c, java_to_c, c_to_python, c_to_java
+from converter.services import python_to_c, java_to_c, c_to_python, c_to_java, python_to_java
+
+
+class JavaPrintSafetyTests(TestCase):
+    def test_formatted_numbers_are_concatenated_as_text(self):
+        generated = python_to_java('x = 2\ny = 3\nprint(f"{x}{y}")')
+        self.assertIn('String.valueOf(x) + String.valueOf(y)', generated)
+
+    def test_java_literals_are_decoded_and_escaped(self):
+        generated = python_to_java(r'''print('say "hi" \\ 猫')''')
+        self.assertIn(r'''System.out.println("say \"hi\" \\ 猫");''', generated)
+
+    def test_unsupported_formatted_expressions_fail_clearly(self):
+        for source in ('print(f"{x + 1}")', 'print(f"{x:.2f}")', 'print(f"{x!r}")'):
+            with self.subTest(source=source), self.assertRaises(ValueError):
+                python_to_java(source)
 
 
 class CStringSafetyTests(TestCase):

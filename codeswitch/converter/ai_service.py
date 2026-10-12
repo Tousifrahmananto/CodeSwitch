@@ -131,7 +131,7 @@ def _call_gemini(api_key, model, user_prompt, timeout, system_prompt, temperatur
     """Call the Google Gemini generateContent REST API."""
     url = (
         f'https://generativelanguage.googleapis.com/v1beta/models/'
-        f'{model}:generateContent?key={api_key}'
+        f'{model}:generateContent'
     )
     payload = {
         'system_instruction': {'parts': [{'text': system_prompt}]},
@@ -139,7 +139,8 @@ def _call_gemini(api_key, model, user_prompt, timeout, system_prompt, temperatur
         'generationConfig': {'temperature': temperature, 'maxOutputTokens': max_tokens},
     }
     with dependency_timer('ai_gemini'):
-        data = request_json('post', url, deadline, json=payload, timeout=timeout)
+        data = request_json('post', url, deadline, json=payload,
+                            headers={'x-goog-api-key': api_key}, timeout=timeout)
     return _response_text(data, 'gemini')
 
 

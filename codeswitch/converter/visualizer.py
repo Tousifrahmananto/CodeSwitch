@@ -896,7 +896,11 @@ def build_visualization(language, code):
                 'steps': traced_steps[:80],
             }
 
+    truncated = False
     for index, line in enumerate(lines, start=1):
+        if len(steps) >= 80:
+            truncated = True
+            break
         kind = _statement_kind(line, language)
         if not kind:
             continue
@@ -965,7 +969,8 @@ def build_visualization(language, code):
     return {
         'language': language,
         'mode': 'concept_trace',
-        'summary': f'Generated {len(steps)} visual steps covering {len(concepts)} concept{"s" if len(concepts) != 1 else ""}.',
+        'summary': (f'Generated {len(steps)} visual steps covering {len(concepts)} concept{"s" if len(concepts) != 1 else ""}.'
+                    + (' Trace truncated at 80 steps.' if truncated else '')),
         'concepts': concepts,
         'recommendations': recommendations[:6],
         'steps': steps[:80],

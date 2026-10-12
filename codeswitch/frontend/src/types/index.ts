@@ -30,6 +30,15 @@ export interface CodeFile {
   updated_at: string;
 }
 
+export type CodeFileSummary = Omit<CodeFile, 'code_content'>;
+
+export interface Page<T> {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+}
+
 export interface LearningModule {
   id: number;
   title: string;

@@ -8,6 +8,72 @@ from unittest.mock import patch
 
 @override_settings(AXES_ENABLED=False)
 class RequestBoundaryTests(TestCase):
+    def test_valid_admin_module_and_lesson_writes_preserve_defaults_and_content(self):
+        from learning.models import Lesson
+        get_user_model().objects.update(is_staff=True)
+        created = self.client.post('/api/admin/modules', {'title': 'New module'}, format='json')
+        self.assertEqual(created.status_code, 201)
+        module_id = created.data['id']
+        created = self.client.post(f'/api/admin/modules/{module_id}/lessons', {'title': 'First lesson'}, format='json')
+        self.assertEqual(created.status_code, 201)
+        lesson = Lesson.objects.get(pk=created.data['id'])
+        self.assertEqual(lesson.order, 1)
+        self.assertEqual(lesson.example_code, '{}')
+        content = '  indented Markdown\n'
+        updated = self.client.put(f'/api/admin/lessons/{lesson.pk}', {
+            'content': content, 'example_code': '{"python":"print(1)"}',
+        }, format='json')
+        self.assertEqual(updated.status_code, 200)
+        lesson.refresh_from_db()
+        self.assertEqual(lesson.content, content)
+        self.assertEqual(lesson.example_code, '{"python":"print(1)"}')
+
+    def test_file_lists_are_paginated_metadata_and_details_remain_private(self):
+        from files.models import CodeFile
+        user = get_user_model().objects.get(username='boundary')
+        CodeFile.objects.bulk_create([
+            CodeFile(user=user, filename=f'{i}.py', language='python', code_content='private source')
+            for i in range(51)
+        ])
+        response = self.client.get('/api/files')
+        self.assertEqual(response.data['count'], 51)
+        self.assertEqual(len(response.data['results']), 50)
+        self.assertNotIn('code_content', response.data['results'][0])
+        detail = self.client.get(f"/api/files/{response.data['results'][0]['id']}")
+        self.assertEqual(detail.data['code_content'], 'private source')
+        other = get_user_model().objects.create_user(username='other-file-user')
+        foreign = CodeFile.objects.create(user=other, filename='secret.py', code_content='secret')
+        self.assertEqual(self.client.get(f'/api/files/{foreign.pk}').status_code, 404)
+
+    def test_quiz_and_admin_inputs_are_validated_before_use(self):
+        from learning.tests import create_module_with_lesson
+        module, lesson, quiz, *_ = create_module_with_lesson()
+        get_user_model().objects.update(is_staff=True)
+        requests = [
+            ('post', f'/api/quizzes/{quiz.pk}/submit/', []),
+            ('post', '/api/admin/modules', {'title': None}),
+            ('post', '/api/admin/modules', {'title': 123}),
+            ('put', f'/api/admin/modules/{module.pk}', {'title': 'x' * 201}),
+            ('put', f'/api/admin/modules/{module.pk}', {'language': 'invalid'}),
+            ('post', f'/api/admin/modules/{module.pk}/lessons', {'title': 'Test', 'order': -1}),
+            ('put', f'/api/admin/lessons/{lesson.pk}', {'example_code': '{"python":3}'}),
+        ]
+        for method, path, data in requests:
+            with self.subTest(path=path, data=data):
+                cache.clear()
+                response = getattr(self.client, method)(path, data, format='json')
+                self.assertEqual(response.status_code, 400)
+        module.refresh_from_db()
+        lesson.refresh_from_db()
+        self.assertEqual(module.title, 'Python Basics')
+        self.assertEqual(lesson.example_code, 'x = 1')
+
+    @override_settings(DATA_UPLOAD_MAX_MEMORY_SIZE=1024)
+    def test_oversized_json_is_rejected_before_field_validation(self):
+        response = self.client.post('/api/login', {'username': 'x' * 100_000, 'password': 'x'}, format='json')
+        self.assertIn(response.status_code, (400, 413))
+        self.assertNotIn('username', getattr(response, 'data', {}))
+
     def setUp(self):
         cache.clear()
         self.addCleanup(cache.clear)

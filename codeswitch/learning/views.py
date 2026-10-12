@@ -17,6 +17,19 @@ class LessonSerializer(serializers.ModelSerializer):
         fields = ('id', 'title', 'content', 'example_code', 'order')
 
 
+class QuizSubmissionSerializer(serializers.Serializer):
+    answers = serializers.DictField(default=dict)
+
+    def validate_answers(self, value):
+        if len(value) > 100 or any(
+            not key.isdecimal() or not isinstance(answer, (int, str))
+            or isinstance(answer, bool) or not str(answer).isdecimal()
+            for key, answer in value.items()
+        ):
+            raise serializers.ValidationError('Answers must contain at most 100 question and option IDs.')
+        return value
+
+
 class ModuleSerializer(serializers.ModelSerializer):
     lesson_count = serializers.SerializerMethodField()
 
@@ -159,9 +172,9 @@ class SubmitQuizAttemptView(APIView):
         except Quiz.DoesNotExist:
             return Response({'error': 'Quiz not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        answers = request.data.get('answers', {})  # {str(question_id): str(option_id)}
-        if not isinstance(answers, dict) or len(answers) > 100:
-            return Response({'error': 'Answers must be an object with at most 100 entries.'}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = QuizSubmissionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        answers = serializer.validated_data['answers']
         questions = list(quiz.questions.all())
         if not questions:
             return Response({'error': 'Quiz has no questions.'}, status=status.HTTP_400_BAD_REQUEST)

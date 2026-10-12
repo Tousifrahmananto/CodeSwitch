@@ -1,4 +1,3 @@
-import json
 from django.test import TestCase, override_settings
 from django.core.cache import cache
 from django.contrib.auth import get_user_model
@@ -94,14 +93,11 @@ class RunCodeTests(TestCase):
         self.client = APIClient()
 
     @patch('converter.views._pick_compiler', return_value='cpython-3.12.0')
-    @patch('converter.views.http_requests.post')
+    @patch('converter.views.request_json')
     def test_run_no_auth_required(self, mock_post, mock_compiler):
-        mock_post.return_value.raise_for_status = lambda: None
-        mock_post.return_value.json.return_value = {
+        mock_post.return_value = {
             'status': '0', 'program_output': '1\n', 'compiler_output': '', 'program_error': ''
         }
-        mock_post.return_value.headers = {}
-        mock_post.return_value.raw.stream.side_effect = lambda **kwargs: iter([json.dumps(mock_post.return_value.json.return_value).encode()])
         response = self.client.post('/api/run/',
             {'language': 'python', 'code': 'print(1)'},
             format='json')
@@ -205,17 +201,11 @@ class VerifyConversionTests(TestCase):
         self.assertEqual(response.status_code, 400)
 
     @patch('converter.views._pick_compiler', return_value='test-compiler')
-    @patch('converter.views.http_requests.post')
+    @patch('converter.views.request_json')
     def test_verify_compares_suffixes_beyond_display_limit(self, mock_post, mock_compiler):
-        from unittest.mock import Mock
-        mock_post.side_effect = [Mock(**{'json.return_value': {
-            'status': '0', 'program_output': 'a' * 100_000 + suffix,
-        }}) for suffix in ('b', 'c')]
-        responses = list(mock_post.side_effect)
-        for response_mock in responses:
-            response_mock.headers = {}
-            response_mock.raw.stream.side_effect = lambda response_mock=response_mock, **kwargs: iter([json.dumps(response_mock.json.return_value).encode()])
-        mock_post.side_effect = responses
+        mock_post.side_effect = [
+            {'status': '0', 'program_output': 'a' * 100_000 + suffix} for suffix in ('b', 'c')
+        ]
         response = self.client.post('/api/verify', self.payload, format='json')
         self.assertFalse(response.data['verified'])
         self.assertFalse(response.data['comparison']['stdout_match'])
@@ -226,6 +216,16 @@ class VerifyConversionTests(TestCase):
 
 @override_settings(AXES_ENABLED=False, PYTHON_EXECUTION_TRACING_ENABLED=True)
 class VisualizeCodeTests(TestCase):
+    @override_settings(PYTHON_EXECUTION_TRACING_ENABLED=False)
+    def test_concept_trace_stops_building_snapshots_at_the_step_limit(self):
+        from converter import visualizer
+        source = '\n'.join(f'x{i} = 1' for i in range(1000))
+        with patch.object(visualizer, '_statement_kind', wraps=visualizer._statement_kind) as classify:
+            result = visualizer.build_visualization('python', source)
+        self.assertEqual(len(result['steps']), 80)
+        self.assertEqual(classify.call_count, 80)
+        self.assertIn('truncated', result['summary'].lower())
+
 
     def setUp(self):
         cache.clear()

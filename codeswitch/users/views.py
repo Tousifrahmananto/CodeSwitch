@@ -6,6 +6,9 @@ from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework.exceptions import AuthenticationFailed, ValidationError
 import time
+import json
+from types import SimpleNamespace
+import requests
 from rest_framework_simplejwt.exceptions import TokenError
 from django.contrib.auth import get_user_model
 from django.conf import settings
@@ -20,10 +23,21 @@ from converter.throttles import (
     PublicProfileThrottle, RegisterThrottle, TokenRefreshThrottle,
     TrackedUserThrottle,
 )
-from google.auth.transport import requests as google_requests
+from google.auth.exceptions import TransportError
 from google.oauth2 import id_token
+from converter.http_client import request_json
 
 User = get_user_model()
+
+
+def _google_cert_request(url, method='GET', **kwargs):
+    data = request_json(method.lower(), url, time.monotonic() + 8, timeout=(3, 5), **kwargs)
+    return SimpleNamespace(status=200, data=json.dumps(data).encode('utf-8'))
+
+
+def _clear_auth_cookies(response):
+    for name in ('access_token', 'refresh_token'):
+        response.delete_cookie(name, samesite='Lax' if settings.DEBUG else 'None')
 
 
 def _set_auth_cookies(response, refresh, access=None):
@@ -130,11 +144,14 @@ class GoogleAuthView(APIView):
         try:
             payload = id_token.verify_oauth2_token(
                 credential,
-                google_requests.Request(),
+                _google_cert_request,
                 client_id,
             )
         except ValueError:
             return Response({'error': 'Invalid Google credential.'}, status=status.HTTP_401_UNAUTHORIZED)
+        except (TransportError, requests.RequestException):
+            return Response({'error': 'Google sign-in is temporarily unavailable.'},
+                            status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         google_sub = payload.get('sub')
         email = (payload.get('email') or '').strip().lower()
@@ -210,8 +227,7 @@ class GoogleAuthView(APIView):
 
         if not user.is_active:
             response = Response({'error': 'This account is disabled.'}, status=status.HTTP_401_UNAUTHORIZED)
-            response.delete_cookie('access_token')
-            response.delete_cookie('refresh_token')
+            _clear_auth_cookies(response)
             return response
 
         refresh = RefreshToken.for_user(user)
@@ -234,8 +250,7 @@ class LogoutView(APIView):
                 pass  # Already expired / blacklisted — still clear cookies
 
         response = Response({'message': 'Logged out successfully.'})
-        response.delete_cookie('access_token')
-        response.delete_cookie('refresh_token')
+        _clear_auth_cookies(response)
         return response
 
 
@@ -261,8 +276,7 @@ class CookieTokenRefreshView(APIView):
             return response
         except (TokenError, AuthenticationFailed, ValidationError, User.DoesNotExist):
             response = Response({'error': 'Invalid or expired refresh token.'}, status=status.HTTP_401_UNAUTHORIZED)
-            response.delete_cookie('access_token')
-            response.delete_cookie('refresh_token')
+            _clear_auth_cookies(response)
             return response
 
 

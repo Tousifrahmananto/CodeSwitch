@@ -2,17 +2,16 @@ from unittest import TestCase
 from unittest.mock import Mock, patch
 
 from converter import ai_service
-import json
-
-
-def http_response(data):
-    response = Mock(headers={})
-    response.raw.stream.side_effect = lambda **kwargs: iter([json.dumps(data).encode()])
-    return response
-
 
 
 class AIResponseValidationTests(TestCase):
+    def test_gemini_key_is_a_header_and_never_part_of_the_url(self):
+        data = {'candidates': [{'finishReason': 'STOP', 'content': {'parts': [{'text': 'result'}]}}]}
+        with patch.object(ai_service, 'request_json', return_value=data) as request:
+            ai_service._call_gemini('private-key', 'model', 'prompt', (3, 10), 'system', 0.1, 100, 20)
+        self.assertNotIn('private-key', request.call_args.args[1])
+        self.assertEqual(request.call_args.kwargs['headers']['x-goog-api-key'], 'private-key')
+
     def test_empty_or_incomplete_responses_fail_for_both_helpers_and_providers(self):
         for provider in ('groq', 'gemini'):
             for text, finished in [(' ', True), ('```\n```', True), ('partial code', False)]:
@@ -20,10 +19,9 @@ class AIResponseValidationTests(TestCase):
                                          'content': {'parts': [{'text': text}]}}]} if provider == 'gemini'
                         else {'choices': [{'finish_reason': 'stop' if finished else 'length',
                                            'message': {'content': text}}]})
-                response = http_response(data)
                 with patch.object(ai_service, '_get', side_effect=lambda key, default='': provider if key == 'AI_PROVIDER' else default), \
                      patch.object(ai_service, '_get_api_keys', return_value=['test-key']), \
-                     patch.object(ai_service.requests, 'post', return_value=response):
+                     patch.object(ai_service, 'request_json', return_value=data):
                     for helper, args in [(ai_service.ai_convert_code, ('python', 'c', 'print(1)')),
                                          (ai_service.ai_explain_code, ('python', 'c', 'print(1)', 'puts("1");'))]:
                         with self.subTest(provider=provider, text=text, finished=finished, helper=helper.__name__):
@@ -36,7 +34,7 @@ class AIResponseValidationTests(TestCase):
         ]:
             with patch.object(ai_service, '_get', side_effect=lambda key, default='': provider if key == 'AI_PROVIDER' else default), \
                  patch.object(ai_service, '_get_api_keys', return_value=['test-key']), \
-                 patch.object(ai_service.requests, 'post', return_value=http_response(data)):
+                 patch.object(ai_service, 'request_json', return_value=data):
                 self.assertEqual(ai_service.ai_convert_code('python', 'c', 'print(1)')['output'], 'result')
                 self.assertEqual(ai_service.ai_explain_code('python', 'c', 'print(1)', 'puts("1");')['explanation'], 'result')
 
@@ -45,10 +43,10 @@ class AIBudgetTests(TestCase):
     def test_only_authentication_and_quota_responses_rotate_keys(self):
         import requests
         for status in (401, 403, 429, 500):
-            response = http_response({'choices': [{'finish_reason': 'stop', 'message': {'content': 'result'}}]})
+            response = {'choices': [{'finish_reason': 'stop', 'message': {'content': 'result'}}]}
             with patch.object(ai_service, '_get_api_keys', return_value=['one', 'two']), \
                  patch.object(ai_service, '_get', side_effect=lambda key, default='': 'groq' if key == 'AI_PROVIDER' else default), \
-                 patch.object(ai_service.requests, 'post', side_effect=[requests.HTTPError(response=Mock(status_code=status)), response]) as post:
+                 patch.object(ai_service, 'request_json', side_effect=[requests.HTTPError(response=Mock(status_code=status)), response]) as post:
                 result = ai_service.ai_convert_code('python', 'c', 'print(1)')
                 self.assertEqual(result['success'], status != 500)
                 self.assertEqual(post.call_count, 1 if status == 500 else 2)
@@ -57,12 +55,12 @@ class AIBudgetTests(TestCase):
         for helper, args in [(ai_service.ai_convert_code, ('python', 'c', 'print(1)')),
                              (ai_service.ai_explain_code, ('python', 'c', 'print(1)', 'result'))]:
             with patch.object(ai_service, '_get_api_keys', return_value=['one', 'two', 'three']), \
-                 patch.object(ai_service.requests, 'post', side_effect=ai_service.requests.Timeout), \
+                 patch.object(ai_service, 'request_json', side_effect=ai_service.requests.Timeout), \
                  patch.object(ai_service, '_get', side_effect=lambda key, default='': default) as config:
                 result = helper(*args)
                 self.assertFalse(result['success'])
-                self.assertEqual(ai_service.requests.post.call_count, 1)
-                connect, read = ai_service.requests.post.call_args.kwargs['timeout']
+                self.assertEqual(ai_service.request_json.call_count, 1)
+                connect, read = ai_service.request_json.call_args.kwargs['timeout']
                 self.assertLessEqual(connect, 3)
                 self.assertLessEqual(read, 10)
 
@@ -77,7 +75,7 @@ class AIBudgetTests(TestCase):
                 elapsed[0] += sum(kwargs['timeout'])
                 raise requests.HTTPError(response=Mock(status_code=429))
             with patch.object(ai_service, '_get_api_keys', return_value=['one', 'two', 'three']), \
-                 patch.object(ai_service.requests, 'post', side_effect=quota_response), \
+                 patch.object(ai_service, 'request_json', side_effect=quota_response), \
                  patch.object(ai_service, '_get', side_effect=lambda key, default='': default), \
                  patch('time.monotonic', side_effect=lambda: elapsed[0]):
                 self.assertFalse(helper(*args)['success'])
@@ -103,10 +101,10 @@ class GroqModelMigrationTests(TestCase):
         }.get(key, default)
 
     @patch.object(ai_service, '_get')
-    @patch.object(ai_service.requests, 'post')
+    @patch.object(ai_service, 'request_json')
     def test_both_helpers_use_replacement_for_retired_model(self, requests, config):
         config.side_effect = self.config
-        requests.return_value = http_response({'choices': [{'finish_reason': 'stop', 'message': {'content': 'result'}}]})
+        requests.return_value = {'choices': [{'finish_reason': 'stop', 'message': {'content': 'result'}}]}
 
         conversion = ai_service.ai_convert_code('python', 'c', 'print(1)')
         explanation = ai_service.ai_explain_code('python', 'c', 'print(1)', 'puts("1");')

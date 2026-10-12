@@ -251,27 +251,33 @@ def _py_print_to_printf(s, type_map=None):
 
 def _py_print_to_println(s):
     """Convert Python print(...) to Java System.out.println(...)."""
-    # f-string: print(f"...")
-    m = re.match(r'print\(f(["\'])(.*)\1\)', s)
-    if m:
-        content = m.group(2)
-        parts = re.split(r'\{(\w+)\}', content)
+    if not re.match(r'print\s*\(', s):
+        return None
+    try:
+        call = ast.parse(s, mode='eval').body
+    except SyntaxError as exc:
+        raise ValueError('Unsupported Python print syntax.') from exc
+    if not isinstance(call, ast.Call) or len(call.args) > 1 or call.keywords:
+        raise ValueError('Unsupported Python print arguments.')
+    if not call.args:
+        return 'System.out.println("");'
+    value = call.args[0]
+    if isinstance(value, ast.JoinedStr):
         tokens = []
-        for i, p in enumerate(parts):
-            if not p:
-                continue
-            if i % 2 == 0:
-                tokens.append(f'"{p}"')
+        for part in value.values:
+            if isinstance(part, ast.Constant) and isinstance(part.value, str):
+                tokens.append(json.dumps(part.value, ensure_ascii=False))
+            elif (isinstance(part, ast.FormattedValue) and isinstance(part.value, ast.Name)
+                  and part.conversion == -1 and part.format_spec is None):
+                tokens.append(f'String.valueOf({part.value.id})')
             else:
-                tokens.append(p)
+                raise ValueError('Unsupported Python formatted print expression.')
         if tokens:
             return f'System.out.println({" + ".join(tokens)});'
         return f'System.out.println("");'
 
-    # String literal
-    m = re.match(r'print\((["\'])(.*)\1\)', s)
-    if m:
-        return f'System.out.println("{m.group(2)}");'
+    if isinstance(value, ast.Constant) and isinstance(value.value, str):
+        return f'System.out.println({json.dumps(value.value, ensure_ascii=False)});'
 
     # Variable/expression
     m = re.match(r'print\((.+)\)', s)
