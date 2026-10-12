@@ -204,6 +204,11 @@ hosting provider's name. Local development uses `0`.
 Recognized transient database failures return HTTP 503 with `Retry-After: 2`.
 The backend does not replay requests or writes automatically.
 
+Deployment uses `migrate_for_deploy`. If the connection drops after migrations
+finish, it reconnects and retries the idempotent permission/content-type checks
+at most twice. It stops if migrations remain unapplied or the error is unrelated
+to a dropped connection.
+
 External JSON requests use short-lived Python processes so the overall deadline
 also covers DNS lookup, response headers, and body decoding. AI attempts share a
 20-second budget; Google certificate fetches have an eight-second budget.
